@@ -6001,7 +6001,7 @@ async function refineKeywordsWithGemini(
 
   const limit = DISCOVERY_PROFILES[mode].keywordLimit;
   
-  const prompt = `You are an expert App Store Optimization (ASO) specialist.
+  const prompt = `You are a strict App Store Optimization (ASO) keyword expert.
 I am optimizing an app with the following metadata:
 Title: "${context.title}"
 Description: "${context.description ? context.description.slice(0, 800) : 'N/A'}"
@@ -6010,10 +6010,12 @@ Category: "${context.category || 'N/A'}"
 I have scraped the following potential keywords from competitors:
 ${rawKeywords.join(', ')}
 
-Your task:
-1. Filter out all irrelevant, spammy, or overly generic "trash" keywords.
-2. Keep only the highest quality, most relevant keywords that an ASO expert would actually target for this specific app.
-3. Return EXACTLY a JSON array of up to ${limit} strings representing the best keywords. Do not include any markdown formatting, just the raw JSON array.`;
+Your task is to refine this list based on strict ASO principles:
+1. Return ONLY real, human-searchable App Store / Google Play keywords with clear search intent.
+2. DO NOT return random app-description fragments, broken phrases, or stemmed/partial tokens (e.g., "featur", "manag").
+3. Output ONLY clean 1-4 word ASO keywords.
+4. NEVER output filler/helper-word combinations or "brand + random word" phrases.
+5. Return EXACTLY a JSON array of up to ${limit} strings. NEVER use markdown formatting.`;
 
   try {
     const response = await genai.models.generateContent({
@@ -6032,7 +6034,27 @@ Your task:
     if (text) {
       const parsed = JSON.parse(text);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.filter(k => typeof k === 'string');
+        const isValidASOKeyword = (k: any): k is string => {
+          if (typeof k !== 'string') return false;
+          const trimmed = k.trim().toLowerCase();
+          if (trimmed.length < 2 || trimmed.length > 40) return false;
+          
+          const words = trimmed.split(/\s+/);
+          if (words.length > 4) return false;
+          
+          const badStems = ['featur', 'manag', 'improv', 'updat', 'experienc', 'perform'];
+          if (words.some(w => badStems.includes(w))) return false;
+          
+          const fillers = new Set(['and', 'the', 'for', 'with', 'to', 'in', 'of', 'a', 'an', 'is', 'by', 'on']);
+          if (words.every(w => fillers.has(w))) return false;
+          
+          return true;
+        };
+        
+        const validKeywords = parsed.filter(isValidASOKeyword);
+        if (validKeywords.length > 0) {
+          return validKeywords;
+        }
       }
     }
   } catch (err) {
