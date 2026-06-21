@@ -6158,20 +6158,43 @@ async function discoverRankedKeywords(input: {
       keyword,
       signalContext,
     );
+    const baseline = scoreKeywordMetrics(features);
+    
+    let displayQuality = 0;
+    displayQuality += features.exactTitleMatch * 50;
+    displayQuality += features.exactTitleSegment * 30;
+    displayQuality += features.orderedTitleCoverage * 20;
+    displayQuality += features.titleCoverage * 10;
+    displayQuality += features.categorySemanticCoverage * 20;
+    displayQuality += features.semanticCoverage * 15;
+    displayQuality += features.categoryCoverage * 10;
+    displayQuality += features.genericCoverage * 10;
+    displayQuality -= features.weakModifierCoverage * 30;
+    if (features.mostlyGeneric) displayQuality -= 15;
+    displayQuality = Math.max(0, Math.min(100, displayQuality));
+
     return {
       id: index,
       keyword,
       features,
-      baseline: scoreKeywordMetrics(features),
+      baseline,
+      displayQuality,
     };
   });
 
   const rankedCandidates = metricCandidates
-    .map((candidate) => candidate.baseline)
+    .filter((candidate) => {
+      const hasStrongSignal = candidate.features.exactTitleMatch > 0 ||
+        candidate.features.exactTitleSegment > 0 ||
+        candidate.features.orderedTitleCoverage >= 0.75 ||
+        candidate.features.semanticCoverage >= 0.5 ||
+        candidate.features.categorySemanticCoverage >= 0.5;
+      return hasStrongSignal || candidate.displayQuality >= 35;
+    })
     .sort((a, b) => {
-      if (b.relevance !== a.relevance) return b.relevance - a.relevance;
-      if (a.difficulty !== b.difficulty) return a.difficulty - b.difficulty;
-      if (b.demand !== a.demand) return b.demand - a.demand;
+      if (b.baseline.relevance !== a.baseline.relevance) return b.baseline.relevance - a.baseline.relevance;
+      if (a.baseline.difficulty !== b.baseline.difficulty) return a.baseline.difficulty - b.baseline.difficulty;
+      if (b.baseline.demand !== a.baseline.demand) return b.baseline.demand - a.baseline.demand;
       return a.keyword.length - b.keyword.length;
     })
     .slice(0, profile.keywordLimit);
@@ -6187,6 +6210,7 @@ async function discoverRankedKeywords(input: {
     difficulty: number;
     relevance: number;
     confidence: 'low' | 'medium' | 'high';
+    displayQuality: number;
     featureQuality: {
       exactTitleMatch: number;
       exactTitleSegment: number;
@@ -6235,15 +6259,16 @@ async function discoverRankedKeywords(input: {
           }
 
           console.log(`[discovery] Found rank ${rank} for "${candidate.keyword}" (${input.store}/${input.country})`);
-          const features = featuresByKeyword.get(normalizeKeyword(candidate.keyword));
+          const features = candidate.features;
           return {
             keyword: candidate.keyword,
             rank,
-            demand: candidate.demand,
-            volume: candidate.volume,
-            difficulty: candidate.difficulty,
-            relevance: candidate.relevance,
-            confidence: candidate.confidence,
+            demand: candidate.baseline.demand,
+            volume: candidate.baseline.volume,
+            difficulty: candidate.baseline.difficulty,
+            relevance: candidate.baseline.relevance,
+            confidence: candidate.baseline.confidence,
+            displayQuality: candidate.displayQuality,
             featureQuality: {
               exactTitleMatch: features?.exactTitleMatch || 0,
               exactTitleSegment: features?.exactTitleSegment || 0,
@@ -6276,15 +6301,12 @@ async function discoverRankedKeywords(input: {
 
   const rankings = validRankings
     .filter((candidate) => {
-      if (candidate.relevance >= 40) return true;
-      if (candidate.rank > 3) return false;
-      return (
-        candidate.featureQuality.exactTitleMatch > 0 ||
+      const hasStrongSignal = candidate.featureQuality.exactTitleMatch > 0 ||
         candidate.featureQuality.exactTitleSegment > 0 ||
         candidate.featureQuality.orderedTitleCoverage >= 0.75 ||
         candidate.featureQuality.semanticCoverage >= 0.5 ||
-        candidate.featureQuality.categorySemanticCoverage >= 0.5
-      );
+        candidate.featureQuality.categorySemanticCoverage >= 0.5;
+      return hasStrongSignal || candidate.displayQuality >= 35;
     })
     .sort((a, b) => {
       if (a.rank !== b.rank) return a.rank - b.rank;
@@ -6304,18 +6326,15 @@ async function discoverRankedKeywords(input: {
   // Always show unranked candidates as suggestions (not just when rankings=0)
   const rankedKeywordSet = new Set(rankings.map((ranking) => normalizeKeyword(ranking.keyword)));
   const suggestions = rankedCandidates
-    .filter((candidate) =>
-      !rankedKeywordSet.has(normalizeKeyword(candidate.keyword)) &&
-      candidate.relevance >= 45,
-    )
+    .filter((candidate) => !rankedKeywordSet.has(normalizeKeyword(candidate.keyword)))
     .slice(0, profile.finalRankingLimit)
-    .map(({ keyword, demand, volume, difficulty, relevance, confidence }) => ({
+    .map(({ keyword, baseline }) => ({
       keyword,
-      demand,
-      volume,
-      difficulty,
-      relevance,
-      confidence,
+      demand: baseline.demand,
+      volume: baseline.volume,
+      difficulty: baseline.difficulty,
+      relevance: baseline.relevance,
+      confidence: baseline.confidence,
     }));
 
   const payload = {
