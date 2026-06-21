@@ -307,7 +307,7 @@ export function UpgradePage({
       if (isDowngrade) {
         return (
           <button type="button" disabled className={normalCta}>
-            Downgrade unavailable
+            Unavailable
           </button>
         );
       }
@@ -330,7 +330,7 @@ export function UpgradePage({
         {isStartingCheckout ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : null}
-        {isDowngrade ? "Downgrade unavailable" : plan.cta}
+        {isDowngrade ? "Unavailable" : plan.cta}
       </button>
     );
   };

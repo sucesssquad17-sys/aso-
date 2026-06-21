@@ -116,12 +116,16 @@ const upstreamFailureCache = new NodeCache({ useClones: false });
 const dodoWebhookEventCache = new NodeCache({ stdTTL: 60 * 60 * 24, useClones: false });
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'updates@rankanalyzerpro.com';
+const CRON_FAILURE_EMAIL_RECIPIENTS = (process.env.CRON_FAILURE_EMAIL || '')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
 const ALERT_EMAIL_APP_URL = process.env.APP_URL?.trim() || 'https://rankanalyzerpro.com';
 const PLAY_STORE_FETCH_TIMEOUT_MS = 30000;
 const UPSTREAM_REQUEST_TIMEOUT_MS = 30000;
 const UPSTREAM_FAILURE_CACHE_TTL_SECONDS = 15;
 const RANKING_FETCH_TIMEOUT_MS = 20000;
-const DISCOVERY_CACHE_VERSION = 'v15';
+const DISCOVERY_CACHE_VERSION = 'v16';
 const GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES = 60;
 const GLOBAL_TRACKING_UTC_OFFSET_MINUTES = 330;
 
@@ -3587,6 +3591,62 @@ async function sendEmailAlertEvents(
   );
 }
 
+function buildCronFailureEmailHtml(input: {
+  runKey: string;
+  trigger: 'automatic' | 'manual' | 'watchdog';
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  errorMessage: string;
+}) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
+      <h2 style="margin: 0 0 12px; font-size: 22px;">Cron job failed</h2>
+      <p style="margin: 0 0 18px; color: #334155;">The daily tracking cron job failed before completing.</p>
+      <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; padding: 18px;">
+        <p style="margin: 0 0 8px;"><strong>Run key:</strong> ${escapeAlertEmailHtml(input.runKey)}</p>
+        <p style="margin: 0 0 8px;"><strong>Trigger:</strong> ${escapeAlertEmailHtml(input.trigger)}</p>
+        <p style="margin: 0 0 8px;"><strong>Started:</strong> ${escapeAlertEmailHtml(formatAlertEmailTimestamp(input.startedAt))}</p>
+        <p style="margin: 0 0 8px;"><strong>Finished:</strong> ${escapeAlertEmailHtml(formatAlertEmailTimestamp(input.finishedAt))}</p>
+        <p style="margin: 0 0 8px;"><strong>Duration:</strong> ${escapeAlertEmailHtml(`${Math.max(0, Math.round(input.durationMs / 1000))}s`)}</p>
+        <p style="margin: 0;"><strong>Error:</strong> ${escapeAlertEmailHtml(input.errorMessage)}</p>
+      </div>
+      <a href="${escapeAlertEmailHtml(ALERT_EMAIL_APP_URL)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
+        Open Workspace
+      </a>
+    </div>
+  `;
+}
+
+async function sendCronFailureEmail(input: {
+  runKey: string;
+  trigger: 'automatic' | 'manual' | 'watchdog';
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  errorMessage: string;
+}) {
+  if (!resend) {
+    console.info('[email] Skipping cron failure email because Resend is not configured.');
+    return;
+  }
+  if (!CRON_FAILURE_EMAIL_RECIPIENTS.length) {
+    console.info('[email] Skipping cron failure email because CRON_FAILURE_EMAIL is not configured.');
+    return;
+  }
+
+  try {
+    await resend.emails.send({
+      from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+      to: CRON_FAILURE_EMAIL_RECIPIENTS,
+      subject: `Cron job failed: ${input.runKey}`,
+      html: buildCronFailureEmailHtml(input),
+    });
+  } catch (error) {
+    console.warn('[email] Failed to deliver cron failure email.', error);
+  }
+}
+
 async function evaluateAndDispatchAlertRules(
   userDocRef: DocumentReference<DocumentData>,
   previousTrackedKeywords: TrackedKeywordRecord[],
@@ -5566,20 +5626,31 @@ async function runAndPersistAllUserTrackingSchedules(
     );
     return summary;
   } catch (error) {
+    const finishedAt = new Date().toISOString();
+    const durationMs = Date.now() - startMs;
+    const errorMessage = error instanceof Error ? error.message : String(error);
     await statusRef
       .set(
         {
           runKey,
           lastStartedAt: startedAt,
-          lastFinishedAt: new Date().toISOString(),
+          lastFinishedAt: finishedAt,
           lastStatus: 'error',
           lastTrigger: options?.trigger || 'manual',
-          durationMs: Date.now() - startMs,
-          error: error instanceof Error ? error.message : String(error),
+          durationMs,
+          error: errorMessage,
         },
         { merge: true },
       )
       .catch(() => undefined);
+    await sendCronFailureEmail({
+      runKey,
+      trigger: options?.trigger || 'manual',
+      startedAt,
+      finishedAt,
+      durationMs,
+      errorMessage,
+    });
     throw error;
   }
 }
@@ -5990,16 +6061,63 @@ async function buildKeywordCandidates(
 }
 const genai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
+function isValidASOKeyword(k: unknown): k is string {
+  if (typeof k !== 'string') return false;
+  const trimmed = k.trim().toLowerCase();
+
+  if (trimmed.length < 2 || trimmed.length > 40) return false;
+
+  // Basic allowed chars: letters, numbers, spaces, hyphen, ampersand, dot
+  if (/[^a-z0-9\s\-\.&]/i.test(trimmed)) return false;
+
+  const words = trimmed.split(/\s+/);
+  if (words.length > 4) return false;
+
+  // Reject stemmed or broken tokens
+  const badStems = new Set(['articl', 'featur', 'gam', 'improv', 'introduc', 'manag', 'optim', 'perform', 'provid', 'resolv', 'stat', 'updat', 'experienc', 'enhanc', 'bugfix']);
+  if (words.some((word) => badStems.has(word))) return false;
+
+  // Reject pure trash words with no search intent
+  const pureTrashWords = new Set(['version', 'release', 'notes', 'bug', 'bugs', 'fix', 'fixes', 'fixed', 'improvement', 'improvements', 'performance', 'experience']);
+  if (words.some((word) => pureTrashWords.has(word))) return false;
+
+  const lowIntentWords = new Set(['download', 'install', 'update', 'updates', 'support', 'user', 'users', 'app', 'apps', 'free', 'premium', 'pro']);
+  const fillers = new Set(['and', 'the', 'for', 'with', 'to', 'in', 'of', 'a', 'an', 'is', 'by', 'on', 'at', 'it', 'my', 'your', 'this', 'that', 'how', 'what', 'why', 'get', 'let']);
+
+  // Reject if the ENTIRE phrase is just low-intent words and fillers (e.g., "free app for you")
+  if (words.every((word) => fillers.has(word) || lowIntentWords.has(word))) return false;
+
+  // Reject trailing fillers like "fitness for"
+  if (words.length > 1 && fillers.has(words[words.length - 1])) return false;
+
+  return true;
+}
+
+function dedupeKeywords(keywords: string[]) {
+  const seen = new Set<string>();
+  return keywords.filter((keyword) => {
+    const normalized = normalizeKeyword(keyword);
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+}
+
 async function refineKeywordsWithGemini(
   context: { title: string; description?: string; category?: string },
   rawKeywords: string[],
   mode: DiscoveryMode
-): Promise<string[]> {
-  let finalKeywords = rawKeywords;
+): Promise<{
+  keywords: string[];
+  rawCount: number;
+  geminiCount: number;
+  strictValidCount: number;
+  fallbackAddedCount: number;
+}> {
+  const limit = DISCOVERY_PROFILES[mode].keywordLimit;
+  let geminiKeywords: string[] = [];
 
   if (genai && rawKeywords.length > 0) {
-    const limit = DISCOVERY_PROFILES[mode].keywordLimit;
-    
     const prompt = `You are a strict App Store Optimization (ASO) keyword expert.
 I am optimizing an app with the following metadata:
 Title: "${context.title}"
@@ -6032,8 +6150,10 @@ Your task is to refine this list based on strict ASO principles:
       const text = response.text;
       if (text) {
         const parsed = JSON.parse(text);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          finalKeywords = parsed;
+        if (Array.isArray(parsed)) {
+          geminiKeywords = parsed.filter(
+            (keyword): keyword is string => typeof keyword === 'string',
+          );
         }
       }
     } catch (err) {
@@ -6041,41 +6161,32 @@ Your task is to refine this list based on strict ASO principles:
     }
   }
 
-  // Deterministic ASO keyword quality filter (applied to both Gemini output and fallback)
-  const isValidASOKeyword = (k: any): k is string => {
-    if (typeof k !== 'string') return false;
-    const trimmed = k.trim().toLowerCase();
-    
-    if (trimmed.length < 2 || trimmed.length > 40) return false;
-    
-    // Basic allowed chars: letters, numbers, spaces, hyphen, ampersand, dot
-    if (/[^a-z0-9\s\-\.&]/i.test(trimmed)) return false;
-    
-    const words = trimmed.split(/\s+/);
-    if (words.length > 4) return false;
-    
-    // Reject stemmed or broken tokens
-    const badStems = new Set(['featur', 'manag', 'improv', 'updat', 'experienc', 'perform', 'enhanc', 'optim', 'resolv', 'bugfix', 'introduc', 'provid']);
-    if (words.some(w => badStems.has(w))) return false;
-    
-    // Reject pure trash words with no search intent
-    const pureTrashWords = new Set(['version', 'release', 'notes', 'bug', 'bugs', 'fix', 'fixes', 'fixed', 'improvement', 'improvements', 'performance', 'experience']);
-    if (words.some(w => pureTrashWords.has(w))) return false;
-    
-    const lowIntentWords = new Set(['download', 'install', 'update', 'updates', 'support', 'user', 'users', 'app', 'apps', 'free', 'premium', 'pro']);
-    const fillers = new Set(['and', 'the', 'for', 'with', 'to', 'in', 'of', 'a', 'an', 'is', 'by', 'on', 'at', 'it', 'my', 'your', 'this', 'that', 'how', 'what', 'why', 'get', 'let']);
-    
-    // Reject if the ENTIRE phrase is just low-intent words and fillers (e.g., "free app for you")
-    if (words.every(w => fillers.has(w) || lowIntentWords.has(w))) return false;
-    
-    // Reject trailing fillers like "fitness for"
-    if (words.length > 1 && fillers.has(words[words.length - 1])) return false;
-    
-    return true;
-  };
+  const strictValid = dedupeKeywords(geminiKeywords.filter(isValidASOKeyword));
+  const strictKeywords = strictValid.slice(0, limit);
+  const seen = new Set(strictKeywords.map((keyword) => normalizeKeyword(keyword)));
+  const fallbackKeywords: string[] = [];
 
-  const validKeywords = finalKeywords.filter(isValidASOKeyword);
-  return validKeywords.length > 0 ? validKeywords : rawKeywords.filter(isValidASOKeyword);
+  for (const keyword of dedupeKeywords(rawKeywords.filter(isValidASOKeyword))) {
+    const normalized = normalizeKeyword(keyword);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    fallbackKeywords.push(keyword);
+    if (strictKeywords.length + fallbackKeywords.length >= limit) {
+      break;
+    }
+  }
+
+  console.log(
+    `[keyword-refine] raw=${rawKeywords.length} gemini=${geminiKeywords.length} strictValid=${strictValid.length} fallbackAdded=${fallbackKeywords.length}`,
+  );
+
+  return {
+    keywords: [...strictKeywords, ...fallbackKeywords],
+    rawCount: rawKeywords.length,
+    geminiCount: geminiKeywords.length,
+    strictValidCount: strictValid.length,
+    fallbackAddedCount: fallbackKeywords.length,
+  };
 }
 
 async function discoverRankedKeywords(input: {
@@ -6137,11 +6248,12 @@ async function discoverRankedKeywords(input: {
     country: input.country,
   }, input.mode, profile);
 
-  const refinedKeywords = await refineKeywordsWithGemini(
+  const refined = await refineKeywordsWithGemini(
     { title: input.title, description: input.description, category: input.category },
     rawKeywords,
     input.mode
   );
+  const refinedKeywords = refined.keywords;
 
   const seen = new Set<string>();
   const uniqueKeywords = [input.title, ...refinedKeywords].filter((keyword) => {
@@ -7533,8 +7645,7 @@ async function startServer() {
       const developer = readOptionalString(req.body?.developer, 'developer', 200);
       const storeType = readStoreType(req.body?.store);
       const country = readOptionalString(req.body?.country, 'country', 12) || 'us';
-      const deadlineAt = getUpstreamDeadline();
-      const finalKeywords = await buildKeywordCandidates({
+      const rawKeywords = await buildKeywordCandidates({
         title,
         description,
         category,
@@ -7542,8 +7653,13 @@ async function startServer() {
         store: storeType as StoreType,
         country: normalizeCountryCode(country, 'us'),
       }, 'deep', DISCOVERY_PROFILES.deep);
+      const refined = await refineKeywordsWithGemini(
+        { title, description, category },
+        rawKeywords,
+        'deep',
+      );
 
-      res.json({ keywords: finalKeywords });
+      res.json({ keywords: refined.keywords });
       
     } catch (error) {
       console.error(`Keyword generation error:`, error);
