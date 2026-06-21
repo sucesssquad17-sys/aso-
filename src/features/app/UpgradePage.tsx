@@ -208,13 +208,7 @@ export function UpgradePage({
   const disablePlanSelection = isPollingActivation;
   const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
   const signedInAccount = currentUserEmail || currentUserLabel;
-  const capacityPreviewPlans = React.useMemo(() => {
-    const visiblePlans = PUBLIC_BILLING_PLANS.filter(
-      (plan) => availablePlans.has(plan.id) || plan.contactOnly,
-    );
-
-    return visiblePlans.length > 0 ? visiblePlans : PUBLIC_BILLING_PLANS;
-  }, [availablePlans]);
+  const capacityPreviewPlans = PUBLIC_BILLING_PLANS;
   const [selectedCapacityPlanId, setSelectedCapacityPlanId] =
     React.useState<BillingPlanId>(() => {
       const defaultPlan =
@@ -691,17 +685,17 @@ export function UpgradePage({
                   ) : (
                     <div className="flex flex-col space-y-7">
                       <UsageBar
-                        used={selectedCapacityLimits.trackedApps ?? 0}
+                        used={billingStatus?.usage?.trackedApps ?? 0}
                         total={selectedCapacityLimits.trackedApps}
                         label="Tracked apps"
                       />
                       <UsageBar
-                        used={selectedCapacityLimits.competitorGroups ?? 0}
+                        used={billingStatus?.usage?.competitorGroups ?? 0}
                         total={selectedCapacityLimits.competitorGroups}
                         label="Competitor groups"
                       />
                       <UsageBar
-                        used={selectedCapacityLimits.trackedKeywords ?? 0}
+                        used={billingStatus?.usage?.activeTrackedKeywords ?? 0}
                         total={selectedCapacityLimits.trackedKeywords}
                         label="Tracked keywords"
                       />
