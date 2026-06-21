@@ -265,13 +265,13 @@ export function UpgradePage({
       !isDowngrade;
 
     const highlightCta =
-      "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+      "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 sm:py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
     
     const normalCta =
-      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 dark:border-blue-900 bg-transparent px-4 py-3 text-sm font-bold text-blue-600 dark:text-blue-400 transition-all hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-800 dark:hover:bg-blue-950/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 dark:border-blue-900 bg-transparent px-4 py-3.5 sm:py-3 text-sm font-bold text-blue-600 dark:text-blue-400 transition-all hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-800 dark:hover:bg-blue-950/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
     
     const currentCta =
-      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-600 bg-transparent px-4 py-3 text-sm font-bold text-blue-600 dark:text-blue-400 cursor-default";
+      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-600 bg-transparent px-4 py-3.5 sm:py-3 text-sm font-bold text-blue-600 dark:text-blue-400 cursor-default";
 
     if (disablePlanSelection) {
       return (
@@ -436,7 +436,7 @@ export function UpgradePage({
                     key={interval}
                     type="button"
                     onClick={() => setSelectedInterval(interval)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                    className={`rounded-full px-5 py-2.5 sm:py-2 text-sm font-semibold transition-colors ${
                       isActive
                         ? "bg-blue-600 text-white"
                         : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
@@ -450,9 +450,9 @@ export function UpgradePage({
           </div>
         ) : null}
 
-        <div className="mb-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-12 flex flex-col sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Plan card */}
-          <div className="flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm">
+          <div className="order-2 sm:order-1 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm">
             <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
               Your membership
             </p>
@@ -545,7 +545,7 @@ export function UpgradePage({
 
           {/* Usage bars */}
           {accessState === "active" && billingStatus?.usage && billingStatus?.planLimits ? (
-            <div className="flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+            <div className="order-1 sm:order-2 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
               <p className="mb-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
                 Capacity usage
               </p>
@@ -568,7 +568,7 @@ export function UpgradePage({
               </div>
             </div>
           ) : (
-            <div className="rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+            <div className="order-1 sm:order-2 rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">

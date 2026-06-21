@@ -184,6 +184,8 @@ import {
   WorkspaceNavButton,
   WorkspacePageIntro,
   WorkspacePanel,
+  MobileBottomNav,
+  MobileDataCard,
   type WorkspacePageConfig,
   type WorkspaceViewMode,
 } from "./workspacePrimitives";
@@ -11182,61 +11184,98 @@ function AuthenticatedApp({
                 </div>
               </div>
               )}
-              <form
-                onSubmit={handleSearch}
-                className="workspace-search-form"
-              >
-                {" "}
-                <div className="relative flex-1">
-                  {" "}
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />{" "}
-                  <input
-                    id="app-search"
-                    name="appSearch"
-                    aria-label="Search apps or paste an app store URL"
-                    type="text"
-                    autoComplete="off"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder={`Search apps or paste a ${storeType === "android" ? "Play Store" : "App Store"} URL...`}
-                    autoFocus
-                    className="input-field !py-2.5 sm:!py-3.5 text-sm sm:text-base"
-                    style={{
-                      paddingLeft: "2.75rem",
-                      paddingRight: searchTerm ? "2.75rem" : "1.25rem",
-                    }}
-                  />{" "}
-                  {searchTerm && (
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="workspace-store-toggle shrink-0">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSearchTerm("");
-                        setSearchResults([]);
-                        setHasSearched(false);
-                      }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-full hover:bg-slate-900 bg-slate-900"
+                      onClick={() => handleStoreTypeChange("android")}
+                      className={cn(
+                        "workspace-store-button",
+                        storeType === "android" && "workspace-store-button-active",
+                      )}
                     >
-                      {" "}
-                      <X className="w-4 h-4" />{" "}
+                      <Play
+                        className="h-3.5 w-3.5"
+                        fill={storeType === "android" ? "currentColor" : "none"}
+                      />
+                      Play
                     </button>
-                  )}{" "}
-                </div>{" "}
-                <button
-                  type="submit"
-                  disabled={isSearching || !searchTerm.trim()}
-                  className="btn-primary sm:w-auto w-full !py-2.5 sm:!py-[0.875rem] !px-4 sm:!px-8 text-sm sm:text-[0.9375rem]"
+                    <button
+                      type="button"
+                      onClick={() => handleStoreTypeChange("ios")}
+                      className={cn(
+                        "workspace-store-button",
+                        storeType === "ios" && "workspace-store-button-active",
+                      )}
+                    >
+                      <Apple className="h-3.5 w-3.5" />
+                      iOS
+                    </button>
+                  </div>
+                  <div className="workspace-topbar-country workspace-utility-chip shrink-0">
+                    <Globe className="hidden h-3.5 w-3.5 text-slate-500 sm:block" />
+                    <CountrySearchSelect
+                      value={country}
+                      onChange={handleCountryChange}
+                      options={COUNTRIES}
+                      ariaLabel="Select storefront country"
+                      className="w-[140px] min-w-0 sm:w-auto sm:min-w-[12rem]"
+                    />
+                  </div>
+                </div>
+                <form
+                  onSubmit={handleSearch}
+                  className="flex flex-col sm:flex-row gap-2 w-full"
                 >
-                  {" "}
-                  {isSearching ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4" />
-                      Search
-                    </>
-                  )}{" "}
-                </button>{" "}
-              </form>{" "}
+                  <div className="relative flex-1">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <input
+                      id="app-search"
+                      name="appSearch"
+                      aria-label="Search apps or paste an app store URL"
+                      type="text"
+                      autoComplete="off"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      placeholder={`Search apps or paste a ${storeType === "android" ? "Play Store" : "App Store"} URL...`}
+                      autoFocus
+                      className="input-field !py-2.5 sm:!py-3.5 text-sm sm:text-base w-full"
+                      style={{
+                        paddingLeft: "2.75rem",
+                        paddingRight: searchTerm ? "2.75rem" : "1.25rem",
+                      }}
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setSearchResults([]);
+                          setHasSearched(false);
+                        }}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-full hover:bg-slate-900 bg-slate-900"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSearching || !searchTerm.trim()}
+                    className="btn-primary sm:w-auto w-full !py-2.5 sm:!py-[0.875rem] !px-4 sm:!px-8 text-sm sm:text-[0.9375rem]"
+                  >
+                    {isSearching ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <>
+                        <Search className="w-4 h-4" />
+                        Search
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
               {error && (
                 <div
                   className="mt-4 p-4 rounded-xl flex items-center justify-between gap-2"
@@ -11551,7 +11590,12 @@ function AuthenticatedApp({
           onReturn={hasActiveBillingAccess ? () => setViewMode("single") : undefined}
         />
       ) : (
-      <div className="workspace-shell min-h-screen text-slate-100 font-sans relative">
+      <div className="workspace-shell min-h-screen text-slate-100 font-sans relative pb-20 md:pb-0">
+        <MobileBottomNav
+          tabs={mobileWorkspacePageConfigs}
+          activeId={viewMode === "charts" ? "single" : viewMode}
+          onTabChange={(id) => setViewMode(id)}
+        />
         <div className="bg-orb bg-orb-1" />
         <div className="bg-orb bg-orb-2" />
         <div className="bg-orb bg-orb-3" />
@@ -11777,41 +11821,7 @@ function AuthenticatedApp({
                     </div>
                   )}
               </div>
-              <div className="workspace-topbar-country workspace-utility-chip">
-                <Globe className="hidden h-3.5 w-3.5 text-slate-500 sm:block" />
-                <CountrySearchSelect
-                  value={country}
-                  onChange={handleCountryChange}
-                  options={COUNTRIES}
-                  ariaLabel="Select storefront country"
-                  className="w-full min-w-0 sm:min-w-[13rem]"
-                />
-              </div>
-              <div className="workspace-store-toggle">
-                <button
-                  onClick={() => handleStoreTypeChange("android")}
-                  className={cn(
-                    "workspace-store-button",
-                    storeType === "android" && "workspace-store-button-active",
-                  )}
-                >
-                  <Play
-                    className="h-3.5 w-3.5"
-                    fill={storeType === "android" ? "currentColor" : "none"}
-                  />
-                  Play
-                </button>
-                <button
-                  onClick={() => handleStoreTypeChange("ios")}
-                  className={cn(
-                    "workspace-store-button",
-                    storeType === "ios" && "workspace-store-button-active",
-                  )}
-                >
-                  <Apple className="h-3.5 w-3.5" />
-                  iOS
-                </button>
-              </div>
+
               <div className="workspace-topbar-actions">
                 <ThemeToggle
                   themeMode={themeMode}
@@ -12334,10 +12344,18 @@ function AuthenticatedApp({
 
                     <div className="space-y-4">
                       <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-2xl border border-slate-700/60 bg-slate-900/65 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
-                          Your App
-                        </p>
+                        <div className={cn(
+                          "rounded-2xl border border-slate-700/60 bg-slate-900/65 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] transition-all",
+                          competitorDraftOwnApp && competitorDraftApps.length > 0 ? "opacity-60 md:opacity-100" : "opacity-100"
+                        )}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
+                            <span className="md:hidden mr-1">Step 1:</span>Your App
+                          </p>
+                          {!competitorDraftOwnApp && (
+                            <span className="md:hidden text-[10px] font-semibold text-cyan-400 animate-pulse">Action required</span>
+                          )}
+                        </div>
                         {competitorDraftOwnApp ? (
                           <div className="mt-3 flex items-start gap-3">
                             <img
@@ -12371,15 +12389,19 @@ function AuthenticatedApp({
                         )}
                       </div>
 
-                        <div className="rounded-2xl border border-slate-700/70 bg-slate-900/45 p-4">
-                          <div className="flex items-center justify-between gap-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
-                            Rival App
-                          </p>
-                          <span className="text-xs text-slate-500">
-                            {competitorDraftApps.length}/1
-                          </span>
-                        </div>
+                        <div className={cn(
+                          "rounded-2xl border border-slate-700/70 bg-slate-900/45 p-4 transition-all",
+                          !competitorDraftOwnApp ? "hidden md:block opacity-40 pointer-events-none" : "block",
+                          competitorDraftApps.length > 0 ? "opacity-60 md:opacity-100" : "opacity-100"
+                        )}>
+                          <div className="flex items-center justify-between gap-3 mb-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                              <span className="md:hidden mr-1">Step 2:</span>Rival App
+                            </p>
+                            <span className="text-xs text-slate-500">
+                              {competitorDraftApps.length}/1
+                            </span>
+                          </div>
                         {competitorDraftApps.length > 0 ? (
                           <div className="mt-3 space-y-3">
                             {competitorDraftApps.map((app) => (
@@ -12422,7 +12444,15 @@ function AuthenticatedApp({
                       </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 p-4">
+                      <div className={cn(
+                        "rounded-2xl border border-slate-700/60 bg-slate-950/40 p-4 transition-all",
+                        competitorDraftApps.length === 0 ? "hidden md:block opacity-40 pointer-events-none" : "block"
+                      )}>
+                        <div className="md:hidden mb-4 border-b border-slate-800 pb-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">
+                            Step 3: Analyze & Track Keywords
+                          </p>
+                        </div>
                       {competitorGroupError && (
                         <div className="rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">
                           {competitorGroupError}
@@ -13399,7 +13429,7 @@ function AuthenticatedApp({
                                       </div>
                                       {isExpanded && (
                                         <div className="mt-4 rounded-2xl border border-slate-700/50 bg-slate-950/50 p-4">
-                                          <div className="h-72">
+                                          <div className="h-72 w-full min-w-0">
                                             {selectedCountryView.chartPoints.length >
                                             0 ? (
                                               <ResponsiveContainer
@@ -15434,8 +15464,8 @@ function AuthenticatedApp({
                       </span>{" "}
                       Keyword Metrics Density{" "}
                     </h3>{" "}
-                    <div
-                      className="h-72 w-full rounded-xl p-2"
+                      <div
+                        className="h-72 w-full min-w-0 rounded-xl p-2"
                       style={chartSurfaceStyle}
                     >
                       {" "}
@@ -16386,7 +16416,7 @@ function AuthenticatedApp({
                         Search Footprint Snapshot{" "}
                       </h3>{" "}
                       <div
-                        className="h-72 w-full rounded-xl p-2"
+                        className="h-72 w-full min-w-0 rounded-xl p-2"
                         style={{ background: "rgba(5,10,25,0.5)" }}
                       >
                         {" "}

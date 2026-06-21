@@ -1825,7 +1825,7 @@ export default function ReportsWorkspace({
                 description="Adjust the report filters or wait for more tracked rank history in this period."
               />
             ) : (
-              <div className="h-80">
+              <div className="h-80 w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsLineChart data={myTrendData}>
                     <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
@@ -2151,7 +2151,7 @@ export default function ReportsWorkspace({
                   </div>
                 ) : (
                   <div className="mt-5 overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/45">
-                    <div className="grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-slate-700/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <div className="hidden lg:grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-slate-700/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                       <div>Detected</div>
                       <div>App</div>
                       <div>Country</div>
@@ -2160,15 +2160,17 @@ export default function ReportsWorkspace({
                     {recentCompetitorAsoDiffs.map((diff) => (
                       <div
                         key={diff.diffId}
-                        className="grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-slate-800/80 px-4 py-3 text-sm text-slate-300 last:border-b-0"
+                        className="flex flex-col lg:grid lg:grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-slate-800/80 px-4 py-3 text-sm text-slate-300 last:border-b-0"
                       >
                         <div className="text-xs text-slate-400">
+                          <span className="lg:hidden font-semibold mr-1">Detected:</span>
                           {formatReportDateTime(diff.detectedAt)}
                         </div>
                         <div className="font-semibold text-slate-100">
                           {diff.appTitle}
                         </div>
                         <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          <span className="lg:hidden text-slate-500 mr-1">Country:</span>
                           {diff.country}
                         </div>
                         <div className="min-w-0">
@@ -2204,7 +2206,7 @@ export default function ReportsWorkspace({
                     description="This group needs more rank history in the selected period before a comparison trend can be plotted."
                   />
                 ) : (
-                  <div className="h-80">
+                  <div className="h-80 w-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={competitorTrendData}>
                         <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />

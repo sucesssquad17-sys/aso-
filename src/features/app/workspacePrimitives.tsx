@@ -153,18 +153,129 @@ export function WorkspaceEmptyBlock({
   title,
   description,
   icon: Icon,
+  action,
 }: {
   title: string;
   description: string;
   icon: LucideIcon;
+  action?: React.ReactNode;
 }) {
   return (
-    <div className="workspace-empty-block">
-      <div className="workspace-empty-icon">
+    <div className="workspace-empty-block px-6 py-10 md:p-12">
+      <div className="workspace-empty-icon mb-4">
         <Icon className="h-6 w-6" />
       </div>
-      <h3 className="workspace-empty-title">{title}</h3>
-      <p className="workspace-empty-description">{description}</p>
+      <h3 className="workspace-empty-title mb-2 text-lg">{title}</h3>
+      <p className="workspace-empty-description mb-6 max-w-sm mx-auto">{description}</p>
+      {action && <div className="mt-2">{action}</div>}
+    </div>
+  );
+}
+
+export function MobileBottomNav({
+  tabs,
+  activeId,
+  onTabChange,
+}: {
+  tabs: WorkspacePageConfig[];
+  activeId: WorkspaceViewMode;
+  onTabChange: (id: WorkspaceViewMode) => void;
+}) {
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
+      {tabs.map((tab) => {
+        const Icon = tab.icon;
+        const isActive = activeId === tab.id;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onTabChange(tab.id)}
+            className={cn(
+              "relative flex min-h-[48px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 transition-colors active:scale-95",
+              isActive
+                ? "text-cyan-600 dark:text-cyan-400"
+                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+            )}
+          >
+            <Icon className="h-5 w-5" />
+            <span className="text-[10px] font-medium leading-none">
+              {tab.shortLabel || tab.label}
+            </span>
+            {typeof tab.badge === "number" && tab.badge > 0 && (
+              <span className="absolute right-2 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-white shadow-sm">
+                {tab.badge > 99 ? "99+" : tab.badge}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+export function MobileDataCard({
+  title,
+  subtitle,
+  badges,
+  metrics,
+  actions,
+  className,
+}: {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  badges?: React.ReactNode[];
+  metrics?: { label: string; value: React.ReactNode }[];
+  actions?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40 md:hidden",
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+              {title}
+            </span>
+            {badges?.map((badge, i) => (
+              <span key={i} className="shrink-0">
+                {badge}
+              </span>
+            ))}
+          </div>
+          {subtitle && (
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {subtitle}
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {metrics && metrics.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-950/50">
+          {metrics.map((metric, i) => (
+            <div key={i} className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+                {metric.label}
+              </span>
+              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {metric.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      {actions && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
