@@ -52,7 +52,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import type { User } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { getToken, onMessage } from "firebase/messaging";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import RankSparkline from "../../components/RankSparkline";
@@ -4839,7 +4839,7 @@ function AuthenticatedApp({
       if (pushSetupErrorRef.current !== "missing-vapid-key") {
         pushSetupErrorRef.current = "missing-vapid-key";
         toast.error(
-          "Push notifications are unavailable right now.",
+          "Push notifications are unavailable because VITE_FIREBASE_VAPID_KEY is not configured on the server.",
         );
       }
       return;
@@ -5451,14 +5451,17 @@ function AuthenticatedApp({
     }
     setIsSavingLegalConsent(true);
     try {
-      await setDoc(
-        userStateDocRef,
+      await fetchAuthedJson<{ success: boolean }>(
+        "/api/account/legal-acceptance",
         {
-          legalAcceptedAt: new Date().toISOString(),
-          legalVersion: LEGAL_VERSION,
-          updatedAt: new Date().toISOString(),
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            legalVersion: LEGAL_VERSION,
+          }),
         },
-        { merge: true },
       );
       setHasAcceptedLegal(true);
       onLegalAcceptedPersisted();

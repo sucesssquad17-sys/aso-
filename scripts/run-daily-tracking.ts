@@ -17,7 +17,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import NodeCache from 'node-cache';
 import { Resend } from 'resend';
 import { getAuth } from 'firebase-admin/auth';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, type DocumentData, type DocumentReference } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { normalizeCountryCode } from '../src/lib/countries';
 import {
@@ -886,12 +886,19 @@ function shouldTriggerCompetitorAsoAlertCondition(
   return field ? diff.changedFields.includes(field) : false;
 }
 
-async function persistAlertEvent(userDocRef: any, event: AlertEvent) {
+async function persistAlertEvent(
+  userDocRef: DocumentReference<DocumentData>,
+  event: AlertEvent,
+) {
   try {
     await userDocRef.collection('alert_events').doc(event.id).create(event);
     return true;
-  } catch (error: any) {
-    if (error?.code === 6 || error?.code === 'already-exists') {
+  } catch (error: unknown) {
+    const code =
+      typeof error === 'object' && error && 'code' in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+    if (code === 6 || code === 'already-exists') {
       return false;
     }
     throw error;
@@ -992,7 +999,7 @@ async function sendPushNotificationToUser(
 }
 
 async function sendPushAlertEvents(
-  userDocRef: any,
+  userDocRef: DocumentReference<DocumentData>,
   notificationSettings: NotificationSettings,
   events: AlertEvent[],
 ) {
@@ -1046,11 +1053,17 @@ function formatAlertEmailTimestamp(timestamp: string) {
   if (Number.isNaN(date.getTime())) {
     return timestamp;
   }
-  return `${date.toLocaleString('en-US', {
+  const istTime = date.toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: GLOBAL_TRACKING_TIMEZONE,
+  });
+  const utcTime = date.toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: 'UTC',
-  })} UTC`;
+  });
+  return `${istTime} ${GLOBAL_TRACKING_TIMEZONE} (${utcTime} UTC)`;
 }
 
 function formatAlertChangedFieldLabel(field: string) {
@@ -1103,7 +1116,10 @@ function buildAlertEmailHtml(event: AlertEvent) {
   `;
 }
 
-async function sendEmailAlertEvents(userDocRef: any, events: AlertEvent[]) {
+async function sendEmailAlertEvents(
+  userDocRef: DocumentReference<DocumentData>,
+  events: AlertEvent[],
+) {
   if (!events.length) {
     return;
   }
@@ -1140,7 +1156,7 @@ async function sendEmailAlertEvents(userDocRef: any, events: AlertEvent[]) {
 }
 
 async function evaluateAndDispatchAlertRules(
-  userDocRef: any,
+  userDocRef: DocumentReference<DocumentData>,
   previousTrackedKeywords: TrackedKeywordRecord[],
   nextTrackedKeywords: TrackedKeywordRecord[],
   alertRules: AlertRule[],
@@ -1265,7 +1281,7 @@ async function evaluateAndDispatchAlertRules(
 }
 
 async function evaluateAndDispatchCompetitorAsoAlertRules(
-  userDocRef: any,
+  userDocRef: DocumentReference<DocumentData>,
   alertRules: AlertRule[],
   notificationSettings: NotificationSettings,
   diffs: CompetitorAsoDiffRecord[],
@@ -1932,6 +1948,10 @@ async function main() {
           timezone: GLOBAL_TRACKING_TIMEZONE,
         }),
       };
+      if (!state.schedule.enabled) {
+        log(`  → User ${userDoc.id}: schedule disabled, skipping`);
+        continue;
+      }
 
       // Skip if already ran for this runKey
       if (state.schedule.lastRunKey === runKey) {
@@ -1993,7 +2013,7 @@ async function main() {
 
       log(`  ✓ User ${userDoc.id}: checked=${result.checked}, changed=${result.changed}, failed=${result.failed}`);
 
-      // Legacy summary email path retired in favor of rule-based alert emails.
+      /* Legacy summary email path retired in favor of rule-based alert emails.
       if (false && result.changed > 0 && resend) {
         try {
           const authUser = await getAuth().getUser(userDoc.id);
@@ -2022,7 +2042,7 @@ async function main() {
         } catch (emailErr) {
           log(`  ✗ Failed to send email to user ${userDoc.id}: ${emailErr instanceof Error ? emailErr.message : String(emailErr)}`);
         }
-      }
+      }*/
     }
 
     const durationMs = Date.now() - startMs;

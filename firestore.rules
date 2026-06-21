@@ -6,46 +6,17 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    function protectedServerOwnedFields() {
-      return [
-        'billingProvider',
-        'billingEmail',
-        'dodoCustomerId',
-        'dodoSubscriptionId',
-        'dodoProductId',
-        'subscriptionTier',
-        'subscriptionInterval',
-        'isPremium',
-        'paypalSubscriptionId',
-        'paypalPlanId',
-        'subscriptionStatus',
-        'pendingPlanId',
-        'pendingInterval',
-        'subscriptionCurrentPeriodEnd',
-        'subscriptionCancelAtPeriodEnd',
-        'subscriptionUpdatedAt',
-        'competitorAsoLatestSnapshots'
-      ];
-    }
-
-    function createDoesNotSetServerOwnedFields() {
-      return !request.resource.data.keys().hasAny(protectedServerOwnedFields());
-    }
-
-    function updateDoesNotChangeServerOwnedFields() {
-      return !request.resource.data.diff(resource.data).changedKeys().hasAny(protectedServerOwnedFields());
-    }
-
     // Deny everything by default. Allowed paths are declared explicitly below.
     match /{document=**} {
       allow read, write: if false;
     }
 
     match /users/{userId} {
-      // The main user doc contains editable workspace data plus server-owned billing state.
+      // The main user doc is server-owned. Clients read it, but all writes go
+      // through authenticated backend endpoints that apply plan checks, billing
+      // protections, and workspace merge rules.
       allow read: if isSignedInAs(userId);
-      allow create: if isSignedInAs(userId) && createDoesNotSetServerOwnedFields();
-      allow update: if isSignedInAs(userId) && updateDoesNotChangeServerOwnedFields();
+      allow create, update: if false;
       // Account deletion goes through the server so billing/audit state can be retained safely.
       allow delete: if false;
 

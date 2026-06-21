@@ -60,7 +60,7 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { getToken, onMessage } from "firebase/messaging";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LandingPage from "./components/LandingPage";
@@ -1696,6 +1696,15 @@ function AuthenticatedApp({
     () => doc(db, "users", currentUser.uid),
     [currentUser.uid],
   );
+  const fetchAuthedJson = React.useCallback(
+    async <T,>(input: string, init?: RequestInit) => {
+      const token = await currentUser.getIdToken();
+      const headers = new Headers(init?.headers || {});
+      headers.set("Authorization", `Bearer ${token}`);
+      return fetchJson<T>(input, { ...init, headers });
+    },
+    [currentUser],
+  );
   const exportRef = React.useRef<HTMLDivElement>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
@@ -1939,26 +1948,30 @@ function AuthenticatedApp({
           return;
         }
         if (!hasRemoteState || shouldPersistInitialLegalAcceptance) {
-          await setDoc(
-            userStateDocRef,
-            serializeUserStateForFirestore({
-              bookmarks: nextBookmarks,
-              trackedKeywords: nextTrackedKeywords,
-              rankHistory: nextRankHistory,
-              trackingSchedule: nextTrackingSchedule,
-              legalAcceptedAt:
-                legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
-                  ? new Date().toISOString()
-                  : remoteState?.legalAcceptedAt,
-              legalVersion:
-                legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
-                  ? LEGAL_VERSION
-                  : remoteState?.legalVersion,
-              migratedFromLocalAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
+          await fetchAuthedJson<{ success: boolean }>("/api/user-state", {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              state: serializeUserStateForFirestore({
+                bookmarks: nextBookmarks,
+                trackedKeywords: nextTrackedKeywords,
+                rankHistory: nextRankHistory,
+                trackingSchedule: nextTrackingSchedule,
+                legalAcceptedAt:
+                  legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
+                    ? new Date().toISOString()
+                    : remoteState?.legalAcceptedAt,
+                legalVersion:
+                  legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
+                    ? LEGAL_VERSION
+                    : remoteState?.legalVersion,
+                migratedFromLocalAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+              }),
             }),
-            { merge: true },
-          );
+          });
           if (shouldPersistInitialLegalAcceptance) {
             onLegalAcceptedPersisted();
           }
@@ -1996,7 +2009,7 @@ function AuthenticatedApp({
     return () => {
       cancelled = true;
     };
-  }, [currentUser.uid, userStateDocRef]);
+  }, [currentUser.uid, fetchAuthedJson, userStateDocRef]);
   const persistLegalAcceptance = async () => {
     if (!consentChecked) {
       toast.error(
@@ -2006,15 +2019,15 @@ function AuthenticatedApp({
     }
     setIsSavingLegalConsent(true);
     try {
-      await setDoc(
-        userStateDocRef,
-        {
-          legalAcceptedAt: new Date().toISOString(),
-          legalVersion: LEGAL_VERSION,
-          updatedAt: new Date().toISOString(),
+      await fetchAuthedJson<{ success: boolean }>("/api/account/legal-acceptance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-        { merge: true },
-      );
+        body: JSON.stringify({
+          legalVersion: LEGAL_VERSION,
+        }),
+      });
       setHasAcceptedLegal(true);
       onLegalAcceptedPersisted();
       toast.success("Legal acceptance saved.");
@@ -2032,17 +2045,21 @@ function AuthenticatedApp({
     if (!userStateHydrated || isApplyingUserState.current) return;
     const persistUserState = async () => {
       try {
-        await setDoc(
-          userStateDocRef,
-          serializeUserStateForFirestore({
-            bookmarks,
-            trackedKeywords,
-            rankHistory: allRankHistory,
-            trackingSchedule,
-            updatedAt: new Date().toISOString(),
+        await fetchAuthedJson<{ success: boolean }>("/api/user-state", {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            state: serializeUserStateForFirestore({
+              bookmarks,
+              trackedKeywords,
+              rankHistory: allRankHistory,
+              trackingSchedule,
+              updatedAt: new Date().toISOString(),
+            }),
           }),
-          { merge: true },
-        );
+        });
       } catch (err) {
         logError(err, { context: "persistUserState", uid: currentUser.uid });
         console.warn("Failed to save user state", err);
@@ -2053,9 +2070,9 @@ function AuthenticatedApp({
     allRankHistory,
     bookmarks,
     currentUser.uid,
+    fetchAuthedJson,
     trackedKeywords,
     trackingSchedule,
-    userStateDocRef,
     userStateHydrated,
   ]);
   const bookmarkedAppKeys = React.useMemo(

@@ -31,6 +31,9 @@ export type BillingStatus = {
   >;
   environment: "test" | "live";
   isPremium: boolean;
+  billingReviewRequired?: boolean;
+  billingReviewReason?: string | null;
+  accountStatus?: "active" | "deleted" | null;
   subscriptionTier?: string | null;
   subscriptionInterval?: BillingInterval | null;
   subscriptionStatus?: string | null;

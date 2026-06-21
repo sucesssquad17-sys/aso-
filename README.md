@@ -27,6 +27,8 @@ Rank Analyzer Pro is a TypeScript SaaS for ASO teams that track keyword rankings
 3. Start development with `npm run dev`.
 
 The Vite frontend and Express server run from the same repo entrypoint in development.
+Firebase client config is loaded at runtime from `GET /api/public-config`, so
+the service environment must provide the public `VITE_FIREBASE_*` variables.
 
 ## Required Environment Variables
 
@@ -38,6 +40,10 @@ Frontend Firebase client:
 - `VITE_FIREBASE_STORAGE_BUCKET`
 - `VITE_FIREBASE_MESSAGING_SENDER_ID`
 - `VITE_FIREBASE_APP_ID`
+
+These values are read by the Node/Express service at runtime and returned to the
+browser through `/api/public-config`. They are not loaded from a private local
+JSON file during `vite build`.
 
 Server/runtime essentials:
 
@@ -93,6 +99,7 @@ Webhook events are signature-verified and duplicate webhook IDs are ignored. Pla
 ## Deployment Notes
 
 - Configure Firebase Auth, Firestore, and Firebase Admin credentials for both the web service and the tracking job
+- Set the public `VITE_FIREBASE_*` client variables on the Cloud Run web service runtime environment so `/api/public-config` can serve them to the browser and push service worker
 - Register the Dodo webhook at `https://<your-domain>/api/dodo/webhook`
 - If you use alert emails, configure a verified Resend sender
 - Do not commit secrets, service-account files, or `.firebase` deploy cache artifacts

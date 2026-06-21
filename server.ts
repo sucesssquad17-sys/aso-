@@ -378,6 +378,11 @@ type UserTrackingDocument = {
   subscriptionCurrentPeriodEnd?: string;
   subscriptionCancelAtPeriodEnd?: boolean;
   subscriptionUpdatedAt?: string;
+  billingReviewRequired?: boolean;
+  billingReviewReason?: string;
+  accountStatus?: 'active' | 'deleted';
+  deletedAt?: string;
+  authDeletedAt?: string;
   legalAcceptedAt?: string;
   legalVersion?: string;
   migratedFromLocalAt?: string;
@@ -412,6 +417,16 @@ type DodoWebhookHeaders = {
   'webhook-id': string;
   'webhook-signature': string;
   'webhook-timestamp': string;
+};
+type PublicFirebaseClientConfig = {
+  apiKey?: string;
+  authDomain?: string;
+  projectId?: string;
+  storageBucket?: string;
+  messagingSenderId?: string;
+  appId?: string;
+  measurementId?: string;
+  firestoreDatabaseId?: string;
 };
 type DodoSubscriptionPayload = {
   cancel_at_next_billing_date?: boolean;
@@ -730,6 +745,62 @@ function getDodoApiKey() {
 
 function getDodoWebhookKey() {
   return process.env.DODO_WEBHOOK_SECRET?.trim() || process.env.DODO_PAYMENTS_WEBHOOK_KEY?.trim() || '';
+}
+
+const REQUIRED_FIREBASE_RUNTIME_ENV_KEYS = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
+] as const;
+
+function readPublicFirebaseClientConfig(): PublicFirebaseClientConfig {
+  return {
+    apiKey: process.env.VITE_FIREBASE_API_KEY?.trim() || undefined,
+    authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN?.trim() || undefined,
+    projectId: process.env.VITE_FIREBASE_PROJECT_ID?.trim() || undefined,
+    storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET?.trim() || undefined,
+    messagingSenderId:
+      process.env.VITE_FIREBASE_MESSAGING_SENDER_ID?.trim() || undefined,
+    appId: process.env.VITE_FIREBASE_APP_ID?.trim() || undefined,
+    measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID?.trim() || undefined,
+    firestoreDatabaseId:
+      process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID?.trim() || undefined,
+  };
+}
+
+function getMissingPublicFirebaseConfigKeys(
+  config: PublicFirebaseClientConfig,
+) {
+  return REQUIRED_FIREBASE_RUNTIME_ENV_KEYS.filter((key) => {
+    switch (key) {
+      case 'VITE_FIREBASE_API_KEY':
+        return !config.apiKey;
+      case 'VITE_FIREBASE_AUTH_DOMAIN':
+        return !config.authDomain;
+      case 'VITE_FIREBASE_PROJECT_ID':
+        return !config.projectId;
+      case 'VITE_FIREBASE_STORAGE_BUCKET':
+        return !config.storageBucket;
+      case 'VITE_FIREBASE_MESSAGING_SENDER_ID':
+        return !config.messagingSenderId;
+      case 'VITE_FIREBASE_APP_ID':
+        return !config.appId;
+      default:
+        return true;
+    }
+  });
+}
+
+function isDeletedUserTrackingDocument(
+  data:
+    | Pick<UserTrackingDocument, 'accountStatus'>
+    | null
+    | undefined,
+) {
+  return data?.accountStatus === 'deleted';
 }
 
 function getConfiguredDodoProductIdsByPlan() {
@@ -1171,6 +1242,9 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     console.warn(`[dodo] No matching user found for webhook ${event.type}.`);
     return;
   }
+  const existingSnapshot = await userDocRef.get();
+  const existingUserData = existingSnapshot.data() as UserTrackingDocument | undefined;
+  const deletedAccount = isDeletedUserTrackingDocument(existingUserData);
 
   const productId = event.data.product_id?.trim() || '';
   const resolvedProductSelection = resolveBillingProductSelection(productId);
@@ -1184,11 +1258,23 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
   const canGrantPaidPlan =
     subscriptionStatus === 'active' &&
     Boolean(resolvedProductSelection) &&
-    metadataMatchesProductSelection;
+    metadataMatchesProductSelection &&
+    !deletedAccount;
   const billingEmail = event.data.customer?.email?.trim().toLowerCase();
   const resolvedPlanId = canGrantPaidPlan
     ? resolvedProductSelection!.planId
     : 'free';
+  const billingReviewReason =
+    deletedAccount
+      ? 'account_deleted'
+      : subscriptionStatus === 'active' && !resolvedProductSelection
+        ? 'unmatched_product_id'
+        : subscriptionStatus === 'active' &&
+            resolvedProductSelection &&
+            !metadataMatchesProductSelection
+          ? 'metadata_mismatch'
+          : null;
+  const billingReviewRequired = Boolean(billingReviewReason);
 
   if (subscriptionStatus === 'active' && !resolvedProductSelection) {
     console.warn(
@@ -1203,6 +1289,11 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
   ) {
     console.warn(
       `[dodo] Active subscription metadata mismatch for user ${userDocRef.id}. product=${resolvedProductSelection.productId} mappedPlan=${resolvedProductSelection.planId}/${resolvedProductSelection.interval} metadataPlan=${metadata.planId || 'missing'}/${metadata.interval || 'missing'}. Premium access was not granted.`,
+    );
+  }
+  if (deletedAccount && subscriptionStatus === 'active') {
+    console.warn(
+      `[dodo] Active subscription webhook received for deleted account ${userDocRef.id}. Premium access remains disabled and billing review is required.`,
     );
   }
 
@@ -1224,6 +1315,8 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     subscriptionCurrentPeriodEnd:
       event.data.next_billing_date || FieldValue.delete(),
     subscriptionCancelAtPeriodEnd: Boolean(event.data.cancel_at_next_billing_date),
+    billingReviewRequired,
+    billingReviewReason: billingReviewReason || FieldValue.delete(),
     subscriptionUpdatedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -2372,7 +2465,7 @@ function getEffectiveBillingPlanId(
 function deriveBillingAccessState(
   data: Pick<
     UserTrackingDocument,
-    'dodoProductId' | 'isPremium' | 'pendingPlanId' | 'subscriptionStatus' | 'subscriptionTier'
+    'accountStatus' | 'dodoProductId' | 'isPremium' | 'pendingPlanId' | 'subscriptionStatus' | 'subscriptionTier'
   > | null | undefined,
 ): BillingAccessState {
   if (hasActiveBillingEntitlement(data)) {
@@ -2387,9 +2480,12 @@ function deriveBillingAccessState(
 function hasActiveBillingEntitlement(
   data: Pick<
     UserTrackingDocument,
-    'dodoProductId' | 'isPremium' | 'subscriptionStatus' | 'subscriptionTier'
+    'accountStatus' | 'dodoProductId' | 'isPremium' | 'subscriptionStatus' | 'subscriptionTier'
   > | null | undefined,
 ): boolean {
+  if (isDeletedUserTrackingDocument(data)) {
+    return false;
+  }
   if (data?.isPremium) {
     return true;
   }
@@ -3375,11 +3471,17 @@ function formatAlertEmailTimestamp(timestamp: string) {
   if (Number.isNaN(date.getTime())) {
     return timestamp;
   }
-  return `${date.toLocaleString('en-US', {
+  const istTime = date.toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: GLOBAL_TRACKING_TIMEZONE,
-  })} ${GLOBAL_TRACKING_TIMEZONE}`;
+  });
+  const utcTime = date.toLocaleString('en-US', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+    timeZone: 'UTC',
+  });
+  return `${istTime} ${GLOBAL_TRACKING_TIMEZONE} (${utcTime} UTC)`;
 }
 
 function formatAlertChangedFieldLabel(field: string) {
@@ -5575,6 +5677,11 @@ function hasRetainedAccountState(data: UserTrackingDocument | undefined) {
     data.subscriptionCurrentPeriodEnd,
     data.subscriptionCancelAtPeriodEnd,
     data.subscriptionUpdatedAt,
+    data.billingReviewRequired,
+    data.billingReviewReason,
+    data.accountStatus,
+    data.deletedAt,
+    data.authDeletedAt,
     data.legalAcceptedAt,
     data.legalVersion,
   ].some((value) => value !== undefined && value !== null && value !== '');
@@ -6323,6 +6430,9 @@ async function startServer() {
         planPricing,
         environment: environment === 'live_mode' ? 'live' : 'test',
         isPremium,
+        billingReviewRequired: Boolean(userData?.billingReviewRequired),
+        billingReviewReason: userData?.billingReviewReason || null,
+        accountStatus: userData?.accountStatus || 'active',
         subscriptionTier: effectiveSubscriptionTier,
         subscriptionInterval: userData?.subscriptionInterval || null,
         subscriptionStatus: userData?.subscriptionStatus || null,
@@ -6471,6 +6581,7 @@ async function startServer() {
       ]);
 
       if (hasRetainedAccountState(userData)) {
+        const deletedAt = new Date().toISOString();
         const deleteWorkspaceDataPayload: DocumentData = {
           bookmarks: FieldValue.delete(),
           trackedApps: FieldValue.delete(),
@@ -6486,7 +6597,15 @@ async function startServer() {
           alertRules: FieldValue.delete(),
           notificationSettings: FieldValue.delete(),
           migratedFromLocalAt: FieldValue.delete(),
-          updatedAt: new Date().toISOString(),
+          accountStatus: 'deleted',
+          deletedAt,
+          authDeletedAt: FieldValue.delete(),
+          isPremium: false,
+          pendingPlanId: FieldValue.delete(),
+          pendingInterval: FieldValue.delete(),
+          billingReviewRequired: true,
+          billingReviewReason: 'account_deleted',
+          updatedAt: deletedAt,
         };
         await userDocRef.set(
           deleteWorkspaceDataPayload,
@@ -6497,9 +6616,44 @@ async function startServer() {
       }
 
       await adminAuth.deleteUser(decodedToken.uid);
+      if (hasRetainedAccountState(userData)) {
+        await userDocRef.set(
+          {
+            authDeletedAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          } satisfies UserTrackingDocument,
+          { merge: true },
+        );
+      }
       res.json({ success: true });
     } catch (error) {
       return sendApiError(res, error, 'Failed to delete account.');
+    }
+  });
+
+  app.post('/api/account/legal-acceptance', authedLightRateLimit, async (req, res) => {
+    try {
+      const decodedToken = await verifyFirebaseRequest(req);
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const requestedVersion =
+        typeof req.body?.legalVersion === 'string' ? req.body.legalVersion.trim() : '';
+      if (!requestedVersion) {
+        throw createBadRequestError('A legal version is required.');
+      }
+
+      await adminDb.collection('users').doc(decodedToken.uid).set({
+        legalAcceptedAt: new Date().toISOString(),
+        legalVersion: requestedVersion,
+        updatedAt: new Date().toISOString(),
+      } satisfies UserTrackingDocument, { merge: true });
+
+      res.json({ success: true });
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to save legal acceptance.');
     }
   });
 
@@ -6849,6 +7003,17 @@ async function startServer() {
   });
 
   // API Routes
+  app.get('/api/public-config', (req, res) => {
+    const config = readPublicFirebaseClientConfig();
+    const missingKeys = getMissingPublicFirebaseConfigKeys(config);
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      configured: missingKeys.length === 0,
+      config: missingKeys.length === 0 ? config : null,
+      missingKeys,
+    });
+  });
+
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok' });
   });

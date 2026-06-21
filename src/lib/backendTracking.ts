@@ -600,8 +600,10 @@ export async function refreshAllTrackingState<TState extends TrackingStateBase>(
   return {
     nextState: {
       ...state,
-      ...trackedRefresh.nextState,
-      ...competitorRefresh.nextState,
+      trackedKeywords: trackedRefresh.nextState.trackedKeywords,
+      rankHistory: trackedRefresh.nextState.rankHistory,
+      competitorTrackedKeywords: competitorRefresh.nextState.competitorTrackedKeywords,
+      competitorRankHistory: competitorRefresh.nextState.competitorRankHistory,
       schedule: options?.updateScheduleMetadata
         ? {
             ...state.schedule,
