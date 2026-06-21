@@ -225,6 +225,7 @@ type BillingPlanId = 'free' | 'indie' | 'starter' | 'pro' | 'agency';
 type BillingInterval = 'monthly' | 'yearly';
 type BillingSubscriptionStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired';
 type BillingAccessState = 'selection_required' | 'activating' | 'active';
+type PaidBillingPlanId = Exclude<BillingPlanId, 'free' | 'agency'>;
 type CompetitorGroupRecord = {
   groupId: string;
   store: StoreType;
@@ -521,6 +522,53 @@ type GooglePlayScraper = {
   category?: Record<string, string>;
   collection?: Record<string, string>;
 };
+type StoreRequestOptions = {
+  timeout?: number;
+  agent?: {
+    http?: HttpsProxyAgent<string>;
+    https?: HttpsProxyAgent<string>;
+  };
+  proxy?: string;
+};
+type StoreSearchResult = {
+  appId?: string | number;
+  id?: string | number;
+  trackId?: string | number;
+  title?: string;
+  trackName?: string;
+  name?: string;
+  developer?: string;
+  developerName?: string;
+  artistName?: string;
+  sellerName?: string;
+  developerId?: string;
+  summary?: string;
+  description?: string;
+  primaryGenre?: string;
+  primaryGenreName?: string;
+  genre?: string;
+  genreId?: string;
+  category?: string;
+  score?: number;
+  icon?: string;
+  iconURL?: string;
+  artworkUrl100?: string;
+  artworkUrl512?: string;
+  url?: string;
+  trackViewUrl?: string;
+  installs?: string;
+  minInstalls?: number;
+  maxInstalls?: string | number;
+  ratings?: number;
+  reviews?: number;
+  histogram?: number[];
+};
+type DodoWebhookBillingMetadata = {
+  planId: PaidBillingPlanId | null;
+  interval: BillingInterval | null;
+  hasPlanIdMetadata: boolean;
+  hasIntervalMetadata: boolean;
+};
 
 type ApiErrorCode =
   | 'BAD_REQUEST'
@@ -584,9 +632,15 @@ if (process.env.PROXY_HOST && process.env.PROXY_PORT) {
   console.log(`[Proxy] Configured HttpsProxyAgent with host: ${process.env.PROXY_HOST}`);
 }
 
-const googlePlayDirectRequestOptions: any = { timeout: PLAY_STORE_FETCH_TIMEOUT_MS };
-const googlePlayProxyRequestOptions: any = { timeout: PLAY_STORE_FETCH_TIMEOUT_MS };
-const appStoreRequestOptions: any = { timeout: PLAY_STORE_FETCH_TIMEOUT_MS };
+const googlePlayDirectRequestOptions: StoreRequestOptions = {
+  timeout: PLAY_STORE_FETCH_TIMEOUT_MS,
+};
+const googlePlayProxyRequestOptions: StoreRequestOptions = {
+  timeout: PLAY_STORE_FETCH_TIMEOUT_MS,
+};
+const appStoreRequestOptions: StoreRequestOptions = {
+  timeout: PLAY_STORE_FETCH_TIMEOUT_MS,
+};
 
 if (proxyAgent && proxyUrlString) {
   googlePlayProxyRequestOptions.agent = {
@@ -678,10 +732,6 @@ function getDodoWebhookKey() {
   return process.env.DODO_WEBHOOK_SECRET?.trim() || process.env.DODO_PAYMENTS_WEBHOOK_KEY?.trim() || '';
 }
 
-function getConfiguredDodoProductId() {
-  return process.env.DODO_PRODUCT_ID?.trim() || process.env.DODO_PRODUCT_ID_STARTER?.trim() || '';
-}
-
 function getConfiguredDodoProductIdsByPlan() {
   return {
     indie: {
@@ -697,7 +747,7 @@ function getConfiguredDodoProductIdsByPlan() {
       monthly: process.env.DODO_PRODUCT_ID_PRO?.trim() || '',
       yearly: process.env.DODO_PRODUCT_ID_PRO_YEARLY?.trim() || '',
     },
-  } satisfies Record<Exclude<BillingPlanId, 'free' | 'agency'>, Record<BillingInterval, string>>;
+  } satisfies Record<PaidBillingPlanId, Record<BillingInterval, string>>;
 }
 
 function getConfiguredBillingPlans(): BillingPlanId[] {
@@ -741,7 +791,7 @@ function getConfiguredBillingPlanIntervals() {
       ...(productIds.pro.monthly ? (['monthly'] as const) : []),
       ...(productIds.pro.yearly ? (['yearly'] as const) : []),
     ],
-  } satisfies Record<Exclude<BillingPlanId, 'free' | 'agency'>, BillingInterval[]>;
+  } satisfies Record<PaidBillingPlanId, BillingInterval[]>;
 }
 
 function resolveBillingProductSelection(
@@ -845,6 +895,8 @@ function readProductPriceAmount(product: { price?: unknown }) {
     price.type === 'recurring_price' ||
     price.type === 'one_time_price'
   ) {
+    // Dodo's SDK types document price values in the smallest currency unit
+    // (for example cents for USD), so the formatter converts from minor units.
     return typeof price.price === 'number' ? price.price : null;
   }
 
@@ -855,13 +907,32 @@ function readProductPriceAmount(product: { price?: unknown }) {
   return null;
 }
 
-function formatCurrencyAmount(amount: number, currency: string) {
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  });
-  const fractionDigits = formatter.resolvedOptions().maximumFractionDigits;
-  return formatter.format(amount / 10 ** fractionDigits);
+function readProductCurrency(product: { price?: unknown }) {
+  if (!product.price || typeof product.price !== 'object') {
+    return null;
+  }
+
+  const currency = (product.price as { currency?: unknown }).currency;
+  return typeof currency === 'string' && currency.trim()
+    ? currency.trim().toUpperCase()
+    : null;
+}
+
+function formatCurrencyAmount(amount: number, currency: string | null) {
+  if (!currency) {
+    return null;
+  }
+
+  try {
+    const formatter = new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    });
+    const fractionDigits = formatter.resolvedOptions().maximumFractionDigits;
+    return formatter.format(amount / 10 ** fractionDigits);
+  } catch {
+    return `${amount} ${currency}`;
+  }
 }
 
 function formatBillingCadence(product: { price?: unknown }) {
@@ -924,8 +995,10 @@ async function loadConfiguredBillingPlanPricing(client: NonNullable<ReturnType<t
             try {
               const product = await client.products.retrieve(productId);
               const amount = readProductPriceAmount(product);
-              const currency = product.price?.currency || null;
+              const currency = readProductCurrency(product);
               const cadence = formatBillingCadence(product);
+              const formattedAmount =
+                amount != null ? formatCurrencyAmount(amount, currency) : null;
 
               planPricing[planId][interval] = {
                 productId,
@@ -933,8 +1006,8 @@ async function loadConfiguredBillingPlanPricing(client: NonNullable<ReturnType<t
                 currency,
                 productName: product.name?.trim() || null,
                 priceLabel:
-                  amount != null && currency
-                    ? `${formatCurrencyAmount(amount, currency)}${cadence || ''}`
+                  formattedAmount
+                    ? `${formattedAmount}${cadence || ''}`
                     : null,
               };
             } catch (error) {
@@ -1038,6 +1111,29 @@ async function resolveBillingUserDocument(
   return null;
 }
 
+function readWebhookBillingMetadata(
+  event: DodoSubscriptionWebhookEvent,
+): DodoWebhookBillingMetadata {
+  const rawPlanId = event.data.metadata?.plan_id?.trim();
+  const planId: PaidBillingPlanId | null =
+    rawPlanId === 'indie' || rawPlanId === 'starter' || rawPlanId === 'pro'
+      ? rawPlanId
+      : null;
+  const rawInterval = event.data.metadata?.billing_interval?.trim();
+  const interval: BillingInterval | null =
+    rawInterval === 'yearly'
+      ? 'yearly'
+      : rawInterval === 'monthly'
+        ? 'monthly'
+        : null;
+  return {
+    planId,
+    interval,
+    hasPlanIdMetadata: Boolean(rawPlanId),
+    hasIntervalMetadata: Boolean(rawInterval),
+  };
+}
+
 function resolveSubscriptionStatusFromWebhook(
   event: DodoSubscriptionWebhookEvent,
 ): BillingSubscriptionStatus {
@@ -1076,31 +1172,52 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     return;
   }
 
-  const productId = event.data.product_id?.trim() || getConfiguredDodoProductId();
+  const productId = event.data.product_id?.trim() || '';
   const resolvedProductSelection = resolveBillingProductSelection(productId);
   const subscriptionStatus = resolveSubscriptionStatusFromWebhook(event);
-  const isPremium = subscriptionStatus === 'active';
-  const resolvedPlanId =
-    event.data.metadata?.plan_id?.trim() ||
-    resolvedProductSelection?.planId ||
-    (isPremium ? 'starter' : 'free');
-  const resolvedInterval =
-    event.data.metadata?.billing_interval?.trim() ||
-    resolvedProductSelection?.interval ||
-    'monthly';
-  const normalizedInterval: BillingInterval =
-    resolvedInterval === 'yearly' ? 'yearly' : 'monthly';
+  const metadata = readWebhookBillingMetadata(event);
+  const metadataMatchesProductSelection =
+    (!metadata.hasPlanIdMetadata ||
+      resolvedProductSelection?.planId === metadata.planId) &&
+    (!metadata.hasIntervalMetadata ||
+      resolvedProductSelection?.interval === metadata.interval);
+  const canGrantPaidPlan =
+    subscriptionStatus === 'active' &&
+    Boolean(resolvedProductSelection) &&
+    metadataMatchesProductSelection;
   const billingEmail = event.data.customer?.email?.trim().toLowerCase();
+  const resolvedPlanId = canGrantPaidPlan
+    ? resolvedProductSelection!.planId
+    : 'free';
+
+  if (subscriptionStatus === 'active' && !resolvedProductSelection) {
+    console.warn(
+      `[dodo] Active subscription for user ${userDocRef.id} has unmatched product ID "${productId || 'missing'}". Premium access was not granted.`,
+    );
+  }
+
+  if (
+    subscriptionStatus === 'active' &&
+    resolvedProductSelection &&
+    !metadataMatchesProductSelection
+  ) {
+    console.warn(
+      `[dodo] Active subscription metadata mismatch for user ${userDocRef.id}. product=${resolvedProductSelection.productId} mappedPlan=${resolvedProductSelection.planId}/${resolvedProductSelection.interval} metadataPlan=${metadata.planId || 'missing'}/${metadata.interval || 'missing'}. Premium access was not granted.`,
+    );
+  }
 
   const billingUpdate: Record<string, unknown> = {
     billingProvider: 'dodo',
     ...(billingEmail ? { billingEmail } : {}),
     dodoCustomerId: event.data.customer?.customer_id?.trim() || FieldValue.delete(),
     dodoSubscriptionId: event.data.subscription_id?.trim() || FieldValue.delete(),
-    dodoProductId: isPremium && productId ? productId : FieldValue.delete(),
-    subscriptionTier: isPremium ? resolvedPlanId : 'free',
-    subscriptionInterval: isPremium ? normalizedInterval : FieldValue.delete(),
-    isPremium,
+    dodoProductId: productId || FieldValue.delete(),
+    subscriptionTier: resolvedPlanId,
+    subscriptionInterval:
+      canGrantPaidPlan && resolvedProductSelection
+        ? resolvedProductSelection.interval
+        : FieldValue.delete(),
+    isPremium: canGrantPaidPlan,
     subscriptionStatus,
     pendingPlanId: FieldValue.delete(),
     pendingInterval: FieldValue.delete(),
@@ -1304,11 +1421,32 @@ function readAuthBearerToken(req: express.Request) {
 
 function createRateLimiter(name: string, limit: number, windowMs: number): express.RequestHandler {
   const state = new Map<string, { count: number; resetAt: number }>();
+  let cleanupCounter = 0;
+
+  // This limiter is per-process only. Cloud Run instances do not share memory, so
+  // thresholds stay intentionally conservative on high-cost routes.
+  const resolveKey = (req: express.Request) => {
+    const bearer = req.header('authorization');
+    if (bearer && bearer.startsWith('Bearer ')) {
+      return `${name}:auth:${crypto.createHash('sha256').update(bearer.slice('Bearer '.length).trim()).digest('hex')}`;
+    }
+
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    return `${name}:ip:${ip}`;
+  };
 
   return (req, res, next) => {
     const now = Date.now();
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    const key = `${name}:${ip}`;
+    cleanupCounter += 1;
+    if (cleanupCounter % 200 === 0) {
+      for (const [entryKey, entry] of state.entries()) {
+        if (entry.resetAt <= now) {
+          state.delete(entryKey);
+        }
+      }
+    }
+
+    const key = resolveKey(req);
     const current = state.get(key);
 
     if (!current || current.resetAt <= now) {
@@ -1894,16 +2032,12 @@ function sanitizeCompetitorAsoLatestSnapshots(
           : new Date(0).toISOString(),
       payload: {
         title:
-          typeof payloadCandidate?.title === 'string' ? payloadCandidate.title : '',
+          normalizeAsoTextValue(payloadCandidate?.title, 300),
         description:
-          typeof payloadCandidate?.description === 'string'
-            ? payloadCandidate.description
-            : '',
-        icon: typeof payloadCandidate?.icon === 'string' ? payloadCandidate.icon : '',
+          normalizeAsoTextValue(payloadCandidate?.description, 4000),
+        icon: normalizeAsoTextValue(payloadCandidate?.icon, 2000),
         category:
-          typeof payloadCandidate?.category === 'string'
-            ? payloadCandidate.category
-            : '',
+          normalizeAsoTextValue(payloadCandidate?.category, 200),
         screenshots: Array.isArray(payloadCandidate?.screenshots)
           ? Array.from(
               new Set(
@@ -1911,7 +2045,7 @@ function sanitizeCompetitorAsoLatestSnapshots(
                   (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0,
                 ),
               ),
-            )
+            ).slice(0, 10)
           : [],
       },
     }];
@@ -2203,8 +2337,10 @@ function normalizeUserTrackingDocument(data: any): NormalizedUserTrackingDocumen
   };
 }
 
-function getResolvedPlanLimits(data: Pick<UserTrackingDocument, 'subscriptionTier'> | null | undefined) {
-  return getPlanLimits(resolveBillingPlanId(data?.subscriptionTier));
+function getResolvedPlanLimits(
+  data: Pick<UserTrackingDocument, 'dodoProductId' | 'subscriptionTier'> | null | undefined,
+) {
+  return getPlanLimits(getEffectiveBillingPlanId(data));
 }
 
 function readPendingPlanId(planId?: string | null): BillingPlanId | null {
@@ -2216,10 +2352,27 @@ function readPendingPlanId(planId?: string | null): BillingPlanId | null {
     : null;
 }
 
+function getEffectiveBillingPlanId(
+  data:
+    | Pick<UserTrackingDocument, 'subscriptionTier' | 'dodoProductId'>
+    | null
+    | undefined,
+): BillingPlanId {
+  const storedPlanId = resolveBillingPlanId(data?.subscriptionTier);
+  if (storedPlanId !== 'free') {
+    return storedPlanId;
+  }
+
+  // Legacy billing rows may have an active paid Dodo product ID even if the
+  // older webhook write failed to persist the paid tier. Only trust configured
+  // product-ID mappings here; never fall back to a default paid plan.
+  return resolvePlanIdFromProductId(data?.dodoProductId) || 'free';
+}
+
 function deriveBillingAccessState(
   data: Pick<
     UserTrackingDocument,
-    'isPremium' | 'pendingPlanId' | 'subscriptionStatus' | 'subscriptionTier'
+    'dodoProductId' | 'isPremium' | 'pendingPlanId' | 'subscriptionStatus' | 'subscriptionTier'
   > | null | undefined,
 ): BillingAccessState {
   if (hasActiveBillingEntitlement(data)) {
@@ -2234,19 +2387,23 @@ function deriveBillingAccessState(
 function hasActiveBillingEntitlement(
   data: Pick<
     UserTrackingDocument,
-    'isPremium' | 'subscriptionStatus' | 'subscriptionTier'
+    'dodoProductId' | 'isPremium' | 'subscriptionStatus' | 'subscriptionTier'
   > | null | undefined,
 ): boolean {
   if (data?.isPremium) {
     return true;
   }
-  if (data?.subscriptionStatus === 'active') {
+  const effectivePlanId = getEffectiveBillingPlanId(data);
+  if (
+    data?.subscriptionStatus === 'active' &&
+    effectivePlanId !== 'free'
+  ) {
     return true;
   }
   if (data?.subscriptionStatus) {
     return false;
   }
-  return readPendingPlanId(data?.subscriptionTier) !== null;
+  return effectivePlanId !== 'free';
 }
 
 function getNormalizedPlanUsage(
@@ -2623,9 +2780,9 @@ function getComparableCompetitorAsoSnapshotKey({
   return `${groupId}:${appId}:${normalizeCountryCode(country, 'us')}`;
 }
 
-function normalizeAsoTextValue(input: unknown) {
+function normalizeAsoTextValue(input: unknown, maxLength = 4000) {
   return typeof input === 'string'
-    ? input.replace(/\s+/g, ' ').trim()
+    ? input.replace(/\s+/g, ' ').trim().slice(0, maxLength)
     : '';
 }
 
@@ -2644,7 +2801,7 @@ function normalizeAsoScreenshotList(input: unknown, iconUrl?: string) {
     }
     seen.add(normalized);
     return [normalized];
-  });
+  }).slice(0, 10);
 }
 
 function extractPlayFallbackScreenshots(html: string, iconUrl?: string) {
@@ -2660,15 +2817,17 @@ function normalizeCompetitorAsoSnapshotPayload(
 ): CompetitorAsoSnapshotPayload {
   const icon = normalizeAsoTextValue(
     details?.icon || details?.artworkUrl512 || details?.artworkUrl100,
+    2000,
   );
   return {
-    title: normalizeAsoTextValue(details?.title || details?.trackName || details?.name),
-    description: normalizeAsoTextValue(details?.description || details?.summary),
+    title: normalizeAsoTextValue(details?.title || details?.trackName || details?.name, 300),
+    description: normalizeAsoTextValue(details?.description || details?.summary, 4000),
     icon,
     category: normalizeAsoTextValue(
       storeType === 'ios'
         ? details?.primaryGenre || details?.genre || details?.category
         : details?.genre || details?.category,
+      200,
     ),
     screenshots: normalizeAsoScreenshotList(
       details?.screenshots || details?.screenshotUrls || details?.ipadScreenshotUrls,
@@ -3219,8 +3378,8 @@ function formatAlertEmailTimestamp(timestamp: string) {
   return `${date.toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
-    timeZone: 'UTC',
-  })} UTC`;
+    timeZone: GLOBAL_TRACKING_TIMEZONE,
+  })} ${GLOBAL_TRACKING_TIMEZONE}`;
 }
 
 function formatAlertChangedFieldLabel(field: string) {
@@ -6104,10 +6263,15 @@ async function startServer() {
 
   const moderateRateLimit = createRateLimiter('public-moderate', 60, 60 * 1000);
   const strictRateLimit = createRateLimiter('public-strict', 30, 60 * 1000);
-  const discoverRateLimit = createRateLimiter('public-discover', 60, 60 * 1000);
+  const discoverRateLimit = createRateLimiter('public-discover', 20, 60 * 1000);
   const authEventRateLimit = createRateLimiter('public-auth-events', 120, 60 * 1000);
+  const authedLightRateLimit = createRateLimiter('authed-light', 120, 60 * 1000);
+  const authedRefreshRateLimit = createRateLimiter('authed-refresh', 20, 60 * 1000);
+  const authedCheckoutRateLimit = createRateLimiter('authed-checkout', 6, 15 * 60 * 1000);
+  const authedPortalRateLimit = createRateLimiter('authed-portal', 12, 15 * 60 * 1000);
+  const authedNotificationTestRateLimit = createRateLimiter('authed-push-test', 5, 10 * 60 * 1000);
 
-  app.get('/api/billing/status', async (req, res) => {
+  app.get('/api/billing/status', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6125,6 +6289,7 @@ async function startServer() {
       const availableBillingIntervals = getConfiguredBillingIntervals();
       const availablePlanIntervals = getConfiguredBillingPlanIntervals();
       const normalizedUserState = normalizeUserTrackingDocument(userData);
+      const effectiveSubscriptionTier = getEffectiveBillingPlanId(userData);
       const accessState = deriveBillingAccessState(userData);
       const isPremium = hasActiveBillingEntitlement(userData);
       const pendingPlanId = readPendingPlanId(userData?.pendingPlanId);
@@ -6143,7 +6308,9 @@ async function startServer() {
             starter: {},
             pro: {},
           };
-      const productConfigured = configuredPlans.length > 2;
+      const productConfigured = configuredPlans.some(
+        (planId) => planId === 'indie' || planId === 'starter' || planId === 'pro',
+      );
 
       res.json({
         configured: Boolean(getDodoApiKey()),
@@ -6156,7 +6323,7 @@ async function startServer() {
         planPricing,
         environment: environment === 'live_mode' ? 'live' : 'test',
         isPremium,
-        subscriptionTier: userData?.subscriptionTier || null,
+        subscriptionTier: effectiveSubscriptionTier,
         subscriptionInterval: userData?.subscriptionInterval || null,
         subscriptionStatus: userData?.subscriptionStatus || null,
         pendingPlanId,
@@ -6171,7 +6338,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/billing/checkout', async (req, res) => {
+  app.post('/api/billing/checkout', authedCheckoutRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6196,7 +6363,7 @@ async function startServer() {
       const userData = userSnapshot.data() as UserTrackingDocument | undefined;
       const isDowngradeAttempt =
         hasActiveBillingEntitlement(userData) &&
-        getBillingPlanRank(planId) < getBillingPlanRank(userData?.subscriptionTier);
+        getBillingPlanRank(planId) < getBillingPlanRank(getEffectiveBillingPlanId(userData));
       if (isDowngradeAttempt) {
         throw createBadRequestError(
           'Downgrades are not available from checkout. Use the billing portal or contact support.',
@@ -6247,7 +6414,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/billing/portal', async (req, res) => {
+  app.post('/api/billing/portal', authedPortalRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6276,7 +6443,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/account/delete', async (req, res) => {
+  app.post('/api/account/delete', authedPortalRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6336,7 +6503,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/user-state', async (req, res) => {
+  app.put('/api/user-state', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6397,7 +6564,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/notifications/token', async (req, res) => {
+  app.post('/api/notifications/token', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6429,7 +6596,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/notifications/status', async (req, res) => {
+  app.get('/api/notifications/status', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6460,7 +6627,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/notifications/test', async (req, res) => {
+  app.post('/api/notifications/test', authedNotificationTestRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6494,7 +6661,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/tracked-keywords/refresh', async (req, res) => {
+  app.post('/api/tracked-keywords/refresh', authedRefreshRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6580,7 +6747,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/alerts/events', async (req, res) => {
+  app.get('/api/alerts/events', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6606,7 +6773,7 @@ async function startServer() {
     }
   });
 
-  app.get('/api/competitors/aso/history', async (req, res) => {
+  app.get('/api/competitors/aso/history', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
@@ -6642,7 +6809,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/alerts/events/mark-read', async (req, res) => {
+  app.post('/api/alerts/events/mark-read', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();

@@ -5581,7 +5581,6 @@ function AuthenticatedApp({
         context: "loadBillingStatus",
         uid: currentUser.uid,
       });
-      setBillingStatus(null);
       setBillingError(getFriendlyErrorMessage(err));
       return null;
     } finally {
@@ -5978,6 +5977,8 @@ function AuthenticatedApp({
   const billingAccessState: BillingAccessState = isDemoMode
     ? "active"
     : billingStatus?.accessState || "selection_required";
+  const hasBillingStatusLoadFailure =
+    !isDemoMode && hasLoadedBillingStatus && !billingStatus && Boolean(billingError);
   const hasActiveBillingAccess =
     isDemoMode || billingAccessState === "active";
   const effectivePlanLimits = React.useMemo(
@@ -11002,6 +11003,48 @@ function AuthenticatedApp({
             <p className="text-sm uppercase tracking-[0.18em] text-slate-500">
               Checking billing access
             </p>
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+  if (hasBillingStatusLoadFailure) {
+    return (
+      <ErrorBoundary>
+        <div
+          className="min-h-screen text-slate-100 font-sans relative flex items-center justify-center"
+          style={{ background: "var(--bg-primary)" }}
+        >
+          <div className="bg-orb bg-orb-1" />
+          <div className="bg-orb bg-orb-2" />
+          <div className="bg-orb bg-orb-3" />
+          <div className="card-glow relative z-10 max-w-md px-8 py-10 text-center">
+            <AlertCircle className="mx-auto mb-4 h-8 w-8 text-amber-300" />
+            <p className="text-sm uppercase tracking-[0.18em] text-slate-500">
+              Billing status unavailable
+            </p>
+            <p className="mt-4 text-sm leading-6 text-slate-300">
+              {billingError ||
+                "We couldn't verify billing access right now. Retry before showing the upgrade gate."}
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <button
+                type="button"
+                onClick={() => void loadBillingStatus()}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Retry billing check
+              </button>
+              <button
+                type="button"
+                onClick={() => void onSignOut()}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+              >
+                <LogOut className="h-4 w-4" />
+                Use different account
+              </button>
+            </div>
           </div>
         </div>
       </ErrorBoundary>

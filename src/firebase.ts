@@ -7,7 +7,16 @@ type FirebaseAppConfig = FirebaseOptions & {
   firestoreDatabaseId?: string;
 };
 
-function readFirebaseConfig() {
+const REQUIRED_FIREBASE_ENV_KEYS = [
+  'VITE_FIREBASE_API_KEY',
+  'VITE_FIREBASE_AUTH_DOMAIN',
+  'VITE_FIREBASE_PROJECT_ID',
+  'VITE_FIREBASE_STORAGE_BUCKET',
+  'VITE_FIREBASE_MESSAGING_SENDER_ID',
+  'VITE_FIREBASE_APP_ID',
+] as const;
+
+export const firebaseConfigErrorDetails = (() => {
   const config: FirebaseAppConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY?.trim(),
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.trim(),
@@ -20,26 +29,54 @@ function readFirebaseConfig() {
       import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID?.trim() || undefined,
   };
 
-  const missingKeys = [
-    ['VITE_FIREBASE_API_KEY', config.apiKey],
-    ['VITE_FIREBASE_AUTH_DOMAIN', config.authDomain],
-    ['VITE_FIREBASE_PROJECT_ID', config.projectId],
-    ['VITE_FIREBASE_STORAGE_BUCKET', config.storageBucket],
-    ['VITE_FIREBASE_MESSAGING_SENDER_ID', config.messagingSenderId],
-    ['VITE_FIREBASE_APP_ID', config.appId],
-  ]
-    .filter(([, value]) => !value)
-    .map(([key]) => key);
+  const missingKeys = REQUIRED_FIREBASE_ENV_KEYS.filter((key) => {
+    switch (key) {
+      case 'VITE_FIREBASE_API_KEY':
+        return !config.apiKey;
+      case 'VITE_FIREBASE_AUTH_DOMAIN':
+        return !config.authDomain;
+      case 'VITE_FIREBASE_PROJECT_ID':
+        return !config.projectId;
+      case 'VITE_FIREBASE_STORAGE_BUCKET':
+        return !config.storageBucket;
+      case 'VITE_FIREBASE_MESSAGING_SENDER_ID':
+        return !config.messagingSenderId;
+      case 'VITE_FIREBASE_APP_ID':
+        return !config.appId;
+      default:
+        return false;
+    }
+  });
 
-  if (missingKeys.length) {
-    throw new Error(
-      `Missing required Firebase client config: ${missingKeys.join(
+  return {
+    config,
+    missingKeys,
+  };
+})();
+
+export const firebaseConfigError =
+  firebaseConfigErrorDetails.missingKeys.length > 0
+    ? `Missing required Firebase client config: ${firebaseConfigErrorDetails.missingKeys.join(
         ', ',
-      )}. Add them to your Vite environment before loading the app.`,
-    );
+      )}.`
+    : null;
+
+function readFirebaseConfig() {
+  if (firebaseConfigError) {
+    return {
+      apiKey: 'missing-api-key',
+      authDomain: 'missing-auth-domain',
+      projectId: 'missing-project-id',
+      storageBucket: 'missing-storage-bucket',
+      messagingSenderId: 'missing-sender-id',
+      appId: 'missing-app-id',
+      firestoreDatabaseId:
+        firebaseConfigErrorDetails.config.firestoreDatabaseId || undefined,
+      measurementId: firebaseConfigErrorDetails.config.measurementId || undefined,
+    } satisfies FirebaseAppConfig;
   }
 
-  return config;
+  return firebaseConfigErrorDetails.config;
 }
 
 const typedFirebaseConfig = readFirebaseConfig();
