@@ -58,7 +58,7 @@ function LegalDocumentScreen({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+            className="inline-flex items-center gap-2 text-sm font-medium text-app-text-muted transition-colors hover:text-app-text"
           >
             <ArrowLeft className="w-4 h-4" /> Back
           </button>
@@ -72,14 +72,14 @@ function LegalDocumentScreen({
           <div className="inline-flex items-center gap-2 badge badge-cyan mb-4">
             <ShieldCheck className="w-3.5 h-3.5" /> Legal
           </div>
-          <h1 className="font-display text-3xl font-bold text-white tracking-tight">
+          <h1 className="font-display text-3xl font-bold text-app-text tracking-tight">
             {title}
           </h1>
-          <p className="text-slate-400 mt-3 text-sm leading-6">{subtitle}</p>
+          <p className="text-app-text-muted mt-3 text-sm leading-6">{subtitle}</p>
         </div>
         <div
           className={`prose prose-sm max-w-none ${
-            themeMode === "light" ? "prose-slate text-slate-600" : "prose-invert text-slate-300"
+            themeMode === "light" ? "prose-slate text-slate-600" : "prose-invert text-app-text-muted"
           }`}
         >
           {children}
@@ -305,10 +305,10 @@ export function LoginScreen({
           <div className="inline-flex items-center gap-2 badge badge-cyan mb-4">
             <ShieldCheck className="w-3.5 h-3.5" /> Secure access
           </div>
-          <h1 className="font-display text-3xl font-bold text-white tracking-tight">
+          <h1 className="font-display text-3xl font-bold text-app-text tracking-tight">
             Sign in to Rank Analyzer Pro
           </h1>
-          <p className="text-slate-400 mt-3 text-sm leading-6">
+          <p className="text-app-text-muted mt-3 text-sm leading-6">
             Use Google or your email and password to access the analyzer
             workspace.
           </p>
@@ -373,11 +373,11 @@ export function LoginScreen({
         </div>
         <form onSubmit={onEmailSubmit} className="space-y-4">
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
               Email
             </span>
             <div className="relative mt-2">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-muted" />
               <input
                 type="email"
                 value={email}
@@ -390,11 +390,11 @@ export function LoginScreen({
             </div>
           </label>
           <label className="block">
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
               Password
             </span>
             <div className="relative mt-2">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-muted" />
               <input
                 type="password"
                 value={password}
@@ -431,9 +431,9 @@ export function LoginScreen({
               type="checkbox"
               checked={legalAccepted}
               onChange={(event) => onLegalAcceptedChange(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400 focus:ring-cyan-500"
+              className="mt-0.5 h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400 focus:ring-cyan-500"
             />
-            <span className="text-slate-400 leading-6">
+            <span className="text-app-text-muted leading-6">
               I agree to the{" "}
               <button
                 type="button"
@@ -469,12 +469,12 @@ export function LoginScreen({
             {isSignIn ? "Sign in with email" : "Create account"}
           </button>
         </form>
-        <p className="text-xs text-slate-500 leading-6 mt-6 text-center">
+        <p className="text-xs text-app-text-muted leading-6 mt-6 text-center">
           Review our{" "}
           <button
             type="button"
             onClick={onOpenPrivacy}
-            className="text-slate-300 hover:text-white underline underline-offset-4"
+            className="text-app-text-muted hover:text-app-text underline underline-offset-4"
           >
             Privacy Policy
           </button>{" "}
@@ -482,7 +482,7 @@ export function LoginScreen({
           <button
             type="button"
             onClick={onOpenTerms}
-            className="text-slate-300 hover:text-white underline underline-offset-4"
+            className="text-app-text-muted hover:text-app-text underline underline-offset-4"
           >
             Terms &amp; Conditions
           </button>{" "}

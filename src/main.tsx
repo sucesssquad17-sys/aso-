@@ -54,25 +54,25 @@ function MissingFirebaseConfigScreen({
   missingKeys: string[];
 }) {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl rounded-3xl border border-amber-400/30 bg-slate-900/90 p-8 shadow-2xl">
+    <div className="min-h-screen bg-app-surface text-app-text flex items-center justify-center p-6">
+      <div className="w-full max-w-2xl rounded-3xl border border-amber-400/30 bg-app-surface-muted/90 p-8 shadow-2xl">
         <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">
           Local setup required
         </p>
-        <h1 className="mt-3 text-3xl font-semibold text-white">
+        <h1 className="mt-3 text-3xl font-semibold text-app-text">
           Firebase client config is unavailable
         </h1>
-        <p className="mt-3 text-sm leading-6 text-slate-300">
+        <p className="mt-3 text-sm leading-6 text-app-text-muted">
           The frontend now loads Firebase config from the running service at{" "}
           <code>/api/public-config</code>. Set the Firebase client env vars on the
           server runtime and reload.
         </p>
-        <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
+        <div className="mt-6 rounded-2xl border border-app-border bg-app-surface/70 p-4">
           <p className="text-sm text-amber-200">
             {loadError ||
               `Missing required Firebase client config: ${missingKeys.join(", ")}.`}
           </p>
-          <ul className="mt-3 space-y-2 text-sm text-slate-300">
+          <ul className="mt-3 space-y-2 text-sm text-app-text-muted">
             {(missingKeys.length > 0 ? missingKeys : RUNTIME_FIREBASE_ENV_KEYS).map((key) => (
               <li key={key}>
                 <code>{key}</code>
@@ -80,7 +80,7 @@ function MissingFirebaseConfigScreen({
             ))}
           </ul>
         </div>
-        <p className="mt-6 text-xs text-slate-500">
+        <p className="mt-6 text-xs text-app-text-muted">
           Reference: <code>.env.example</code> lists the required runtime variables
           for local, Docker, and Cloud Run service builds.
         </p>

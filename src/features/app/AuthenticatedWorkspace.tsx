@@ -2488,7 +2488,7 @@ function getTrackedRankDisplay(trackedKeyword: TrackedKeyword) {
   }
   return {
     label: "Pending",
-    className: "text-slate-400",
+    className: "text-app-text-muted",
   };
 }
 
@@ -2698,7 +2698,7 @@ function getNotificationDiagnosticToneClass(tone: NotificationDiagnosticTone) {
     case "bad":
       return "border-red-500/25 bg-red-500/10 text-red-200";
     default:
-      return "border-slate-700/60 bg-slate-900/70 text-slate-300";
+      return "border-app-border/60 bg-app-surface-muted/70 text-app-text-muted";
   }
 }
 
@@ -3006,7 +3006,7 @@ function CountrySearchSelect({
         <div
           ref={menuRef}
           style={menuStyle}
-          className="rounded-2xl border border-slate-700/70 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-xl"
+          className="rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl"
         >
           <input
             value={query}
@@ -3028,16 +3028,16 @@ function CountrySearchSelect({
                   setIsOpen(false);
                   setQuery("");
                 }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-slate-300 hover:bg-slate-900/80"}`}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
               >
                 <div className="font-medium">{option.name}</div>
-                <div className="text-xs uppercase text-slate-500">
+                <div className="text-xs uppercase text-app-text-muted">
                   {option.code}
                 </div>
               </button>
             ))}
             {filteredOptions.length === 0 ? (
-              <div className="rounded-xl px-3 py-4 text-sm text-slate-500">
+              <div className="rounded-xl px-3 py-4 text-sm text-app-text-muted">
                 No countries match your search.
               </div>
             ) : null}
@@ -3056,7 +3056,7 @@ function CountrySearchSelect({
         className="input-field py-2 w-full text-left flex items-center justify-between gap-3"
       >
         <span className="truncate">{selectedLabel}</span>
-        <span className="text-slate-500 text-xs uppercase">
+        <span className="text-app-text-muted text-xs uppercase">
           {value.toUpperCase()}
         </span>
       </button>{" "}
@@ -3136,16 +3136,16 @@ function CountryMultiSelectModal({
               onToggleCountry(option.code);
             }
           }}
-          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-slate-300 hover:bg-slate-900/80"}`}
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
         >
           <div>
             <div className="font-medium">{option.name}</div>
-            <div className="text-xs uppercase text-slate-500">
+            <div className="text-xs uppercase text-app-text-muted">
               {option.code}
             </div>
           </div>
           <div
-            className={`text-xs font-semibold ${isSelected ? "text-cyan-300" : "text-slate-500"}`}
+            className={`text-xs font-semibold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}
           >
             {isSelected ? selectedLabel : isDisabled ? disabledLabel : addLabel}
           </div>
@@ -3163,18 +3163,18 @@ function CountryMultiSelectModal({
   );
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
       {" "}
-      <div className="w-full max-w-2xl rounded-3xl border border-slate-700/70 bg-slate-950/95 p-6 shadow-2xl">
+      <div className="w-full max-w-2xl rounded-3xl border border-app-border/70 bg-app-surface/95 p-6 shadow-2xl">
         {" "}
         <div className="flex items-start justify-between gap-4">
           {" "}
           <div>
             {" "}
-            <h3 className="font-display text-xl font-bold text-slate-100">
+            <h3 className="font-display text-xl font-bold text-app-text">
               {title}
             </h3>{" "}
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-app-text-muted">
               {description ?? (
                 <>
                   {" "}
@@ -3188,7 +3188,7 @@ function CountryMultiSelectModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-200"
+            className="rounded-xl p-2 text-app-text-muted transition-colors hover:bg-white/5 hover:text-app-text"
           >
             {" "}
             <X className="w-4 h-4" />{" "}
@@ -3209,7 +3209,7 @@ function CountryMultiSelectModal({
           {disabledCountries.map((countryCode) => (
             <span
               key={`tracked-${countryCode}`}
-              className="rounded-full border border-slate-700/70 bg-slate-950/60 px-3 py-1 text-xs text-slate-400"
+              className="rounded-full border border-app-border/70 bg-app-surface/60 px-3 py-1 text-xs text-app-text-muted"
             >
               {findCountryName(countryCode)} already tracked
             </span>
@@ -3224,12 +3224,12 @@ function CountryMultiSelectModal({
             </span>
           ))}{" "}
           {selectedCountries.length === 0 && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-app-text-muted">
               Choose at least one country.
             </span>
           )}{" "}
         </div>{" "}
-        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border border-slate-700/60 bg-slate-900/40 p-3">
+        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border border-app-border/60 bg-app-surface-muted/40 p-3">
           {query.trim() ? (
             <>
               {filteredOptions.map(renderCountryButton)}
@@ -3244,8 +3244,8 @@ function CountryMultiSelectModal({
                   {priorityOptions.map(renderCountryButton)}
                 </div>
               </div>
-              <div className="border-t border-slate-700/50 pt-3">
-                <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <div className="border-t border-app-border/50 pt-3">
+                <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                   All Countries
                 </p>
                 <div className="space-y-2">
@@ -3255,14 +3255,14 @@ function CountryMultiSelectModal({
             </>
           )}
           {filteredOptions.length === 0 && (
-            <div className="rounded-xl px-3 py-4 text-sm text-slate-500">
+            <div className="rounded-xl px-3 py-4 text-sm text-app-text-muted">
               No countries match your search.
             </div>
           )}
         </div>{" "}
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           {" "}
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-app-text-muted">
             {" "}
             {selectedCountries.length} selected{" "}
           </div>{" "}
@@ -3562,21 +3562,21 @@ function AlertRuleManagerModal({
   if (!isOpen || !group) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl rounded-3xl border border-slate-700/60 bg-slate-950/95 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700/50 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-4xl rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-app-border/50 px-6 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
               Alerts
             </p>
-            <h3 className="mt-1 font-display text-xl font-bold text-slate-100">
+            <h3 className="mt-1 font-display text-xl font-bold text-app-text">
               {group.appTitle} - "{group.keyword}"
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-200"
+            className="rounded-xl p-2 text-app-text-muted transition-colors hover:bg-app-surface-muted hover:text-app-text"
           >
             <X className="h-4 w-4" />
           </button>
@@ -3612,7 +3612,7 @@ function AlertRuleManagerModal({
                     setSelectedCountries(group.countries);
                     setEditingRuleId(null);
                   }}
-                  className="rounded-full border border-slate-700/60 bg-slate-900/70 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
+                  className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-3 py-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
                   title={preset.description}
                 >
                   {preset.label}
@@ -3620,16 +3620,16 @@ function AlertRuleManagerModal({
               ))}
             </div>
 
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
+            <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-slate-100">
+                <h4 className="text-sm font-semibold text-app-text">
                   {editingRuleId ? "Edit rule" : "Create rule"}
                 </h4>
                 {editingRuleId && (
                   <button
                     type="button"
                     onClick={resetBuilder}
-                    className="text-xs font-semibold text-slate-400 transition-colors hover:text-slate-200"
+                    className="text-xs font-semibold text-app-text-muted transition-colors hover:text-app-text"
                   >
                     New rule
                   </button>
@@ -3638,7 +3638,7 @@ function AlertRuleManagerModal({
 
               <div className="space-y-4">
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Countries
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -3655,7 +3655,7 @@ function AlertRuleManagerModal({
                                 : [...prev, country],
                             )
                           }
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${isSelected ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200" : "border-slate-700/60 bg-slate-950/40 text-slate-400 hover:text-slate-200"}`}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${isSelected ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200" : "border-app-border/60 bg-app-surface/40 text-app-text-muted hover:text-app-text"}`}
                         >
                           {country.toUpperCase()}
                         </button>
@@ -3665,7 +3665,7 @@ function AlertRuleManagerModal({
                 </div>
 
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Conditions
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -3673,7 +3673,7 @@ function AlertRuleManagerModal({
                       (conditionType) => (
                         <label
                           key={conditionType}
-                          className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-2 text-sm text-slate-300"
+                          className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
@@ -3686,7 +3686,7 @@ function AlertRuleManagerModal({
                                     [conditionType]: event.target.checked,
                                   }))
                                 }
-                                className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                                className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                               />
                               <span>{ALERT_CONDITION_LABELS[conditionType]}</span>
                             </div>
@@ -3701,7 +3701,7 @@ function AlertRuleManagerModal({
                                     [conditionType]: event.target.value,
                                   }))
                                 }
-                                className="w-16 rounded-lg border border-slate-700/60 bg-slate-900 px-2 py-1 text-right text-xs text-slate-200"
+                                className="w-16 rounded-lg border border-app-border/60 bg-app-surface-muted px-2 py-1 text-right text-xs text-app-text"
                               />
                             )}
                           </div>
@@ -3712,7 +3712,7 @@ function AlertRuleManagerModal({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <label className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-2 text-sm text-slate-300">
+                  <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted">
                     <div className="flex items-center justify-between">
                       <span>In-app</span>
                       <input
@@ -3721,11 +3721,11 @@ function AlertRuleManagerModal({
                         onChange={(event) =>
                           setInAppEnabled(event.target.checked)
                         }
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </div>
                   </label>
-                  <label className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-2 text-sm text-slate-300">
+                  <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted">
                     <div className="flex items-center justify-between">
                       <span>Push</span>
                       <input
@@ -3734,11 +3734,11 @@ function AlertRuleManagerModal({
                         onChange={(event) => {
                           void handlePushToggle(event.target.checked);
                         }}
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </div>
                   </label>
-                  <label className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-2 text-sm text-slate-300">
+                  <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted">
                     <div className="flex items-center justify-between">
                       <span>Email</span>
                       <input
@@ -3747,7 +3747,7 @@ function AlertRuleManagerModal({
                         onChange={(event) =>
                           setEmailEnabled(event.target.checked)
                         }
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </div>
                   </label>
@@ -3774,27 +3774,27 @@ function AlertRuleManagerModal({
           </div>
 
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
-              <h4 className="text-sm font-semibold text-slate-100">
+            <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
+              <h4 className="text-sm font-semibold text-app-text">
                 Existing rules
               </h4>
               <div className="mt-3 space-y-3">
                 {groupRules.length === 0 ? (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-app-text-muted">
                     No alert rules yet. Start with a preset or create your own.
                   </p>
                 ) : (
                   groupRules.map((rule) => (
                     <div
                       key={rule.id}
-                      className="rounded-2xl border border-slate-700/60 bg-slate-950/40 p-3"
+                      className="rounded-2xl border border-app-border/60 bg-app-surface/40 p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-slate-100">
+                          <div className="text-sm font-semibold text-app-text">
                             {buildAlertRuleSummary(rule)}
                           </div>
-                          <div className="mt-1 text-xs text-slate-500">
+                          <div className="mt-1 text-xs text-app-text-muted">
                             {rule.countries.map((country) => country.toUpperCase()).join(", ")}
                           </div>
                         </div>
@@ -4033,17 +4033,17 @@ function CompetitorAsoAlertRuleManagerModal({
   if (!isOpen || !group) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl rounded-3xl border border-slate-700/60 bg-slate-950/95 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700/50 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-4xl rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-app-border/50 px-6 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
               Competitor ASO Alerts
             </p>
-            <h3 className="mt-1 font-display text-xl font-bold text-slate-100">
+            <h3 className="mt-1 font-display text-xl font-bold text-app-text">
               {group.title}
             </h3>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-app-text-muted">
               Watch daily metadata changes across the competitor apps in this
               group.
             </p>
@@ -4051,7 +4051,7 @@ function CompetitorAsoAlertRuleManagerModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-200"
+            className="rounded-xl p-2 text-app-text-muted transition-colors hover:bg-app-surface-muted hover:text-app-text"
           >
             <X className="h-4 w-4" />
           </button>
@@ -4079,7 +4079,7 @@ function CompetitorAsoAlertRuleManagerModal({
                     setSelectedCountries(group.countries);
                     setEditingRuleId(null);
                   }}
-                  className="rounded-full border border-slate-700/60 bg-slate-900/70 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
+                  className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-3 py-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
                   title={preset.description}
                 >
                   {preset.label}
@@ -4087,16 +4087,16 @@ function CompetitorAsoAlertRuleManagerModal({
               ))}
             </div>
 
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
+            <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-slate-100">
+                <h4 className="text-sm font-semibold text-app-text">
                   {editingRuleId ? "Edit rule" : "Create rule"}
                 </h4>
                 {editingRuleId ? (
                   <button
                     type="button"
                     onClick={resetBuilder}
-                    className="text-xs font-semibold text-slate-400 transition-colors hover:text-slate-200"
+                    className="text-xs font-semibold text-app-text-muted transition-colors hover:text-app-text"
                   >
                     New rule
                   </button>
@@ -4104,7 +4104,7 @@ function CompetitorAsoAlertRuleManagerModal({
               </div>
               <div className="space-y-4">
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Countries
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -4121,7 +4121,7 @@ function CompetitorAsoAlertRuleManagerModal({
                                 : [...prev, country],
                             )
                           }
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${isSelected ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200" : "border-slate-700/60 bg-slate-950/40 text-slate-400 hover:text-slate-200"}`}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${isSelected ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200" : "border-app-border/60 bg-app-surface/40 text-app-text-muted hover:text-app-text"}`}
                         >
                           {country.toUpperCase()}
                         </button>
@@ -4130,14 +4130,14 @@ function CompetitorAsoAlertRuleManagerModal({
                   </div>
                 </div>
                 <div>
-                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Change types
                   </p>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {COMPETITOR_ASO_ALERT_CONDITION_TYPES.map((conditionType) => (
                       <label
                         key={conditionType}
-                        className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-2 text-sm text-slate-300"
+                        className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted"
                       >
                         <div className="flex items-center gap-2">
                           <input
@@ -4149,7 +4149,7 @@ function CompetitorAsoAlertRuleManagerModal({
                                 [conditionType]: event.target.checked,
                               }))
                             }
-                            className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                            className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                           />
                           <span>{ALERT_CONDITION_LABELS[conditionType]}</span>
                         </div>
@@ -4158,11 +4158,11 @@ function CompetitorAsoAlertRuleManagerModal({
                   </div>
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  <label className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-3 text-sm text-slate-300">
+                  <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-slate-100">In-app</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="font-semibold text-app-text">In-app</p>
+                        <p className="mt-1 text-xs text-app-text-muted">
                           Add events to the workspace notification feed.
                         </p>
                       </div>
@@ -4172,15 +4172,15 @@ function CompetitorAsoAlertRuleManagerModal({
                         onChange={(event) =>
                           setInAppEnabled(event.target.checked)
                         }
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </div>
                   </label>
-                  <label className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-3 text-sm text-slate-300">
+                  <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-slate-100">Push</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="font-semibold text-app-text">Push</p>
+                        <p className="mt-1 text-xs text-app-text-muted">
                           Send browser push alerts for these changes.
                         </p>
                       </div>
@@ -4190,15 +4190,15 @@ function CompetitorAsoAlertRuleManagerModal({
                         onChange={(event) => {
                           void handlePushToggle(event.target.checked);
                         }}
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </div>
                   </label>
-                  <label className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-3 py-3 text-sm text-slate-300">
+                  <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <p className="font-semibold text-slate-100">Email</p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="font-semibold text-app-text">Email</p>
+                        <p className="mt-1 text-xs text-app-text-muted">
                           Send alert emails to your account address.
                         </p>
                       </div>
@@ -4208,7 +4208,7 @@ function CompetitorAsoAlertRuleManagerModal({
                         onChange={(event) =>
                           setEmailEnabled(event.target.checked)
                         }
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </div>
                   </label>
@@ -4224,25 +4224,25 @@ function CompetitorAsoAlertRuleManagerModal({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
+          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h4 className="text-sm font-semibold text-slate-100">
+                <h4 className="text-sm font-semibold text-app-text">
                   Existing rules
                 </h4>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-app-text-muted">
                   These rules cover {group.competitorApps.length} competitor
                   app{group.competitorApps.length === 1 ? "" : "s"} in this
                   group.
                 </p>
               </div>
-              <span className="rounded-full border border-slate-700/60 bg-slate-950/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+              <span className="rounded-full border border-app-border/60 bg-app-surface/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                 {groupRules.length} saved
               </span>
             </div>
             <div className="mt-4 space-y-3">
               {groupRules.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-700/60 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
+                <div className="rounded-2xl border border-dashed border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
                   No ASO alert rules yet. Create one to monitor title,
                   description, screenshots, icon, or category changes.
                 </div>
@@ -4250,14 +4250,14 @@ function CompetitorAsoAlertRuleManagerModal({
                 groupRules.map((rule) => (
                   <div
                     key={rule.id}
-                    className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4"
+                    className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-semibold text-slate-100">
+                        <p className="text-sm font-semibold text-app-text">
                           {buildAlertRuleSummary(rule)}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-app-text-muted">
                           Updated{" "}
                           {formatAlertEventTime(
                             rule.updatedAt || rule.createdAt || "",
@@ -4268,7 +4268,7 @@ function CompetitorAsoAlertRuleManagerModal({
                         <button
                           type="button"
                           onClick={() => startEditingRule(rule)}
-                          className="rounded-xl border border-slate-700/60 bg-slate-900/80 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
+                          className="rounded-xl border border-app-border/60 bg-app-surface-muted/80 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
                         >
                           Edit
                         </button>
@@ -6795,10 +6795,10 @@ function AuthenticatedApp({
           toast(
             <div className="flex flex-col gap-1">
               {" "}
-              <span className="font-semibold text-slate-100">
+              <span className="font-semibold text-app-text">
                 {trackedKeyword.appTitle}
               </span>{" "}
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-app-text-muted">
                 Keyword:{" "}
                 <span className="font-medium text-cyan-400">
                   "{trackedKeyword.keyword}"
@@ -10905,7 +10905,7 @@ function AuthenticatedApp({
     : `${discoveryCardBaseClass} bg-cyan-950/40 border border-cyan-500/20 text-cyan-300 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
   const suggestionKeywordCardClass = isLightTheme
     ? `${discoveryCardBaseClass} border border-cyan-200/80 bg-[linear-gradient(180deg,rgba(247,253,255,0.94),rgba(233,247,252,0.86))] text-slate-800 hover:border-cyan-400/65 hover:shadow-cyan-200/55`
-    : `${discoveryCardBaseClass} bg-slate-900/70 border border-cyan-500/20 text-cyan-200 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
+    : `${discoveryCardBaseClass} bg-app-surface-muted/70 border border-cyan-500/20 text-cyan-200 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
   const discoveryMetricRowClass = isLightTheme
     ? "flex items-center gap-2.5 text-xs text-sky-700/80 font-semibold"
     : "flex items-center gap-2.5 text-xs text-cyan-400/80 font-medium";
@@ -10921,7 +10921,7 @@ function AuthenticatedApp({
               ? "border-emerald-300/80 hover:bg-emerald-50 text-emerald-600"
               : "border-sky-300/80 hover:bg-sky-50 text-sky-600"
         }`
-      : `bg-slate-900/90 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${
+      : `bg-app-surface-muted/90 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${
           isTracked
             ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400"
             : tone === "ranked"
@@ -10975,7 +10975,7 @@ function AuthenticatedApp({
     return (
       <ErrorBoundary>
         <div
-          className="min-h-screen text-slate-100 font-sans relative flex items-center justify-center"
+          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
           {" "}
@@ -10985,7 +10985,7 @@ function AuthenticatedApp({
           <div className="card-glow relative z-10 px-8 py-10 text-center">
             {" "}
             <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />{" "}
-            <p className="text-sm uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
               Loading account data
             </p>{" "}
           </div>{" "}
@@ -10997,7 +10997,7 @@ function AuthenticatedApp({
     return (
       <ErrorBoundary>
         <div
-          className="min-h-screen text-slate-100 font-sans relative flex items-center justify-center"
+          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
           <div className="bg-orb bg-orb-1" />
@@ -11005,7 +11005,7 @@ function AuthenticatedApp({
           <div className="bg-orb bg-orb-3" />
           <div className="card-glow relative z-10 px-8 py-10 text-center">
             <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
-            <p className="text-sm uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
               Checking billing access
             </p>
           </div>
@@ -11017,7 +11017,7 @@ function AuthenticatedApp({
     return (
       <ErrorBoundary>
         <div
-          className="min-h-screen text-slate-100 font-sans relative flex items-center justify-center"
+          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
           <div className="bg-orb bg-orb-1" />
@@ -11025,10 +11025,10 @@ function AuthenticatedApp({
           <div className="bg-orb bg-orb-3" />
           <div className="card-glow relative z-10 max-w-md px-8 py-10 text-center">
             <AlertCircle className="mx-auto mb-4 h-8 w-8 text-amber-300" />
-            <p className="text-sm uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
               Billing status unavailable
             </p>
-            <p className="mt-4 text-sm leading-6 text-slate-300">
+            <p className="mt-4 text-sm leading-6 text-app-text-muted">
               {billingError ||
                 "We couldn't verify billing access right now. Retry before showing the upgrade gate."}
             </p>
@@ -11044,7 +11044,7 @@ function AuthenticatedApp({
               <button
                 type="button"
                 onClick={() => void onSignOut()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-slate-700 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:bg-slate-800"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-app-border bg-app-surface-muted/70 px-4 py-2 text-sm font-semibold text-app-text transition-colors hover:bg-app-surface-strong"
               >
                 <LogOut className="h-4 w-4" />
                 Use different account
@@ -11089,10 +11089,10 @@ function AuthenticatedApp({
             {" "}
             <ShieldCheck className="w-3.5 h-3.5" /> First login{" "}
           </div>{" "}
-          <h1 className="font-display text-3xl font-bold text-white tracking-tight">
+          <h1 className="font-display text-3xl font-bold text-app-text tracking-tight">
             Accept the legal terms
           </h1>{" "}
-          <p className="text-slate-400 mt-3 text-sm leading-6">
+          <p className="text-app-text-muted mt-3 text-sm leading-6">
             {" "}
             Before entering the app for the first time, review and accept the
             Privacy Policy and Terms &amp; Conditions.{" "}
@@ -11128,9 +11128,9 @@ function AuthenticatedApp({
               type="checkbox"
               checked={consentChecked}
               onChange={(event) => setConsentChecked(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400 focus:ring-cyan-500"
+              className="mt-0.5 h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400 focus:ring-cyan-500"
             />{" "}
-            <span className="text-slate-400 leading-6">
+            <span className="text-app-text-muted leading-6">
               {" "}
               I have read and agree to the Terms &amp; Conditions and Privacy
               Policy.{" "}
@@ -11159,14 +11159,14 @@ function AuthenticatedApp({
 <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                   <div className="workspace-chip-label">Search Composer</div>
-                  <h2 className="mt-1 text-xl font-semibold text-slate-100">
+                  <h2 className="mt-1 text-xl font-semibold text-app-text">
                     {visibleWorkspaceMode === "single"
                       ? "Find an app to analyze"
                       : visibleWorkspaceMode === "competitors"
                         ? "Build a competitor group"
                         : "Search and add apps to compare"}
                   </h2>
-                  <p className="mt-2 text-sm text-slate-400">
+                  <p className="mt-2 text-sm text-app-text-muted">
                     {visibleWorkspaceMode === "single"
                       ? "Search by app name or paste a direct store URL to load its workspace."
                       : visibleWorkspaceMode === "competitors"
@@ -11214,7 +11214,7 @@ function AuthenticatedApp({
                     </button>
                   </div>
                   <div className="workspace-topbar-country workspace-utility-chip shrink-0">
-                    <Globe className="hidden h-3.5 w-3.5 text-slate-500 sm:block" />
+                    <Globe className="hidden h-3.5 w-3.5 text-app-text-muted sm:block" />
                     <CountrySearchSelect
                       value={country}
                       onChange={handleCountryChange}
@@ -11229,7 +11229,7 @@ function AuthenticatedApp({
                   className="flex flex-col sm:flex-row gap-2 w-full"
                 >
                   <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-app-text-muted" />
                     <input
                       id="app-search"
                       name="appSearch"
@@ -11254,7 +11254,7 @@ function AuthenticatedApp({
                           setSearchResults([]);
                           setHasSearched(false);
                         }}
-                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-full hover:bg-slate-900 bg-slate-900"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-app-text-muted hover:text-app-text-muted transition-colors p-1 rounded-full hover:bg-app-surface-muted bg-app-surface-muted"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -11305,7 +11305,7 @@ function AuthenticatedApp({
               {/* Search Results Skeleton */}{" "}
               {isSearching && (
                 <div
-                  className="mt-4 rounded-2xl overflow-hidden border border-slate-700/40 bg-slate-950/60"
+                  className="mt-4 rounded-2xl overflow-hidden border border-app-border/40 bg-app-surface/60"
                 >
                   {" "}
                   {[1, 2, 3, 4].map((i) => (
@@ -11352,10 +11352,10 @@ function AuthenticatedApp({
                         style={{ color: "#475569" }}
                       />{" "}
                     </div>{" "}
-                    <h3 className="text-base font-semibold text-slate-300 mb-1">
+                    <h3 className="text-base font-semibold text-app-text-muted mb-1">
                       No apps found
                     </h3>{" "}
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-app-text-muted">
                       Try adjusting your search term or paste a direct store
                       URL.
                     </p>{" "}
@@ -11370,7 +11370,7 @@ function AuthenticatedApp({
                       {" "}
                       <button
                         onClick={() => setSelectedCategory(null)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "text-black border-transparent" : "text-slate-400 hover:text-slate-200"}`}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
                         style={
                           selectedCategory === null
                             ? {
@@ -11390,7 +11390,7 @@ function AuthenticatedApp({
                         <button
                           key={cat}
                           onClick={() => setSelectedCategory(cat)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "text-black border-transparent" : "text-slate-400 hover:text-slate-200"}`}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
                           style={
                             selectedCategory === cat
                               ? {
@@ -11410,7 +11410,7 @@ function AuthenticatedApp({
                     </div>
                   )}{" "}
                   <div
-                    className="rounded-2xl overflow-hidden max-h-[560px] overflow-y-auto border border-slate-700/40 bg-slate-950/70"
+                    className="rounded-2xl overflow-hidden max-h-[560px] overflow-y-auto border border-app-border/40 bg-app-surface/70"
                   >
                     {" "}
                     {filteredResults.length > 0 ? (
@@ -11428,8 +11428,8 @@ function AuthenticatedApp({
                         return (
                         <div
                           key={app.appId || app.id}
-                          className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-all hover:bg-slate-800/50 cursor-pointer ${
-                            idx < filteredResults.length - 1 ? "border-b border-slate-800/70" : ""
+                          className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-all hover:bg-app-surface-strong/50 cursor-pointer ${
+                            idx < filteredResults.length - 1 ? "border-b border-app-border/70" : ""
                           }`}
                         >
                           {" "}
@@ -11445,19 +11445,19 @@ function AuthenticatedApp({
                             <img
                               src={app.icon}
                               alt={app.title}
-                              className="w-14 h-14 rounded-2xl shadow-lg object-cover flex-shrink-0 border border-slate-700/40"
+                              className="w-14 h-14 rounded-2xl shadow-lg object-cover flex-shrink-0 border border-app-border/40"
                             />{" "}
                             <div className="min-w-0">
                               {" "}
                               <h3
-                                className="font-semibold text-slate-100 line-clamp-1 mb-0.5"
+                                className="font-semibold text-app-text line-clamp-1 mb-0.5"
                                 style={{ fontSize: "0.9375rem" }}
                               >
                                 {app.title}
                               </h3>{" "}
                               <div className="flex flex-wrap items-center gap-2">
                                 {" "}
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-app-text-muted">
                                   {app.developer}
                                 </p>{" "}
                                 {app.category && (
@@ -11556,7 +11556,7 @@ function AuthenticatedApp({
                         );
                       })
                     ) : (
-                      <div className="p-10 text-center text-slate-500 flex flex-col items-center">
+                      <div className="p-10 text-center text-app-text-muted flex flex-col items-center">
                         {" "}
                         <Search className="w-8 h-8 mb-3 opacity-40" /> No apps
                         in this category.{" "}
@@ -11590,7 +11590,7 @@ function AuthenticatedApp({
           onReturn={hasActiveBillingAccess ? () => setViewMode("single") : undefined}
         />
       ) : (
-      <div className="workspace-shell min-h-screen text-slate-100 font-sans relative pb-20 md:pb-0">
+      <div className="workspace-shell min-h-screen text-app-text font-sans relative pb-20 md:pb-0">
         <MobileBottomNav
           tabs={mobileWorkspacePageConfigs}
           activeId={viewMode === "charts" ? "single" : viewMode}
@@ -11612,7 +11612,7 @@ function AuthenticatedApp({
               <div className="workspace-mobile-only flex items-center gap-2">
                 <button
                   onClick={onSignOut}
-                  className="h-8 w-8 overflow-hidden rounded-full border border-slate-700/50 bg-slate-800 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-950 sm:h-9 sm:w-9"
+                  className="h-8 w-8 overflow-hidden rounded-full border border-app-border/50 bg-app-surface-strong focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-950 sm:h-9 sm:w-9"
                   title="Sign out"
                 >
                   {currentUser.photoURL ? (
@@ -11629,7 +11629,7 @@ function AuthenticatedApp({
               <div className="workspace-desktop-only workspace-utility-chip">
                 <div className="min-w-0">
                   <p className="workspace-chip-label">Signed in as</p>
-                  <p className="truncate text-sm font-semibold text-slate-200 max-w-[180px]">
+                  <p className="truncate text-sm font-semibold text-app-text max-w-[180px]">
                     {currentUser.displayName ||
                       currentUser.email ||
                       "Authenticated user"}
@@ -11679,7 +11679,7 @@ function AuthenticatedApp({
                       <p className="mb-2 text-sm font-semibold text-red-200">
                         Delete this account?
                       </p>
-                      <p className="mb-3 text-xs leading-relaxed text-slate-400">
+                      <p className="mb-3 text-xs leading-relaxed text-app-text-muted">
                         This removes your saved bookmarks, tracked apps,
                         competitor snapshots, tracked keywords, rank history,
                         and Firebase login for this account.
@@ -11688,9 +11688,9 @@ function AuthenticatedApp({
                         If Firebase asks for a recent login, sign in again and
                         retry.
                       </p>
-                      <label className="mb-3 block text-xs text-slate-400">
+                      <label className="mb-3 block text-xs text-app-text-muted">
                         Type{" "}
-                        <span className="font-semibold text-slate-200">
+                        <span className="font-semibold text-app-text">
                           {deleteAccountConfirmationPhrase}
                         </span>{" "}
                         to confirm.
@@ -11701,7 +11701,7 @@ function AuthenticatedApp({
                             setDeleteAccountConfirmationInput(event.target.value)
                           }
                           placeholder={deleteAccountConfirmationPhrase}
-                          className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none transition-colors focus:border-cyan-500/40"
+                          className="mt-2 w-full rounded-xl border border-app-border bg-app-surface/80 px-3 py-2 text-sm text-app-text outline-none transition-colors focus:border-cyan-500/40"
                         />
                       </label>
                       <div className="flex gap-2">
@@ -11756,13 +11756,13 @@ function AuthenticatedApp({
                           <div className="mb-3 flex items-center justify-between sm:mb-4">
                             <div className="flex items-center gap-2">
                               <BellRing className="h-4 w-4 text-cyan-400" />
-                              <h3 className="font-bold text-slate-100">Quick Start</h3>
+                              <h3 className="font-bold text-app-text">Quick Start</h3>
                             </div>
                             <div className="text-xs font-bold text-cyan-400">
                               {completedOnboardingStepCount}/{onboardingSteps.length}
                             </div>
                           </div>
-                          <p className="mb-3 text-[10px] leading-relaxed text-slate-400 sm:mb-4 sm:text-xs">
+                          <p className="mb-3 text-[10px] leading-relaxed text-app-text-muted sm:mb-4 sm:text-xs">
                             Follow these steps once and the app starts paying you back: analyze your app, track a keyword, add competitors, then turn on alerts.
                           </p>
                           <div className="flex flex-col gap-2">
@@ -11772,8 +11772,8 @@ function AuthenticatedApp({
                                 className={cn(
                                   "rounded-xl border p-2 sm:p-3",
                                   step.isComplete
-                                    ? "border-slate-700/50 bg-slate-800/50"
-                                    : "border-slate-600/60 bg-slate-800/80"
+                                    ? "border-app-border/50 bg-app-surface-strong/50"
+                                    : "border-app-border/60 bg-app-surface-strong/80"
                                 )}
                               >
                                 <div className="flex items-start gap-2 sm:gap-3">
@@ -11782,7 +11782,7 @@ function AuthenticatedApp({
                                       "mt-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold sm:h-5 sm:w-5 sm:text-[10px]",
                                       step.isComplete
                                         ? "bg-cyan-500/20 text-cyan-300"
-                                        : "bg-slate-900 text-slate-300"
+                                        : "bg-app-surface-muted text-app-text-muted"
                                     )}
                                   >
                                     {step.isComplete ? "✓" : index + 1}
@@ -11791,12 +11791,12 @@ function AuthenticatedApp({
                                     <h4
                                       className={cn(
                                         "text-[11px] font-semibold sm:text-xs",
-                                        step.isComplete ? "text-slate-300" : "text-slate-100"
+                                        step.isComplete ? "text-app-text-muted" : "text-app-text"
                                       )}
                                     >
                                       {step.title}
                                     </h4>
-                                    <p className="mt-0.5 text-[9px] leading-tight text-slate-400 sm:mt-1 sm:text-[10px]">
+                                    <p className="mt-0.5 text-[9px] leading-tight text-app-text-muted sm:mt-1 sm:text-[10px]">
                                       {step.description}
                                     </p>
                                     {!step.isComplete && (
@@ -11899,13 +11899,13 @@ function AuthenticatedApp({
                           <div className="mb-3 flex items-center justify-between sm:mb-4">
                             <div className="flex items-center gap-2">
                               <BellRing className="h-4 w-4 text-cyan-400" />
-                              <h3 className="font-bold text-slate-100">Quick Start</h3>
+                              <h3 className="font-bold text-app-text">Quick Start</h3>
                             </div>
                             <div className="text-xs font-bold text-cyan-400">
                               {completedOnboardingStepCount}/{onboardingSteps.length}
                             </div>
                           </div>
-                          <p className="mb-3 text-[10px] leading-relaxed text-slate-400 sm:mb-4 sm:text-xs">
+                          <p className="mb-3 text-[10px] leading-relaxed text-app-text-muted sm:mb-4 sm:text-xs">
                             Follow these steps once and the app starts paying you back: analyze your app, track a keyword, add competitors, then turn on alerts.
                           </p>
                           <div className="flex flex-col gap-2">
@@ -11915,8 +11915,8 @@ function AuthenticatedApp({
                                 className={cn(
                                   "rounded-xl border p-2 sm:p-3",
                                   step.isComplete
-                                    ? "border-slate-700/50 bg-slate-800/50"
-                                    : "border-slate-600/60 bg-slate-800/80"
+                                    ? "border-app-border/50 bg-app-surface-strong/50"
+                                    : "border-app-border/60 bg-app-surface-strong/80"
                                 )}
                               >
                                 <div className="flex items-start gap-2 sm:gap-3">
@@ -11925,7 +11925,7 @@ function AuthenticatedApp({
                                       "mt-0.5 flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold sm:h-5 sm:w-5 sm:text-[10px]",
                                       step.isComplete
                                         ? "bg-cyan-500/20 text-cyan-300"
-                                        : "bg-slate-900 text-slate-300"
+                                        : "bg-app-surface-muted text-app-text-muted"
                                     )}
                                   >
                                     {step.isComplete ? "✓" : index + 1}
@@ -11934,12 +11934,12 @@ function AuthenticatedApp({
                                     <h4
                                       className={cn(
                                         "text-[11px] font-semibold sm:text-xs",
-                                        step.isComplete ? "text-slate-300" : "text-slate-100"
+                                        step.isComplete ? "text-app-text-muted" : "text-app-text"
                                       )}
                                     >
                                       {step.title}
                                     </h4>
-                                    <p className="mt-0.5 text-[9px] leading-tight text-slate-400 sm:mt-1 sm:text-[10px]">
+                                    <p className="mt-0.5 text-[9px] leading-tight text-app-text-muted sm:mt-1 sm:text-[10px]">
                                       {step.description}
                                     </p>
                                     {!step.isComplete && (
@@ -11972,10 +11972,10 @@ function AuthenticatedApp({
             <WorkspacePanel className="workspace-sidebar-panel workspace-sidebar-brand">
               <div className="space-y-3">
                 <div className="workspace-page-eyebrow">Workspace</div>
-                <div className="text-lg font-semibold text-slate-100">
+                <div className="text-lg font-semibold text-app-text">
                   {activeWorkspacePage.title}
                 </div>
-                <p className="workspace-sidebar-description text-sm text-slate-400">
+                <p className="workspace-sidebar-description text-sm text-app-text-muted">
                   {activeWorkspacePage.description}
                 </p>
               </div>
@@ -11997,26 +11997,26 @@ function AuthenticatedApp({
               <div className="workspace-chip-label">Live context</div>
               <div className="mt-3 space-y-3 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500">Market</span>
-                  <span className="font-medium text-slate-200">
+                  <span className="text-app-text-muted">Market</span>
+                  <span className="font-medium text-app-text">
                     {findCountryName(country) || country}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500">Store</span>
-                  <span className="font-medium text-slate-200">
+                  <span className="text-app-text-muted">Store</span>
+                  <span className="font-medium text-app-text">
                     {storeType === "ios" ? "iOS" : "Google Play"}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500">Tracked groups</span>
-                  <span className="font-medium text-slate-200">
+                  <span className="text-app-text-muted">Tracked groups</span>
+                  <span className="font-medium text-app-text">
                     {trackedKeywordGroupCount}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500">Bookmarks</span>
-                  <span className="font-medium text-slate-200">
+                  <span className="text-app-text-muted">Bookmarks</span>
+                  <span className="font-medium text-app-text">
                     {bookmarks.length}
                   </span>
                 </div>
@@ -12060,7 +12060,7 @@ function AuthenticatedApp({
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-300/80">
                       Session access
                     </p>
-                    <p className="mt-1 text-sm leading-6 text-slate-400">
+                    <p className="mt-1 text-sm leading-6 text-app-text-muted">
                       Some actions are unavailable in this session. Sign in to manage your live workspace data.
                     </p>
                   </div>
@@ -12114,7 +12114,7 @@ function AuthenticatedApp({
                               <div className="flex items-center justify-between gap-3">
                                 <div>
                                   <div className="workspace-chip-label">PDF Export</div>
-                                  <h3 className="mt-1 text-sm font-semibold text-slate-100">
+                                  <h3 className="mt-1 text-sm font-semibold text-app-text">
                                     Choose timeline and country
                                   </h3>
                                 </div>
@@ -12128,7 +12128,7 @@ function AuthenticatedApp({
                                 </button>
                               </div>
                               <div className="mt-4">
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                   Timeline
                                 </div>
                                 <div className="mt-2 grid grid-cols-2 gap-2">
@@ -12141,7 +12141,7 @@ function AuthenticatedApp({
                                         "rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
                                         pdfHistoryRange === option.key
                                           ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-200"
-                                          : "border-slate-700/70 bg-slate-950/60 text-slate-300 hover:text-slate-100",
+                                          : "border-app-border/70 bg-app-surface/60 text-app-text-muted hover:text-app-text",
                                       )}
                                     >
                                       {option.label}
@@ -12150,7 +12150,7 @@ function AuthenticatedApp({
                                 </div>
                               </div>
                               <div className="mt-4">
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                   Country Scope
                                 </div>
                                 <div className="mt-2">
@@ -12278,7 +12278,7 @@ function AuthenticatedApp({
                         </h3>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/60 p-1">
+                        <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
                           {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                             <button
                               key={mode}
@@ -12288,7 +12288,7 @@ function AuthenticatedApp({
                                 setCompetitorGroupMode(mode);
                                 clearCompetitorDraftAnalysis();
                               }}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${competitorGroupMode === mode ? "bg-slate-900 text-cyan-100 ring-1 ring-inset ring-cyan-300/10" : "text-slate-400 hover:text-slate-200"}`}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${competitorGroupMode === mode ? "bg-app-surface-muted text-cyan-100 ring-1 ring-inset ring-cyan-300/10" : "text-app-text-muted hover:text-app-text"}`}
                             >
                               {mode}
                             </button>
@@ -12345,7 +12345,7 @@ function AuthenticatedApp({
                     <div className="space-y-4">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className={cn(
-                          "rounded-2xl border border-slate-700/60 bg-slate-900/65 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] transition-all",
+                          "rounded-2xl border border-app-border/60 bg-app-surface-muted/65 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] transition-all",
                           competitorDraftOwnApp && competitorDraftApps.length > 0 ? "opacity-60 md:opacity-100" : "opacity-100"
                         )}>
                         <div className="flex items-center justify-between mb-2">
@@ -12361,13 +12361,13 @@ function AuthenticatedApp({
                             <img
                               src={competitorDraftOwnApp.icon}
                               alt={competitorDraftOwnApp.title}
-                              className="h-14 w-14 rounded-2xl border border-slate-700/60 bg-slate-900/80"
+                              className="h-14 w-14 rounded-2xl border border-app-border/60 bg-app-surface-muted/80"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-slate-100">
+                              <p className="truncate text-sm font-semibold text-app-text">
                                 {competitorDraftOwnApp.title}
                               </p>
-                              <p className="truncate text-xs text-slate-400">
+                              <p className="truncate text-xs text-app-text-muted">
                                 {competitorDraftOwnApp.developer}
                               </p>
                             </div>
@@ -12377,28 +12377,28 @@ function AuthenticatedApp({
                                 clearCompetitorDraftAnalysis();
                                 setCompetitorDraftOwnApp(null);
                               }}
-                              className="rounded-lg border border-slate-700/60 bg-slate-900/70 p-2 text-slate-400 transition-colors hover:text-white"
+                              className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <p className="mt-3 text-sm text-slate-400">
+                          <p className="mt-3 text-sm text-app-text-muted">
                             Search above and use "Set My App" on one result.
                           </p>
                         )}
                       </div>
 
                         <div className={cn(
-                          "rounded-2xl border border-slate-700/70 bg-slate-900/45 p-4 transition-all",
+                          "rounded-2xl border border-app-border/70 bg-app-surface-muted/45 p-4 transition-all",
                           !competitorDraftOwnApp ? "hidden md:block opacity-40 pointer-events-none" : "block",
                           competitorDraftApps.length > 0 ? "opacity-60 md:opacity-100" : "opacity-100"
                         )}>
                           <div className="flex items-center justify-between gap-3 mb-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               <span className="md:hidden mr-1">Step 2:</span>Rival App
                             </p>
-                            <span className="text-xs text-slate-500">
+                            <span className="text-xs text-app-text-muted">
                               {competitorDraftApps.length}/1
                             </span>
                           </div>
@@ -12407,18 +12407,18 @@ function AuthenticatedApp({
                             {competitorDraftApps.map((app) => (
                               <div
                                 key={getCompareAppKey(app, storeType)}
-                                className="flex items-start gap-3 rounded-2xl border border-slate-700/50 bg-slate-950/45 p-3"
+                                className="flex items-start gap-3 rounded-2xl border border-app-border/50 bg-app-surface/45 p-3"
                               >
                                 <img
                                   src={app.icon}
                                   alt={app.title}
-                                  className="h-12 w-12 rounded-xl border border-slate-700/60 bg-slate-900/80"
+                                  className="h-12 w-12 rounded-xl border border-app-border/60 bg-app-surface-muted/80"
                                 />
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-semibold text-slate-100">
+                                  <p className="truncate text-sm font-semibold text-app-text">
                                     {app.title}
                                   </p>
-                                  <p className="truncate text-xs text-slate-400">
+                                  <p className="truncate text-xs text-app-text-muted">
                                     {app.developer}
                                   </p>
                                 </div>
@@ -12429,7 +12429,7 @@ function AuthenticatedApp({
                                       getCompareAppKey(app, storeType),
                                     )
                                   }
-                                  className="rounded-lg border border-slate-700/60 bg-slate-900/70 p-2 text-slate-400 transition-colors hover:text-white"
+                                  className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -12437,7 +12437,7 @@ function AuthenticatedApp({
                             ))}
                           </div>
                         ) : (
-                          <p className="mt-3 text-sm text-slate-400">
+                          <p className="mt-3 text-sm text-app-text-muted">
                             Add one rival app from the search results.
                           </p>
                         )}
@@ -12445,10 +12445,10 @@ function AuthenticatedApp({
                       </div>
 
                       <div className={cn(
-                        "rounded-2xl border border-slate-700/60 bg-slate-950/40 p-4 transition-all",
+                        "rounded-2xl border border-app-border/60 bg-app-surface/40 p-4 transition-all",
                         competitorDraftApps.length === 0 ? "hidden md:block opacity-40 pointer-events-none" : "block"
                       )}>
-                        <div className="md:hidden mb-4 border-b border-slate-800 pb-3">
+                        <div className="md:hidden mb-4 border-b border-app-border pb-3">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-400">
                             Step 3: Analyze & Track Keywords
                           </p>
@@ -12464,40 +12464,40 @@ function AuthenticatedApp({
                             {competitorDraftAnalysis.appInsights.map((insight) => (
                               <div
                                 key={`draft-${insight.appKey}`}
-                                className={`rounded-2xl border p-4 ${insight.role === "own" ? "border-cyan-400/20 bg-slate-900/70 ring-1 ring-inset ring-cyan-300/10" : "border-slate-700/60 bg-slate-900/60"}`}
+                                className={`rounded-2xl border p-4 ${insight.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/70 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/60 bg-app-surface-muted/60"}`}
                               >
                                 <div className="flex items-start gap-3">
                                   <img
                                     src={insight.app.icon}
                                     alt={insight.app.title}
-                                    className="h-11 w-11 rounded-xl border border-slate-700/60 bg-slate-900/80"
+                                    className="h-11 w-11 rounded-xl border border-app-border/60 bg-app-surface-muted/80"
                                   />
                                   <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-semibold text-slate-100">
+                                    <p className="truncate text-sm font-semibold text-app-text">
                                       {insight.app.title}
                                     </p>
-                                    <p className="text-[11px] text-slate-500 uppercase tracking-[0.18em]">
+                                    <p className="text-[11px] text-app-text-muted uppercase tracking-[0.18em]">
                                       {insight.role === "own" ? "Your app" : "Competitor"}
                                     </p>
                                   </div>
                                 </div>
                                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-2 text-slate-300">
+                                  <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-2 text-app-text-muted">
                                     Top 10/30/100
-                                    <div className="mt-1 font-semibold text-slate-100">
+                                    <div className="mt-1 font-semibold text-app-text">
                                       {insight.top10}/{insight.top30}/{insight.top100}
                                     </div>
                                   </div>
-                                  <div className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-2 text-slate-300">
+                                  <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-2 text-app-text-muted">
                                     Avg rank
-                                    <div className="mt-1 font-semibold text-slate-100">
+                                    <div className="mt-1 font-semibold text-app-text">
                                       {insight.averageRank ? `#${insight.averageRank}` : "No data"}
                                     </div>
                                   </div>
                                 </div>
-                                <p className="mt-3 text-xs text-slate-400">
+                                <p className="mt-3 text-xs text-app-text-muted">
                                   Best rank:{" "}
-                                  <span className="font-semibold text-slate-200">
+                                  <span className="font-semibold text-app-text">
                                     {insight.strongestKeyword
                                       ? `${insight.strongestKeyword.keyword} (#${insight.strongestKeyword.rank})`
                                       : "None yet"}
@@ -12506,17 +12506,17 @@ function AuthenticatedApp({
                               </div>
                             ))}
                           </div>
-                          <div className="rounded-2xl border border-slate-700/60 bg-slate-900/65 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/65 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
                             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                                   Track Keywords For This Group
                                 </p>
-                                <p className="mt-2 text-sm text-slate-400">
+                                <p className="mt-2 text-sm text-app-text-muted">
                                   Add from keywords both apps rank for, or search
                                   any keyword and check both apps before tracking it.
                                 </p>
-                                <p className="mt-2 text-xs text-slate-500">
+                                <p className="mt-2 text-xs text-app-text-muted">
                                   {competitorDraftSaveHint}
                                 </p>
                                 <p className="mt-1 text-xs text-cyan-200/80">
@@ -12525,7 +12525,7 @@ function AuthenticatedApp({
                               </div>
                               <div className="flex w-full max-w-xl flex-col gap-2 sm:flex-row">
                                 <div className="relative flex-1">
-                                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted" />
                                   <input
                                     type="text"
                                     value={competitorDraftKeywordSearch}
@@ -12541,7 +12541,7 @@ function AuthenticatedApp({
                                       }
                                     }}
                                     placeholder="Search a keyword for both apps"
-                                    className="w-full rounded-xl border border-slate-700/60 bg-slate-950/70 py-2 sm:py-2.5 pl-9 pr-3 text-[13px] sm:text-sm text-slate-100 outline-none transition-colors placeholder:text-slate-500 focus:border-cyan-400/30"
+                                    className="w-full rounded-xl border border-app-border/60 bg-app-surface/70 py-2 sm:py-2.5 pl-9 pr-3 text-[13px] sm:text-sm text-app-text outline-none transition-colors placeholder:text-app-text-muted focus:border-cyan-400/30"
                                   />
                                 </div>
                                 <button
@@ -12553,7 +12553,7 @@ function AuthenticatedApp({
                                     competitorDraftApps.length === 0 ||
                                     !competitorDraftKeywordSearch.trim()
                                   }
-                                  className="rounded-xl border border-slate-600/70 bg-slate-900/80 px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm font-semibold text-slate-100 transition-colors hover:border-cyan-400/30 hover:bg-slate-900 disabled:opacity-40"
+                                  className="rounded-xl border border-app-border/70 bg-app-surface-muted/80 px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted disabled:opacity-40"
                                 >
                                   {isCheckingCompetitorDraftKeyword ? (
                                     <span className="inline-flex items-center gap-2">
@@ -12575,7 +12575,7 @@ function AuthenticatedApp({
                                     onClick={() =>
                                       removeCompetitorDraftKeyword(selection.keyword)
                                     }
-                                    className="inline-flex items-center gap-2 rounded-full border border-slate-600/70 bg-slate-900/80 px-3 py-1.5 text-xs font-semibold text-slate-100 transition-colors hover:border-cyan-400/30 hover:bg-slate-900"
+                                    className="inline-flex items-center gap-2 rounded-full border border-app-border/70 bg-app-surface-muted/80 px-3 py-1.5 text-xs font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted"
                                   >
                                     {selection.keyword} · {selection.selectedCountries.length}{" "}
                                     {selection.selectedCountries.length === 1
@@ -12585,7 +12585,7 @@ function AuthenticatedApp({
                                   </button>
                                 ))
                               ) : (
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-app-text-muted">
                                   No keywords selected yet.
                                 </p>
                               )}
@@ -12602,12 +12602,12 @@ function AuthenticatedApp({
                                   return (
                                     <div
                                       key={`${candidate.source}:${candidate.keyword}`}
-                                      className="rounded-2xl border border-slate-700/50 bg-slate-950/45 p-4"
+                                      className="rounded-2xl border border-app-border/50 bg-app-surface/45 p-4"
                                     >
                                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                         <div>
                                           <div className="flex flex-wrap items-center gap-2">
-                                            <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                                            <p className="text-sm font-semibold text-slate-900 dark:text-app-text">
                                               {candidate.keyword}
                                             </p>
                                             {candidate.source === "search" && (
@@ -12629,7 +12629,7 @@ function AuthenticatedApp({
                                               </span>
                                             )}
                                           </div>
-                                          <p className="mt-1 text-xs text-slate-500">
+                                          <p className="mt-1 text-xs text-app-text-muted">
                                             {candidate.detail}
                                           </p>
                                         </div>
@@ -12640,7 +12640,7 @@ function AuthenticatedApp({
                                               candidate.keyword,
                                             )
                                           }
-                                          className={`rounded-lg border px-3 py-2 text-[11px] font-semibold transition-colors ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-slate-600/70 bg-slate-900/80 text-slate-100 hover:border-cyan-400/30 hover:bg-slate-900"}`}
+                                          className={`rounded-lg border px-3 py-2 text-[11px] font-semibold transition-colors ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-app-border/70 bg-app-surface-muted/80 text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
                                         >
                                           {activeSelection
                                             ? "Edit Countries"
@@ -12664,14 +12664,14 @@ function AuthenticatedApp({
                                           return (
                                             <div
                                               key={`${candidate.keyword}:${app.appKey}`}
-                                              className={`rounded-xl border px-3 py-3 ${app.role === "own" ? "border-cyan-400/20 bg-slate-900/75 ring-1 ring-inset ring-cyan-300/10" : "border-slate-700/50 bg-slate-900/60"}`}
+                                              className={`rounded-xl border px-3 py-3 ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
                                             >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
-                                                  <p className="truncate text-xs font-semibold text-slate-100">
+                                                  <p className="truncate text-xs font-semibold text-app-text">
                                                     {app.title}
                                                   </p>
-                                                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                                                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-app-text-muted">
                                                     {app.role === "own"
                                                       ? "Your app"
                                                       : "Rival"}
@@ -12697,11 +12697,11 @@ function AuthenticatedApp({
                                   );
                                 })
                               ) : (
-                                <div className="rounded-2xl border border-dashed border-slate-700/60 bg-slate-950/35 px-4 py-8 text-center">
-                                  <p className="text-sm font-medium text-slate-300">
+                                <div className="rounded-2xl border border-dashed border-app-border/60 bg-app-surface/35 px-4 py-8 text-center">
+                                  <p className="text-sm font-medium text-app-text-muted">
                                     No shared ranked keywords surfaced yet.
                                   </p>
-                                  <p className="mt-1 text-sm text-slate-500">
+                                  <p className="mt-1 text-sm text-app-text-muted">
                                     Search any keyword above to check both apps
                                     and add it to this group.
                                   </p>
@@ -12711,11 +12711,11 @@ function AuthenticatedApp({
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-dashed border-slate-700/60 bg-slate-950/35 px-4 py-8 text-center">
-                          <p className="text-sm font-medium text-slate-300">
+                        <div className="rounded-2xl border border-dashed border-app-border/60 bg-app-surface/35 px-4 py-8 text-center">
+                          <p className="text-sm font-medium text-app-text-muted">
                             Run analysis to load keyword battles for this draft.
                           </p>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="mt-1 text-sm text-app-text-muted">
                             Reports covers the broader movement history after the group is saved.
                           </p>
                         </div>
@@ -12727,12 +12727,12 @@ function AuthenticatedApp({
               ) : null}
 
               {competitorDashboardCards.length === 0 ? (
-                <div className="rounded-3xl border border-slate-700/60 bg-slate-900/75 py-16 text-center shadow-xl shadow-black/20">
-                  <Globe className="w-12 h-12 text-slate-500 mx-auto mb-4" />
-                  <p className="text-slate-300 font-medium">
+                <div className="rounded-3xl border border-app-border/60 bg-app-surface-muted/75 py-16 text-center shadow-xl shadow-black/20">
+                  <Globe className="w-12 h-12 text-app-text-muted mx-auto mb-4" />
+                  <p className="text-app-text-muted font-medium">
                     No tracked competitor groups yet.
                   </p>
-                  <p className="text-sm text-slate-500 mt-2 max-w-xl mx-auto">
+                  <p className="text-sm text-app-text-muted mt-2 max-w-xl mx-auto">
                     Search for your app and one rival above, analyze the pair,
                     then save it here.
                   </p>
@@ -12818,7 +12818,7 @@ function AuthenticatedApp({
                           }
                         : groupAsoSnapshotCount === 0
                           ? {
-                              tone: "border-slate-700/60 bg-slate-950/40 text-slate-300",
+                              tone: "border-app-border/60 bg-app-surface/40 text-app-text-muted",
                               title: "Baseline pending",
                               message:
                                 "The first daily ASO run still needs to capture the initial store snapshot.",
@@ -12831,7 +12831,7 @@ function AuthenticatedApp({
                                   "The baseline snapshot is saved. The next daily ASO run will perform the first comparison.",
                               }
                             : {
-                                tone: "border-slate-700/60 bg-slate-950/40 text-slate-300",
+                                tone: "border-app-border/60 bg-app-surface/40 text-app-text-muted",
                                 title: "No changes detected",
                                 message:
                                   "Monitoring is active and recent snapshots have not produced an ASO diff yet.",
@@ -12839,38 +12839,38 @@ function AuthenticatedApp({
                     return (
                       <div
                         key={card.group.groupId}
-                      className="min-w-0 rounded-3xl border border-slate-600/80 bg-slate-900/75 shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10"
+                      className="min-w-0 rounded-3xl border border-app-border/80 bg-app-surface-muted/75 shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10"
                       >
-                        <div className="border-b border-slate-600/70 bg-slate-900/35 px-5 py-5">
+                        <div className="border-b border-app-border/70 bg-app-surface-muted/35 px-5 py-5">
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0">
                               <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                                <h3 className="max-w-full truncate text-base font-semibold text-slate-100">
+                                <h3 className="max-w-full truncate text-base font-semibold text-app-text">
                                   {getCompetitorGroupLabel(card.group)}
                                 </h3>
-                                <span className="hidden rounded-full border border-slate-600/70 bg-slate-900/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 sm:inline-flex">
+                                <span className="hidden rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 sm:inline-flex">
                                   {card.group.store === "ios" ? "iOS" : "Android"}
                                 </span>
-                                <span className="hidden rounded-full border border-slate-700/60 bg-slate-900/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300 sm:inline-flex">
+                                <span className="hidden rounded-full border border-app-border/60 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted sm:inline-flex">
                                   {card.group.country.toUpperCase()}
                                 </span>
-                                <span className="hidden rounded-full border border-slate-700/70 bg-slate-900/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300 sm:inline-flex">
+                                <span className="hidden rounded-full border border-app-border/70 bg-app-surface-muted/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted sm:inline-flex">
                                   {card.group.mode}
                                 </span>
                               </div>
-                              <p className="mt-2 text-sm text-slate-400 sm:hidden">
+                              <p className="mt-2 text-sm text-app-text-muted sm:hidden">
                                 {compactGroupContext}
                               </p>
-                              <p className="mt-1 text-xs text-slate-500 sm:hidden">
+                              <p className="mt-1 text-xs text-app-text-muted sm:hidden">
                                 {compactGroupStatus}
                               </p>
-                              <p className="mt-2 hidden text-sm text-slate-400 sm:block">
+                              <p className="mt-2 hidden text-sm text-app-text-muted sm:block">
                                 Last analyzed{" "}
                                 {card.group.lastAnalyzedAt
                                   ? formatTrackingChartDateTime(card.group.lastAnalyzedAt)
                                   : "not yet"}
                               </p>
-                              <p className="mt-1 hidden text-xs text-slate-500 sm:block">
+                              <p className="mt-1 hidden text-xs text-app-text-muted sm:block">
                                 Keyword refresh{" "}
                                 {card.lastKeywordRefreshAt
                                   ? formatTrackingChartDateTime(
@@ -12887,7 +12887,7 @@ function AuthenticatedApp({
                                     card.group.groupId,
                                   )
                                 }
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-900/80"
+                                className="inline-flex items-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
                               >
                                 <Bell className="h-4 w-4" />
                                 ASO Alerts
@@ -12899,7 +12899,7 @@ function AuthenticatedApp({
                                     card.group.groupId,
                                   )
                                 }
-                                className="inline-flex items-center gap-2 rounded-xl border border-slate-700/60 bg-slate-900/70 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-900/80"
+                                className="inline-flex items-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
                               >
                                 <ChevronDown
                                   className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -12919,37 +12919,37 @@ function AuthenticatedApp({
 
                         <div className="space-y-4 p-5">
                           {!isExpanded ? (
-                            <div className="rounded-2xl border border-slate-600/70 bg-slate-900/55 px-4 py-4 text-sm text-slate-300 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                            <div className="rounded-2xl border border-app-border/70 bg-app-surface-muted/55 px-4 py-4 text-sm text-app-text-muted shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
                               {1 + card.group.competitors.length} apps,{" "}
                               {card.trackedKeywords.length} tracked keywords,{" "}
                               {card.rankedPairCount} ranked pairs.
                             </div>
                           ) : (
                             <>
-                          <div className="rounded-2xl border border-slate-600/75 bg-slate-900/60 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          <div className="rounded-2xl border border-app-border/75 bg-app-surface-muted/60 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               Group Apps
                             </p>
                             <div className="mt-3 grid gap-3 md:grid-cols-3">
                               {[card.group.ownApp, ...card.group.competitors].map((app) => (
                                 <div
                                   key={`${card.group.groupId}:${app.appKey}`}
-                                  className={`rounded-2xl border p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${app.role === "own" ? "border-cyan-400/20 bg-slate-900/75 ring-1 ring-inset ring-cyan-300/10" : "border-slate-600/70 bg-slate-950/70"}`}
+                                  className={`rounded-2xl border p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/70 bg-app-surface/70"}`}
                                 >
                                   <div className="flex items-start gap-3">
                                     <img
                                       src={app.icon}
                                       alt={app.title}
-                                      className="h-11 w-11 rounded-xl border border-slate-700/60 bg-slate-900/80"
+                                      className="h-11 w-11 rounded-xl border border-app-border/60 bg-app-surface-muted/80"
                                     />
                                     <div className="min-w-0 flex-1">
-                                      <p className="truncate text-sm font-semibold text-slate-100">
+                                      <p className="truncate text-sm font-semibold text-app-text">
                                         {app.title}
                                       </p>
-                                      <p className="truncate text-xs text-slate-400">
+                                      <p className="truncate text-xs text-app-text-muted">
                                         {app.developer}
                                       </p>
-                                      <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                                      <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-app-text-muted">
                                         {app.role === "own" ? "Your app" : "Competitor"}
                                       </p>
                                     </div>
@@ -12959,7 +12959,7 @@ function AuthenticatedApp({
                                       href={app.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 transition-colors hover:text-cyan-100"
+                                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:text-cyan-100"
                                     >
                                       <ExternalLink className="h-3.5 w-3.5" />
                                       Open Store
@@ -12970,23 +12970,23 @@ function AuthenticatedApp({
                             </div>
                           </div>
 
-                          <div className="rounded-2xl border border-slate-700/60 bg-slate-900/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                                   Daily ASO Changes
                                 </p>
-                                <p className="mt-2 text-sm text-slate-400">
+                                <p className="mt-2 text-sm text-app-text-muted">
                                   Review title, description, icon, category, and
                                   screenshot changes detected for this
                                   competitor set.
                                 </p>
                               </div>
                               <div className="flex flex-wrap gap-2">
-                                <span className="rounded-full border border-slate-700/60 bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-slate-200">
+                                <span className="rounded-full border border-app-border/60 bg-app-surface/60 px-3 py-1.5 text-xs font-semibold text-app-text">
                                   {groupAsoDiffs.length} changes logged
                                 </span>
-                                <span className="rounded-full border border-slate-700/60 bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-slate-200">
+                                <span className="rounded-full border border-app-border/60 bg-app-surface/60 px-3 py-1.5 text-xs font-semibold text-app-text">
                                   {groupAsoSnapshotCount} snapshots
                                 </span>
                                 <button
@@ -13003,42 +13003,42 @@ function AuthenticatedApp({
                               </div>
                             </div>
                             <div className="mt-4 grid gap-3 md:grid-cols-4">
-                              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
+                              <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
                                 <div className="workspace-chip-label">
                                   Total Changes
                                 </div>
-                                <div className="mt-2 text-2xl font-display font-bold text-white">
+                                <div className="mt-2 text-2xl font-display font-bold text-app-text">
                                   {groupAsoDiffs.length}
                                 </div>
                               </div>
-                              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
+                              <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
                                 <div className="workspace-chip-label">
                                   Changed Apps
                                 </div>
-                                <div className="mt-2 text-2xl font-display font-bold text-white">
+                                <div className="mt-2 text-2xl font-display font-bold text-app-text">
                                   {groupAsoChangedApps.size}
                                 </div>
                               </div>
-                              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
+                              <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
                                 <div className="workspace-chip-label">
                                   Countries
                                 </div>
-                                <div className="mt-2 text-2xl font-display font-bold text-white">
+                                <div className="mt-2 text-2xl font-display font-bold text-app-text">
                                   {groupAsoChangedCountries.size}
                                 </div>
                               </div>
-                              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
+                              <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
                                 <div className="workspace-chip-label">
                                   Last Snapshot
                                 </div>
-                                <div className="mt-2 text-sm font-semibold text-slate-100">
+                                <div className="mt-2 text-sm font-semibold text-app-text">
                                   {groupAsoLatestSnapshotAt
                                     ? formatTrackingChartDateTime(
                                         groupAsoLatestSnapshotAt,
                                       )
                                     : "Waiting for baseline"}
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500">
+                                <div className="mt-1 text-xs text-app-text-muted">
                                   {groupAsoDiffs[0]
                                     ? `Latest change ${formatTrackingChartDateTime(
                                         groupAsoDiffs[0].detectedAt,
@@ -13130,11 +13130,11 @@ function AuthenticatedApp({
                               </div>
                             ) : null}
                             {isLoadingCompetitorAsoHistory ? (
-                              <div className="mt-4 rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
+                              <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
                                 Loading competitor ASO history...
                               </div>
                             ) : filteredGroupAsoDiffs.length === 0 ? (
-                              <div className="mt-4 rounded-2xl border border-dashed border-slate-700/60 bg-slate-950/40 px-4 py-6 text-sm text-slate-400">
+                              <div className="mt-4 rounded-2xl border border-dashed border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
                                 {groupAsoDiffs.length === 0
                                   ? groupAsoSnapshotCount === 0
                                     ? "Baseline not captured yet. The first ASO snapshot will appear after the next scheduled monitoring run."
@@ -13144,8 +13144,8 @@ function AuthenticatedApp({
                                   : "No ASO changes match the current filters."}
                               </div>
                             ) : (
-                              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/40">
-                                <div className="grid grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-slate-700/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              <div className="mt-4 overflow-hidden rounded-2xl border border-app-border/60 bg-app-surface/40">
+                                <div className="grid grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                   <div>Detected</div>
                                   <div>App</div>
                                   <div>Country</div>
@@ -13156,26 +13156,26 @@ function AuthenticatedApp({
                                   {filteredGroupAsoDiffs.map((diff) => (
                                     <div
                                       key={diff.diffId}
-                                      className="grid grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-slate-800/80 px-4 py-3 text-sm text-slate-300 last:border-b-0"
+                                      className="grid grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/80 px-4 py-3 text-sm text-app-text-muted last:border-b-0"
                                     >
-                                      <div className="text-xs text-slate-400">
+                                      <div className="text-xs text-app-text-muted">
                                         {formatTrackingChartDateTime(
                                           diff.detectedAt,
                                         )}
                                       </div>
                                       <div className="min-w-0">
-                                        <p className="truncate font-semibold text-slate-100">
+                                        <p className="truncate font-semibold text-app-text">
                                           {diff.appTitle}
                                         </p>
                                       </div>
-                                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                                         {diff.country}
                                       </div>
                                       <div className="flex flex-wrap gap-1">
                                         {diff.changedFields.map((field) => (
                                           <span
                                             key={`${diff.diffId}:${field}`}
-                                            className="rounded-full border border-slate-700/60 bg-slate-900/70 px-2 py-1 text-[10px] font-semibold text-slate-200"
+                                            className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-2 py-1 text-[10px] font-semibold text-app-text"
                                           >
                                             {getCompetitorAsoFieldLabel(field)}
                                           </span>
@@ -13185,22 +13185,22 @@ function AuthenticatedApp({
                                         {diff.changes.map((change) => (
                                           <div
                                             key={`${diff.diffId}:${change.field}`}
-                                            className="rounded-xl border border-slate-800/80 bg-slate-900/60 px-3 py-2"
+                                            className="rounded-xl border border-app-border/80 bg-app-surface-muted/60 px-3 py-2"
                                           >
-                                            <div className="text-[11px] font-semibold text-slate-100">
+                                            <div className="text-[11px] font-semibold text-app-text">
                                               {getCompetitorAsoFieldLabel(
                                                 change.field,
                                               )}
                                             </div>
-                                            <div className="mt-1 text-[11px] text-slate-400">
+                                            <div className="mt-1 text-[11px] text-app-text-muted">
                                               {change.summary}
                                             </div>
                                             <div className="mt-2 grid gap-2 md:grid-cols-2">
                                               <div>
-                                                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                                                   Previous
                                                 </div>
-                                                <div className="mt-1 text-[11px] text-slate-300">
+                                                <div className="mt-1 text-[11px] text-app-text-muted">
                                                   {formatCompetitorAsoValue(
                                                     change.field,
                                                     change.previousValue,
@@ -13208,10 +13208,10 @@ function AuthenticatedApp({
                                                 </div>
                                               </div>
                                               <div>
-                                                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                                                   Current
                                                 </div>
-                                                <div className="mt-1 text-[11px] text-slate-300">
+                                                <div className="mt-1 text-[11px] text-app-text-muted">
                                                   {formatCompetitorAsoValue(
                                                     change.field,
                                                     change.currentValue,
@@ -13229,18 +13229,18 @@ function AuthenticatedApp({
                             )}
                           </div>
 
-                          <div className="rounded-2xl border border-slate-700/60 bg-slate-900/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
                             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                                   Tracked Group Keywords
                                 </p>
-                                <p className="mt-2 text-sm text-slate-400">
+                                <p className="mt-2 text-sm text-app-text-muted">
                                   Each keyword keeps one shared chart with rank
                                   lines for every app in this battle group.
                                 </p>
                               </div>
-                              <span className="rounded-full border border-slate-700/60 bg-slate-950/60 px-3 py-1.5 text-xs font-semibold text-slate-200">
+                              <span className="rounded-full border border-app-border/60 bg-app-surface/60 px-3 py-1.5 text-xs font-semibold text-app-text">
                                 {card.trackedKeywordGroups.length} monitored
                               </span>
                             </div>
@@ -13289,14 +13289,14 @@ function AuthenticatedApp({
                                   return (
                                     <div
                                       key={keywordGroup.groupKey}
-                                      className="rounded-2xl border border-slate-600/80 border-l-2 border-l-cyan-400/25 bg-slate-900/70 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                                      className="rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/25 bg-app-surface-muted/70 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                                     >
                                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                         <div>
-                                          <p className="text-sm font-semibold text-slate-100">
+                                          <p className="text-sm font-semibold text-app-text">
                                             {trackedKeyword.keyword}
                                           </p>
-                                          <p className="mt-1 text-xs text-slate-500">
+                                          <p className="mt-1 text-xs text-app-text-muted">
                                             {keywordGroup.countries.length}{" "}
                                             {keywordGroup.countries.length === 1
                                               ? "country scope"
@@ -13319,7 +13319,7 @@ function AuthenticatedApp({
                                                   event.target.value,
                                                 )
                                               }
-                                              className="rounded-lg border border-slate-700/60 bg-slate-900/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-100 outline-none"
+                                              className="rounded-lg border border-app-border/60 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text outline-none"
                                               aria-label={`Select competitor keyword country for ${trackedKeyword.keyword}`}
                                             >
                                               {keywordGroup.countryViews.map(
@@ -13349,7 +13349,7 @@ function AuthenticatedApp({
                                                 keywordGroup.groupKey,
                                               )
                                             }
-                                            className="rounded-lg border border-slate-600/70 bg-slate-900/80 px-3 py-2 text-[11px] font-semibold text-slate-100 transition-colors hover:border-cyan-400/30 hover:bg-slate-900"
+                                            className="rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted"
                                           >
                                             {isExpanded ? "Hide Chart" : "Open Chart"}
                                           </button>
@@ -13388,14 +13388,14 @@ function AuthenticatedApp({
                                           return (
                                             <div
                                               key={`${trackedKeyword.trackedKeywordId}:${view.app.appKey}`}
-                                              className={`rounded-xl border px-3 py-3 ${view.app.role === "own" ? "border-cyan-400/20 bg-slate-900/75 ring-1 ring-inset ring-cyan-300/10" : "border-slate-700/50 bg-slate-900/60"}`}
+                                              className={`rounded-xl border px-3 py-3 ${view.app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
                                             >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
-                                                  <p className="truncate text-xs font-semibold text-slate-100">
+                                                  <p className="truncate text-xs font-semibold text-app-text">
                                                     {view.app.title}
                                                   </p>
-                                                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-slate-500">
+                                                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-app-text-muted">
                                                     {view.app.role === "own"
                                                       ? "Your app"
                                                       : "Competitor"}
@@ -13428,7 +13428,7 @@ function AuthenticatedApp({
                                         })}
                                       </div>
                                       {isExpanded && (
-                                        <div className="mt-4 rounded-2xl border border-slate-700/50 bg-slate-950/50 p-4">
+                                        <div className="mt-4 rounded-2xl border border-app-border/50 bg-app-surface/50 p-4">
                                           <div className="h-72 w-full min-w-0">
                                             {selectedCountryView.chartPoints.length >
                                             0 ? (
@@ -13554,7 +13554,7 @@ function AuthenticatedApp({
                                                 </LineChart>
                                               </ResponsiveContainer>
                                             ) : (
-                                              <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                                              <div className="flex h-full items-center justify-center text-sm text-app-text-muted">
                                                 No rank history yet.
                                               </div>
                                             )}
@@ -13566,7 +13566,7 @@ function AuthenticatedApp({
                                 })}
                               </div>
                             ) : (
-                              <p className="mt-4 text-sm text-slate-500">
+                              <p className="mt-4 text-sm text-app-text-muted">
                                 Analyze a group and save at least one keyword to
                                 start persistent competitor monitoring here.
                               </p>
@@ -13625,10 +13625,10 @@ function AuthenticatedApp({
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <div className="workspace-chip-label">Saved Shortcuts</div>
-                    <h2 className="mt-1 text-xl font-semibold text-slate-100">
+                    <h2 className="mt-1 text-xl font-semibold text-app-text">
                       Bookmarked Apps
                     </h2>
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-app-text-muted">
                       Use bookmarks as your quick-launch rail for apps you revisit
                       frequently across markets and stores.
                     </p>
@@ -13689,10 +13689,10 @@ function AuthenticatedApp({
                       />{" "}
                       <div className="flex-1 min-w-0">
                         {" "}
-                        <h3 className="font-semibold text-slate-100 truncate text-sm">
+                        <h3 className="font-semibold text-app-text truncate text-sm">
                           {b.title}
                         </h3>{" "}
-                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                        <p className="text-xs text-app-text-muted truncate mt-0.5">
                           {b.developer}
                         </p>{" "}
                         <div className="flex items-center gap-1.5 mt-1.5">
@@ -13725,7 +13725,7 @@ function AuthenticatedApp({
                             ),
                           );
                         }}
-                        className="p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-slate-500 hover:text-red-400"
+                        className="p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-app-text-muted hover:text-red-400"
                       >
                         {" "}
                         <X className="w-4 h-4" />{" "}
@@ -13755,7 +13755,7 @@ function AuthenticatedApp({
                         </span>
                         Tracked Keywords
                       </h2>
-                      <p className="mt-2 text-sm text-slate-400">
+                      <p className="mt-2 text-sm text-app-text-muted">
                         Focus on the latest rank, region coverage, and what needs attention.
                       </p>
                     </div>
@@ -13775,7 +13775,7 @@ function AuthenticatedApp({
                     <>
                       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_220px]">
                         <div className="relative">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted" />
                           <input
                             type="text"
                             value={trackSearchTerm}
@@ -13879,20 +13879,20 @@ function AuthenticatedApp({
                       <button
                         type="button"
                         onClick={() => setViewMode("upgrade")}
-                        className="workspace-warning-button btn-ghost rounded-xl px-3 py-2 text-xs text-amber-100 hover:text-white"
+                        className="workspace-warning-button btn-ghost rounded-xl px-3 py-2 text-xs text-amber-100 hover:text-app-text"
                       >
                         View plans
                       </button>
                     </div>
                   </div>
                 ) : null}
-                <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-3 text-xs text-slate-400">
+                <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-xs text-app-text-muted">
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="inline-flex items-center gap-2">
                       <BellRing className="w-4 h-4 text-cyan-400" />
                       Daily tracking refreshes automatically once a day
                     </div>
-                    <div className="text-slate-500">
+                    <div className="text-app-text-muted">
                       Last refresh: {trackingSchedule.lastRunAt ? formatTrackingChartDateTime(trackingSchedule.lastRunAt) : "Not yet"}
                     </div>
                   </div>
@@ -13901,13 +13901,13 @@ function AuthenticatedApp({
               {(() => {
                 if (trackedKeywordGroupCount === 0) {
                   return (
-                    <div className="text-center py-16 bg-slate-900/80 rounded-3xl shadow-xl shadow-slate-900/20 border border-slate-700/60">
+                    <div className="text-center py-16 bg-app-surface-muted/80 rounded-3xl shadow-xl shadow-slate-900/20 border border-app-border/60">
                       {" "}
-                      <Bell className="w-12 h-12 text-slate-500 mx-auto mb-4" />{" "}
-                      <p className="text-slate-400 font-medium">
+                      <Bell className="w-12 h-12 text-app-text-muted mx-auto mb-4" />{" "}
+                      <p className="text-app-text-muted font-medium">
                         No keywords tracked yet.
                       </p>{" "}
-                      <p className="text-sm text-slate-500 mt-2">
+                      <p className="text-sm text-app-text-muted mt-2">
                         Search for an app, check a keyword ranking, and click
                         "Track Keyword" to monitor it here.
                       </p>{" "}
@@ -13916,9 +13916,9 @@ function AuthenticatedApp({
                 }
                 if (processedTrackedAppGroups.length === 0) {
                   return (
-                    <div className="text-center py-12 bg-slate-900/80 rounded-3xl shadow-xl border border-slate-700/60">
+                    <div className="text-center py-12 bg-app-surface-muted/80 rounded-3xl shadow-xl border border-app-border/60">
                       {" "}
-                      <p className="text-slate-400 font-medium">
+                      <p className="text-app-text-muted font-medium">
                         {" "}
                         No tracked keyword groups for{" "}
                         {trackFilterCountry === "all"
@@ -13963,39 +13963,39 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={appGroup.appKey}
-                            className="rounded-3xl border border-slate-600/80 bg-slate-950/55 shadow-xl shadow-black/35 ring-1 ring-inset ring-slate-400/10"
+                            className="rounded-3xl border border-app-border/80 bg-app-surface/55 shadow-xl shadow-black/35 ring-1 ring-inset ring-slate-400/10"
                           >
-                            <div className="border-b border-slate-600/70 bg-slate-900/35 px-4 py-4 sm:px-5">
+                            <div className="border-b border-app-border/70 bg-app-surface-muted/35 px-4 py-4 sm:px-5">
                               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
                                 <div className="flex items-start gap-3">
-                                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-slate-600/75 bg-slate-900/90 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
+                                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-app-border/75 bg-app-surface-muted/90 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
                                     {selectedStoreGroup.store === "ios" ? (
-                                      <Apple className="h-4 w-4 text-slate-200" />
+                                      <Apple className="h-4 w-4 text-app-text" />
                                     ) : (
-                                      <Play className="h-4 w-4 text-slate-200" />
+                                      <Play className="h-4 w-4 text-app-text" />
                                     )}
                                   </div>
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <h3 className="truncate text-base font-semibold text-slate-100">
+                                      <h3 className="truncate text-base font-semibold text-app-text">
                                         {appGroup.appTitle}
                                       </h3>
-                                      <span className="rounded-full border border-slate-700/60 bg-slate-900/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                                      <span className="rounded-full border border-app-border/60 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                         {selectedStoreGroup.store === "ios"
                                           ? "iOS"
                                           : "Android"}
                                       </span>
                                     </div>
-                                    <p className="mt-1 text-sm text-slate-400">
+                                    <p className="mt-1 text-sm text-app-text-muted">
                                       Tracked keywords stay inside this app, and the store switch only changes this app block.
                                     </p>
-                                    <p className="mt-1 text-xs text-slate-500">
+                                    <p className="mt-1 text-xs text-app-text-muted">
                                       Last checked {appLastChecked}
                                     </p>
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-3 xl:items-end">
-                                  <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/80 p-1">
+                                  <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/80 p-1">
                                     {appGroup.storeGroups.map((storeGroup) => {
                                       const isActive =
                                         storeGroup.store === selectedStoreGroup.store;
@@ -14012,7 +14012,7 @@ function AuthenticatedApp({
                                           className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                                             isActive
                                               ? "bg-cyan-300 text-black"
-                                              : "text-slate-400 hover:text-slate-200"
+                                              : "text-app-text-muted hover:text-app-text"
                                           }`}
                                         >
                                           {storeGroup.store === "ios" ? (
@@ -14033,19 +14033,19 @@ function AuthenticatedApp({
                                     })}
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2 text-xs">
-                                    <span className="rounded-full border border-slate-700/60 bg-slate-950/55 px-3 py-1.5 text-cyan-300">
+                                    <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-cyan-300">
                                       {selectedStoreGroup.groups.length} keywords
                                     </span>
-                                    <span className="rounded-full border border-slate-700/60 bg-slate-950/55 px-3 py-1.5 text-slate-300">
+                                    <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-app-text-muted">
                                       {selectedStoreGroup.totalRegions} regions
                                     </span>
-                                    <span className="rounded-full border border-slate-700/60 bg-slate-950/55 px-3 py-1.5 text-cyan-300">
+                                    <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-cyan-300">
                                       {selectedStoreGroup.rankedCount} ranking
                                     </span>
                                     {(selectedStoreGroup.pendingCount > 0 ||
                                       selectedStoreGroup.needsAttentionCount >
                                         0) && (
-                                      <span className="rounded-full border border-slate-700/60 bg-slate-950/55 px-3 py-1.5 text-amber-300">
+                                      <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-amber-300">
                                         {selectedStoreGroup.pendingCount} pending /{" "}
                                         {selectedStoreGroup.needsAttentionCount} errors
                                       </span>
@@ -14054,7 +14054,7 @@ function AuthenticatedApp({
                                 </div>
                               </div>
                             </div>
-                              <div className="space-y-3 bg-slate-950/20 p-3 sm:p-4">
+                              <div className="space-y-3 bg-app-surface/20 p-3 sm:p-4">
                               {selectedStoreGroup.groups.map((group) => {
                         const groupImprovement = group.improvement;
                         const isExpanded = expandedTrackedGroupIds.includes(
@@ -14130,7 +14130,7 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={group.groupId}
-                            className="rounded-2xl border border-slate-600/80 border-l-2 border-l-cyan-400/35 bg-slate-900/75 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                            className="rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/35 bg-app-surface-muted/75 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                           >
                             <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)_72px_minmax(280px,1.35fr)_76px_32px] lg:items-center lg:gap-4">
                               {" "}
@@ -14143,17 +14143,17 @@ function AuthenticatedApp({
                                 className="flex items-center gap-3 text-left min-w-0"
                               >
                                 {" "}
-                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-900 border border-slate-700 flex items-center justify-center">
+                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-app-surface-muted border border-app-border flex items-center justify-center">
                                   {" "}
                                   {group.store === "ios" ? (
-                                    <Apple className="w-3.5 h-3.5 text-slate-300" />
+                                    <Apple className="w-3.5 h-3.5 text-app-text-muted" />
                                   ) : (
-                                    <Play className="w-3.5 h-3.5 text-slate-300" />
+                                    <Play className="w-3.5 h-3.5 text-app-text-muted" />
                                   )}{" "}
                                 </div>{" "}
                                 <div className="min-w-0">
                                   {" "}
-                                  <p className="text-sm font-semibold text-slate-100 truncate leading-tight">
+                                  <p className="text-sm font-semibold text-app-text truncate leading-tight">
                                     {group.appTitle}
                                   </p>{" "}
                                   <p className="text-xs text-cyan-400/80 font-medium truncate mt-0.5">
@@ -14161,7 +14161,7 @@ function AuthenticatedApp({
                                   </p>{" "}
                                 </div>{" "}
                                 <ChevronDown
-                                  className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                  className={`w-4 h-4 text-app-text-muted flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                                 />{" "}
                               </button>{" "}
                               {/* Regions - hidden on mobile */}{" "}
@@ -14178,7 +14178,7 @@ function AuthenticatedApp({
                                     )
                                   }
                                   onClick={(event) => event.stopPropagation()}
-                                  className="rounded-full border border-slate-700/60 bg-slate-900/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300 outline-none"
+                                  className="rounded-full border border-app-border/60 bg-app-surface-muted/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-app-text-muted outline-none"
                                   aria-label={`Select summary country for ${group.keyword}`}
                                 >
                                   {group.countryViews.map((cv) => (
@@ -14198,10 +14198,10 @@ function AuthenticatedApp({
                                   return (
                                     <span
                                       key={cv.trackedKeyword.country}
-                                      className="inline-flex items-center gap-1 rounded-full bg-slate-900/80 border border-slate-700/60 px-2 py-0.5 text-[10px]"
+                                      className="inline-flex items-center gap-1 rounded-full bg-app-surface-muted/80 border border-app-border/60 px-2 py-0.5 text-[10px]"
                                     >
                                       {" "}
-                                      <span className="text-slate-400">
+                                      <span className="text-app-text-muted">
                                         {cv.trackedKeyword.country.toUpperCase()}
                                       </span>{" "}
                                       <span
@@ -14223,26 +14223,26 @@ function AuthenticatedApp({
                                     {summaryRankDisplay.label}
                                   </span>
                                 ) : (
-                                  <span className="text-xs text-slate-500">
+                                  <span className="text-xs text-app-text-muted">
                                     Pending
                                   </span>
                                 )}{" "}
                               </div>{" "}
-                              <div className="rounded-xl border border-slate-700/50 bg-slate-950/45 px-4 py-3">
+                              <div className="rounded-xl border border-app-border/50 bg-app-surface/45 px-4 py-3">
                                 <div className="mb-2 flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                       {summaryCountryView
                                         ? findCountryName(
                                             summaryCountryView.trackedKeyword.country,
                                           )
                                         : "Selected Country"}
                                     </p>
-                                    <p className="mt-0.5 truncate text-[11px] text-slate-400">
+                                    <p className="mt-0.5 truncate text-[11px] text-app-text-muted">
                                       Updated {summaryLastChecked}
                                     </p>
                                   </div>
-                                  <span className="rounded-full border border-slate-700/60 bg-slate-900/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300">
+                                  <span className="rounded-full border border-app-border/60 bg-app-surface-muted/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-app-text-muted">
                                     {summaryValidHistory.length} pts
                                   </span>
                                 </div>
@@ -14252,7 +14252,7 @@ function AuthenticatedApp({
                                     stroke={summaryLineColor}
                                   />
                                 </div>
-                                <div className="mt-2 grid grid-cols-3 gap-1.5 border-t border-slate-700/40 pt-2">
+                                <div className="mt-2 grid grid-cols-3 gap-1.5 border-t border-app-border/40 pt-2">
                                   {[
                                     {
                                       label: "Best",
@@ -14281,9 +14281,9 @@ function AuthenticatedApp({
                                   ].map(({ label, value, color }) => (
                                     <div
                                       key={label}
-                                      className="rounded-lg bg-slate-900/60 py-1 text-center"
+                                      className="rounded-lg bg-app-surface-muted/60 py-1 text-center"
                                     >
-                                      <p className="text-[8px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                      <p className="text-[8px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                                         {label}
                                       </p>
                                       <p
@@ -14347,7 +14347,7 @@ function AuthenticatedApp({
                                       "manual",
                                     )
                                   }
-                                  className="mr-1.5 rounded-lg border border-slate-700/60 bg-slate-900/80 px-2.5 py-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:border-cyan-400/30 hover:text-cyan-200"
+                                  className="mr-1.5 rounded-lg border border-app-border/60 bg-app-surface-muted/80 px-2.5 py-1.5 text-[11px] font-semibold text-app-text-muted transition-colors hover:border-cyan-400/30 hover:text-cyan-200"
                                   title="Edit tracked countries"
                                 >
                                   Edit Countries
@@ -14355,7 +14355,7 @@ function AuthenticatedApp({
                                 <button
                                   type="button"
                                   onClick={() => setActiveAlertGroupId(group.groupId)}
-                                  className="mr-1.5 p-1.5 text-slate-500 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition-colors"
+                                  className="mr-1.5 p-1.5 text-app-text-muted hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition-colors"
                                   title="Manage alerts"
                                 >
                                   <Bell className="w-4 h-4" />
@@ -14378,7 +14378,7 @@ function AuthenticatedApp({
                             </div>{" "}
                             {/* Expanded detail */}{" "}
                             {isExpanded && (
-                              <div className="border-t border-slate-600/45 bg-slate-950/40 px-5 pb-5 pt-2">
+                              <div className="border-t border-app-border/45 bg-app-surface/40 px-5 pb-5 pt-2">
                                 {" "}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                   {" "}
@@ -14425,7 +14425,7 @@ function AuthenticatedApp({
                                     return (
                                       <div
                                         key={`${group.groupId}:${trackedKeyword.country}`}
-                                        className="rounded-xl border border-slate-600/75 bg-slate-900/75 p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                                        className="rounded-xl border border-app-border/75 bg-app-surface-muted/75 p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                                       >
                                         {" "}
                                         {/* Country header */}{" "}
@@ -14433,12 +14433,12 @@ function AuthenticatedApp({
                                           {" "}
                                           <div>
                                             {" "}
-                                            <p className="text-[9px] uppercase tracking-widest text-slate-500 font-semibold">
+                                            <p className="text-[9px] uppercase tracking-widest text-app-text-muted font-semibold">
                                               {findCountryName(
                                                 trackedKeyword.country,
                                               )}
                                             </p>{" "}
-                                            <p className="text-xs font-bold text-slate-300 mt-0.5">
+                                            <p className="text-xs font-bold text-app-text-muted mt-0.5">
                                               {trackedKeyword.country.toUpperCase()}
                                             </p>{" "}
                                           </div>{" "}
@@ -14482,7 +14482,7 @@ function AuthenticatedApp({
                                               />
                                             </div>{" "}
                                             {validHistory.length > 0 && (
-                                              <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t border-slate-700/40">
+                                              <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t border-app-border/40">
                                                 {" "}
                                                 {[
                                                   {
@@ -14513,10 +14513,10 @@ function AuthenticatedApp({
                                                   ({ label, value, color }) => (
                                                     <div
                                                       key={label}
-                                                      className="text-center bg-slate-900/50 rounded-lg py-1"
+                                                      className="text-center bg-app-surface-muted/50 rounded-lg py-1"
                                                     >
                                                       {" "}
-                                                      <p className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold">
+                                                      <p className="text-[8px] uppercase tracking-wider text-app-text-muted font-semibold">
                                                         {label}
                                                       </p>{" "}
                                                       <p
@@ -14571,7 +14571,7 @@ function AuthenticatedApp({
                     </span>
                     Market Snapshot
                   </h3>
-                  <p className="mt-3 text-sm text-slate-400">
+                  <p className="mt-3 text-sm text-app-text-muted">
                     {viewMode === "single"
                       ? `Snapshot of ${getChartTypeLabel(selectedChartType).toLowerCase()} in ${selectedChartCategory?.label || "this category"} for ${findCountryName(country) || country}.`
                       : "Compare overall category-chart visibility for this market snapshot, not just keyword rankings."}
@@ -14583,7 +14583,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartType(event.target.value as ChartType)
                     }
-                    className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
                   >
                     {CHART_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -14596,7 +14596,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartCategoryCode(event.target.value)
                     }
-                    className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 sm:col-span-2"
+                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2"
                     disabled={
                       isLoadingChartCategories || chartCategories.length === 0
                     }
@@ -14611,13 +14611,13 @@ function AuthenticatedApp({
               </div>
               {viewMode === "single" && selectedApp ? (
                 <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-                  <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       {selectedApp.title}
                     </p>
                     <div className="mt-4 flex items-end justify-between gap-3">
                       <div>
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-app-text-muted">
                           Current chart position
                         </p>
                         <p className="mt-2 font-display text-4xl font-bold text-cyan-300">
@@ -14626,7 +14626,7 @@ function AuthenticatedApp({
                             : "-"}
                         </p>
                       </div>
-                      <div className="text-right text-xs text-slate-500">
+                      <div className="text-right text-xs text-app-text-muted">
                         <p>{selectedChartCategory?.label || "Category"}</p>
                         <p className="mt-1">
                           {getChartTypeLabel(selectedChartType)}
@@ -14638,9 +14638,9 @@ function AuthenticatedApp({
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-3 text-sm text-slate-300">
+                    <div className="mt-4 rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-3 text-sm text-app-text-muted">
                       {isLoadingCharts ? (
-                        <div className="flex items-center gap-2 text-slate-400">
+                        <div className="flex items-center gap-2 text-app-text-muted">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Loading category chart...
                         </div>
@@ -14648,20 +14648,20 @@ function AuthenticatedApp({
                         <div className="text-amber-300">{chartError}</div>
                       ) : selectedAppChartEntry ? (
                         <div>
-                          <p className="font-semibold text-slate-100">
+                          <p className="font-semibold text-app-text">
                             Ranking live in the current snapshot.
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs text-app-text-muted">
                             Use this as a quick benchmark against the wider
                             category, not just keyword visibility.
                           </p>
                         </div>
                       ) : (
                         <div>
-                          <p className="font-semibold text-slate-100">
+                          <p className="font-semibold text-app-text">
                             This app is not in the loaded top chart slice.
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs text-app-text-muted">
                             Increase the chart scope later if you want deeper
                             snapshots beyond the current top 100.
                           </p>
@@ -14669,12 +14669,12 @@ function AuthenticatedApp({
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4">
+                  <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                         Current leaders
                       </p>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-app-text-muted">
                         {isLoadingCharts
                           ? "Refreshing..."
                           : `${chartEntries.length} rows`}
@@ -14688,24 +14688,24 @@ function AuthenticatedApp({
                           return (
                             <div
                               key={`${entry.chartType}-${entry.appId}`}
-                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-slate-700/50 bg-slate-900/50"}`}
+                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-app-border/50 bg-app-surface-muted/50"}`}
                             >
                               <div
-                                className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-slate-400"}`}
+                                className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}
                               >
                                 #{entry.position}
                               </div>
                               <img
                                 src={entry.icon}
                                 alt=""
-                                className="h-10 w-10 rounded-xl border border-slate-700/50"
+                                className="h-10 w-10 rounded-xl border border-app-border/50"
                                 referrerPolicy="no-referrer"
                               />
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-slate-100">
+                                <p className="truncate text-sm font-semibold text-app-text">
                                   {entry.title}
                                 </p>
-                                <p className="truncate text-xs text-slate-400">
+                                <p className="truncate text-xs text-app-text-muted">
                                   {entry.developer}
                                 </p>
                               </div>
@@ -14721,7 +14721,7 @@ function AuthenticatedApp({
                       {!isLoadingCharts &&
                         !chartError &&
                         chartEntries.length === 0 && (
-                          <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 px-3 py-6 text-center text-sm text-slate-500">
+                          <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-6 text-center text-sm text-app-text-muted">
                             No chart data available for this store / country /
                             category combination right now.
                           </div>
@@ -14731,7 +14731,7 @@ function AuthenticatedApp({
                 </div>
               ) : (
                 <>
-                  <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+                  <div className="mb-3 flex items-center justify-between gap-3 text-xs text-app-text-muted">
                     <span>
                       {getChartTypeLabel(selectedChartType)} -{" "}
                       {selectedChartCategory?.label || "Category"} -{" "}
@@ -14752,12 +14752,12 @@ function AuthenticatedApp({
                   ) : (
                     <div className="space-y-2">
                       {isLoadingCharts ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-slate-700/50 bg-slate-900/50 px-4 py-4 text-sm text-slate-400">
+                        <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Loading category chart snapshot...
                         </div>
                       ) : chartEntries.length === 0 ? (
-                        <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 px-4 py-4 text-sm text-slate-500">
+                        <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
                           No chart data available for this combination right
                           now.
                         </div>
@@ -14769,24 +14769,24 @@ function AuthenticatedApp({
                           return (
                             <div
                               key={`${entry.chartType}-${entry.appId}-compare`}
-                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-slate-700/50 bg-slate-900/50"}`}
+                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface-muted/50"}`}
                             >
                               <div
-                                className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-slate-400"}`}
+                                className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-app-text-muted"}`}
                               >
                                 #{entry.position}
                               </div>
                               <img
                                 src={entry.icon}
                                 alt=""
-                                className="h-10 w-10 rounded-xl border border-slate-700/50"
+                                className="h-10 w-10 rounded-xl border border-app-border/50"
                                 referrerPolicy="no-referrer"
                               />
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-slate-100">
+                                <p className="truncate text-sm font-semibold text-app-text">
                                   {entry.title}
                                 </p>
-                                <p className="truncate text-xs text-slate-400">
+                                <p className="truncate text-xs text-app-text-muted">
                                   {entry.developer}
                                 </p>
                               </div>
@@ -14846,7 +14846,7 @@ function AuthenticatedApp({
                       <div className="flex flex-wrap justify-center md:justify-start items-center gap-2.5 mb-1.5">
                         {" "}
                         <h2
-                          className="font-display font-bold text-white"
+                          className="font-display font-bold text-app-text"
                           style={{
                             fontSize: "1.75rem",
                             letterSpacing: "-0.03em",
@@ -14873,7 +14873,7 @@ function AuthenticatedApp({
                           </a>
                         )}{" "}
                       </div>{" "}
-                      <p className="text-slate-400 font-medium">
+                      <p className="text-app-text-muted font-medium">
                         {selectedApp.developer}
                       </p>{" "}
                     </div>{" "}
@@ -14917,7 +14917,7 @@ function AuthenticatedApp({
                       <span style={{ color: "#fbbf24", fontSize: "1.125rem" }}>
                         &#9733;
                       </span>{" "}
-                      <span className="text-sm font-semibold text-slate-200 font-mono">
+                      <span className="text-sm font-semibold text-app-text font-mono">
                         {selectedApp.score
                           ? Number(selectedApp.score).toFixed(1)
                           : "N/A"}
@@ -14930,7 +14930,7 @@ function AuthenticatedApp({
                           className="w-4 h-4"
                           style={{ color: "#64748b" }}
                         />{" "}
-                        <span className="text-sm font-medium text-slate-300">
+                        <span className="text-sm font-medium text-app-text-muted">
                           {selectedApp.installs}
                         </span>{" "}
                       </div>
@@ -14977,12 +14977,12 @@ function AuthenticatedApp({
                   {/* Auto Discovered Rankings */}{" "}
                   <div className="mb-7">
                     {" "}
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
+                    <h4 className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-4">
                       Currently Ranking For - Auto-Discovered
                     </h4>{" "}
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       {" "}
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-app-text-muted">
                         {" "}
                         Fast mode checks fewer candidates in the top 100. Deep
                         mode scans a wider keyword set and checks deeper
@@ -14990,7 +14990,7 @@ function AuthenticatedApp({
                       </p>{" "}
                       <div className="flex flex-wrap items-center gap-2">
                         {" "}
-                        <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/60 p-1">
+                        <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
                           {" "}
                           {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                             <button
@@ -15009,7 +15009,7 @@ function AuthenticatedApp({
                                   );
                                 }
                               }}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${discoveryMode === mode ? "bg-cyan-500/20 text-cyan-300" : "text-slate-400 hover:text-slate-200"}`}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${discoveryMode === mode ? "bg-cyan-500/20 text-cyan-300" : "text-app-text-muted hover:text-app-text"}`}
                             >
                               {" "}
                               {mode}{" "}
@@ -15033,7 +15033,7 @@ function AuthenticatedApp({
                       </div>{" "}
                     </div>{" "}
                     {isDiscoveringKeywords ? (
-                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <div className="flex items-center gap-2 text-sm text-app-text-muted">
                         {" "}
                         <Loader2 className="w-4 h-4 animate-spin" />{" "}
                         {discoveryMode === "deep"
@@ -15247,13 +15247,13 @@ function AuthenticatedApp({
                         ))}{" "}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-app-text-muted">
                         No ranked keywords or suggestions discovered yet.
                       </p>
                     )}{" "}
                   </div>{" "}
                   <div className="divider my-6" />{" "}
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
+                  <h4 className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-4">
                     Check Specific Keyword
                   </h4>{" "}
                   <form
@@ -15296,13 +15296,13 @@ function AuthenticatedApp({
                       {" "}
                       <p
                         className={`text-sm mb-4 ${
-                          isLightTheme ? "text-slate-600" : "text-slate-500"
+                          isLightTheme ? "text-slate-600" : "text-app-text-muted"
                         }`}
                       >
                         Ranking for{" "}
                         <span
                           className={`font-semibold ${
-                            isLightTheme ? "text-slate-900" : "text-slate-200"
+                            isLightTheme ? "text-slate-900" : "text-app-text"
                           }`}
                         >
                           "{ranking.keyword}"
@@ -15347,7 +15347,7 @@ function AuthenticatedApp({
                               className={`w-12 h-12 rounded-2xl shadow-xl ${
                                 isLightTheme
                                   ? "border border-sky-200/80"
-                                  : "border border-slate-700/50"
+                                  : "border border-app-border/50"
                               }`}
                               referrerPolicy="no-referrer"
                             />
@@ -15360,7 +15360,7 @@ function AuthenticatedApp({
                           </div>{" "}
                           <p
                             className={`text-xs ${
-                              isLightTheme ? "text-slate-600" : "text-slate-500"
+                              isLightTheme ? "text-slate-600" : "text-app-text-muted"
                             }`}
                           >
                             in{" "}
@@ -15415,7 +15415,7 @@ function AuthenticatedApp({
                               "manual",
                             )
                           }
-                          className={`text-sm flex items-center gap-1.5 transition-colors font-medium ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: ranking.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "text-amber-400" : isLightTheme ? "text-slate-600 hover:text-slate-900" : "text-slate-500 hover:text-slate-300"}`}
+                          className={`text-sm flex items-center gap-1.5 transition-colors font-medium ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: ranking.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "text-amber-400" : isLightTheme ? "text-slate-600 hover:text-slate-900" : "text-app-text-muted hover:text-app-text-muted"}`}
                         >
                           {" "}
                           {trackedKeywordGroupKeys.has(
@@ -15534,7 +15534,7 @@ function AuthenticatedApp({
                     </div>{" "}
                     <p
                       className={`text-sm mt-6 text-center ${
-                        isLightTheme ? "text-slate-600" : "text-slate-400"
+                        isLightTheme ? "text-slate-600" : "text-app-text-muted"
                       }`}
                     >
                       {" "}
@@ -15629,7 +15629,7 @@ function AuthenticatedApp({
                     </div>{" "}
                     <p
                       className={`text-xs mt-4 text-center ${
-                        isLightTheme ? "text-slate-600" : "text-slate-500"
+                        isLightTheme ? "text-slate-600" : "text-app-text-muted"
                       }`}
                     >
                       Profile of top keyword "{autoRankings[0]?.keyword}". Rank
@@ -15758,7 +15758,7 @@ function AuthenticatedApp({
                     </div>{" "}
                     <p
                       className={`text-xs mt-4 text-center ${
-                        isLightTheme ? "text-slate-600" : "text-slate-500"
+                        isLightTheme ? "text-slate-600" : "text-app-text-muted"
                       }`}
                     >
                       Top-left = lower estimated difficulty + higher estimated
@@ -15866,7 +15866,7 @@ function AuthenticatedApp({
                     </div>{" "}
                     <p
                       className={`text-xs mt-4 text-center ${
-                        isLightTheme ? "text-slate-600" : "text-slate-500"
+                        isLightTheme ? "text-slate-600" : "text-app-text-muted"
                       }`}
                     >
                       Distribution of discovered keyword rankings across
@@ -15893,7 +15893,7 @@ function AuthenticatedApp({
                     </span>
                     Category Charts
                   </h3>
-                  <p className="mt-3 text-sm text-slate-400">
+                  <p className="mt-3 text-sm text-app-text-muted">
                     Snapshot of {getChartTypeLabel(selectedChartType).toLowerCase()} in{" "}
                     {selectedChartCategory?.label || "this category"} for{" "}
                     {findCountryName(country) || country}.
@@ -15905,7 +15905,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartType(event.target.value as ChartType)
                     }
-                    className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
                   >
                     {CHART_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -15918,7 +15918,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartCategoryCode(event.target.value)
                     }
-                    className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 sm:col-span-2"
+                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2"
                     disabled={isLoadingChartCategories || chartCategories.length === 0}
                   >
                     {chartCategories.map((option) => (
@@ -15930,18 +15930,18 @@ function AuthenticatedApp({
                 </div>
               </div>
               <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-                <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     {selectedApp.title}
                   </p>
                   <div className="mt-4 flex items-end justify-between gap-3">
                     <div>
-                      <p className="text-sm text-slate-400">Current chart position</p>
+                      <p className="text-sm text-app-text-muted">Current chart position</p>
                       <p className="mt-2 font-display text-4xl font-bold text-cyan-300">
                         {selectedAppChartEntry ? `#${selectedAppChartEntry.position}` : "-"}
                       </p>
                     </div>
-                    <div className="text-right text-xs text-slate-500">
+                    <div className="text-right text-xs text-app-text-muted">
                       <p>{selectedChartCategory?.label || "Category"}</p>
                       <p className="mt-1">{getChartTypeLabel(selectedChartType)}</p>
                       <p className="mt-1">
@@ -15949,9 +15949,9 @@ function AuthenticatedApp({
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-3 text-sm text-slate-300">
+                  <div className="mt-4 rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-3 text-sm text-app-text-muted">
                     {isLoadingCharts ? (
-                      <div className="flex items-center gap-2 text-slate-400">
+                      <div className="flex items-center gap-2 text-app-text-muted">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading category chart...
                       </div>
@@ -15959,31 +15959,31 @@ function AuthenticatedApp({
                       <div className="text-amber-300">{chartError}</div>
                     ) : selectedAppChartEntry ? (
                       <div>
-                        <p className="font-semibold text-slate-100">
+                        <p className="font-semibold text-app-text">
                           Ranking live in the current snapshot.
                         </p>
-                        <p className="mt-1 text-xs text-slate-400">
+                        <p className="mt-1 text-xs text-app-text-muted">
                           Use this as a quick benchmark against the wider category, not just keyword visibility.
                         </p>
                       </div>
                     ) : (
                       <div>
-                        <p className="font-semibold text-slate-100">
+                        <p className="font-semibold text-app-text">
                           This app is not in the loaded top chart slice.
                         </p>
-                        <p className="mt-1 text-xs text-slate-400">
+                        <p className="mt-1 text-xs text-app-text-muted">
                           Increase the chart scope later if you want deeper snapshots beyond the current top 100.
                         </p>
                       </div>
                     )}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 p-4">
+                <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       Current leaders
                     </p>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-app-text-muted">
                       {isLoadingCharts ? "Refreshing..." : `${chartEntries.length} rows`}
                     </p>
                   </div>
@@ -15993,22 +15993,22 @@ function AuthenticatedApp({
                       return (
                         <div
                           key={`${entry.chartType}-${entry.appId}`}
-                          className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-slate-700/50 bg-slate-900/50"}`}
+                          className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-app-border/50 bg-app-surface-muted/50"}`}
                         >
-                          <div className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-slate-400"}`}>
+                          <div className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}>
                             #{entry.position}
                           </div>
                           <img
                             src={entry.icon}
                             alt=""
-                            className="h-10 w-10 rounded-xl border border-slate-700/50"
+                            className="h-10 w-10 rounded-xl border border-app-border/50"
                             referrerPolicy="no-referrer"
                           />
                           <div className="min-w-0 flex-1">
-                            <p className="truncate text-sm font-semibold text-slate-100">
+                            <p className="truncate text-sm font-semibold text-app-text">
                               {entry.title}
                             </p>
-                            <p className="truncate text-xs text-slate-400">
+                            <p className="truncate text-xs text-app-text-muted">
                               {entry.developer}
                             </p>
                           </div>
@@ -16021,7 +16021,7 @@ function AuthenticatedApp({
                       );
                     })}
                     {!isLoadingCharts && !chartError && chartEntries.length === 0 && (
-                      <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 px-3 py-6 text-center text-sm text-slate-500">
+                      <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-6 text-center text-sm text-app-text-muted">
                         No chart data available for this store / country / category combination right now.
                       </div>
                     )}
@@ -16046,10 +16046,10 @@ function AuthenticatedApp({
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                   <div>
                     <div className="workspace-chip-label">Compare Overview</div>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-100">
+                    <h3 className="mt-1 text-lg font-semibold text-app-text">
                       Competitive signal summary
                     </h3>
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-app-text-muted">
                       The compare page follows the shared shell but leans into
                       multi-app KPI framing before the deeper keyword modules.
                     </p>
@@ -16079,7 +16079,7 @@ function AuthenticatedApp({
                 <div>
                   {" "}
                   <h2
-                    className="font-display font-bold text-slate-100 flex items-center gap-3"
+                    className="font-display font-bold text-app-text flex items-center gap-3"
                     style={{ fontSize: "1.375rem", letterSpacing: "-0.02em" }}
                   >
                     {" "}
@@ -16098,7 +16098,7 @@ function AuthenticatedApp({
                     </span>{" "}
                     Compare Apps{" "}
                   </h2>{" "}
-                  <p className="mt-2 text-sm text-slate-400">
+                  <p className="mt-2 text-sm text-app-text-muted">
                     {" "}
                     Compare now shows keyword footprint, contested search terms,
                     and whitespace opportunities across the whole set.{" "}
@@ -16106,7 +16106,7 @@ function AuthenticatedApp({
                 </div>{" "}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   {" "}
-                  <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/60 p-1">
+                  <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
                     {" "}
                     {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                       <button
@@ -16117,7 +16117,7 @@ function AuthenticatedApp({
                           if (mode === compareDiscoveryMode) return;
                           setCompareDiscoveryMode(mode);
                         }}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${compareDiscoveryMode === mode ? "bg-cyan-500/20 text-cyan-200" : "text-slate-400 hover:text-slate-200"}`}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${compareDiscoveryMode === mode ? "bg-cyan-500/20 text-cyan-200" : "text-app-text-muted hover:text-app-text"}`}
                       >
                         {" "}
                         {mode}{" "}
@@ -16145,19 +16145,19 @@ function AuthenticatedApp({
                   </button>{" "}
                 </div>{" "}
               </div>{" "}
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-3 text-sm text-slate-400 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-sm text-app-text-muted flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 {" "}
                 <span>
                   {" "}
                   Analysis mode:{" "}
-                  <span className="font-semibold text-slate-200 uppercase">
+                  <span className="font-semibold text-app-text uppercase">
                     {compareDiscoveryMode}
                   </span>{" "}
                 </span>{" "}
                 <span>
                   {" "}
                   Coverage loaded for{" "}
-                  <span className="font-semibold text-slate-200">
+                  <span className="font-semibold text-app-text">
                     {compareAnalyzedCount}/{comparedApps.length}
                   </span>{" "}
                   apps in{" "}
@@ -16194,7 +16194,7 @@ function AuthenticatedApp({
                       </span>
                       Category Charts
                     </h3>
-                    <p className="mt-3 text-sm text-slate-400">
+                    <p className="mt-3 text-sm text-app-text-muted">
                       Compare overall category-chart visibility for this market snapshot, not just keyword rankings.
                     </p>
                   </div>
@@ -16204,7 +16204,7 @@ function AuthenticatedApp({
                       onChange={(event) =>
                         setSelectedChartType(event.target.value as ChartType)
                       }
-                      className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                      className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
                     >
                       {CHART_TYPE_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -16217,7 +16217,7 @@ function AuthenticatedApp({
                       onChange={(event) =>
                         setSelectedChartCategoryCode(event.target.value)
                       }
-                      className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 sm:col-span-2"
+                      className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2"
                       disabled={isLoadingChartCategories || chartCategories.length === 0}
                     >
                       {chartCategories.map((option) => (
@@ -16228,7 +16228,7 @@ function AuthenticatedApp({
                     </select>
                   </div>
                 </div>
-                <div className="mb-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+                <div className="mb-3 flex items-center justify-between gap-3 text-xs text-app-text-muted">
                   <span>
                     {getChartTypeLabel(selectedChartType)} - {selectedChartCategory?.label || "Category"} - {findCountryName(country) || country}
                   </span>
@@ -16247,12 +16247,12 @@ function AuthenticatedApp({
                 ) : (
                   <div className="space-y-2">
                     {isLoadingCharts ? (
-                      <div className="flex items-center gap-2 rounded-xl border border-slate-700/50 bg-slate-900/50 px-4 py-4 text-sm text-slate-400">
+                      <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading category chart snapshot...
                       </div>
                     ) : chartEntries.length === 0 ? (
-                      <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 px-4 py-4 text-sm text-slate-500">
+                      <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
                         No chart data available for this combination right now.
                       </div>
                     ) : (
@@ -16261,22 +16261,22 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={`${entry.chartType}-${entry.appId}-compare`}
-                            className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-slate-700/50 bg-slate-900/50"}`}
+                            className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface-muted/50"}`}
                           >
-                            <div className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-slate-400"}`}>
+                            <div className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-app-text-muted"}`}>
                               #{entry.position}
                             </div>
                             <img
                               src={entry.icon}
                               alt=""
-                              className="h-10 w-10 rounded-xl border border-slate-700/50"
+                              className="h-10 w-10 rounded-xl border border-app-border/50"
                               referrerPolicy="no-referrer"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-slate-100">
+                              <p className="truncate text-sm font-semibold text-app-text">
                                 {entry.title}
                               </p>
-                              <p className="truncate text-xs text-slate-400">
+                              <p className="truncate text-xs text-app-text-muted">
                                 {entry.developer}
                               </p>
                             </div>
@@ -16297,11 +16297,11 @@ function AuthenticatedApp({
                 {compareAppInsights.map((insight) => (
                   <div
                     key={insight.compareKey}
-                    className="bg-slate-900/60 p-5 rounded-2xl shadow-lg border border-slate-700/50 relative transition-all hover:shadow-cyan-500/10 hover:border-slate-600 backdrop-blur-sm"
+                    className="bg-app-surface-muted/60 p-5 rounded-2xl shadow-lg border border-app-border/50 relative transition-all hover:shadow-cyan-500/10 hover:border-app-border backdrop-blur-sm"
                   >
                     <button
                       onClick={() => removeCompareApp(insight.appDetails)}
-                      className="absolute top-3 right-3 p-1.5 bg-slate-900/80 hover:bg-red-500 hover:text-white text-slate-400 rounded-full transition-colors shadow-sm"
+                      className="absolute top-3 right-3 p-1.5 bg-app-surface-muted/80 hover:bg-red-500 hover:text-white text-app-text-muted rounded-full transition-colors shadow-sm"
                     >
                       {" "}
                       <X className="w-3.5 h-3.5" />{" "}
@@ -16309,11 +16309,11 @@ function AuthenticatedApp({
                     <img
                       src={insight.appDetails.icon}
                       alt={insight.appDetails.title}
-                      className="w-16 h-16 rounded-2xl shadow-md mb-4 border border-slate-700/50"
+                      className="w-16 h-16 rounded-2xl shadow-md mb-4 border border-app-border/50"
                     />{" "}
                     <div className="flex items-center gap-1.5 justify-center mb-1">
                       {" "}
-                      <h3 className="font-semibold text-slate-100 text-sm line-clamp-1">
+                      <h3 className="font-semibold text-app-text text-sm line-clamp-1">
                         {insight.appDetails.title}
                       </h3>{" "}
                       {insight.appDetails.url && (
@@ -16321,7 +16321,7 @@ function AuthenticatedApp({
                           href={insight.appDetails.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-cyan-400 hover:text-white transition-colors flex-shrink-0 bg-cyan-500/10 hover:bg-cyan-500 p-1.5 rounded-md"
+                          className="text-cyan-400 hover:text-app-text transition-colors flex-shrink-0 bg-cyan-500/10 hover:bg-cyan-500 p-1.5 rounded-md"
                           title="Open in Store"
                         >
                           {" "}
@@ -16329,11 +16329,11 @@ function AuthenticatedApp({
                         </a>
                       )}{" "}
                     </div>{" "}
-                    <p className="text-[11px] text-slate-400 font-medium line-clamp-1 mb-4">
+                    <p className="text-[11px] text-app-text-muted font-medium line-clamp-1 mb-4">
                       {insight.appDetails.developer}
                     </p>{" "}
                     <div className="mb-4 flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-slate-700/70 bg-slate-900/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                      <span className="rounded-full border border-app-border/70 bg-app-surface-muted/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                         Compare Set
                       </span>
                     </div>
@@ -16341,17 +16341,17 @@ function AuthenticatedApp({
                       {" "}
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {" "}
-                        <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 px-3 py-2 text-slate-300">
+                        <div className="rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-app-text-muted">
                           {" "}
                           Top 10 / 30 / 100{" "}
-                          <div className="mt-1 font-semibold text-slate-100">
+                          <div className="mt-1 font-semibold text-app-text">
                             {insight.top10} / {insight.top30} / {insight.top100}
                           </div>{" "}
                         </div>{" "}
-                        <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 px-3 py-2 text-slate-300">
+                        <div className="rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-app-text-muted">
                           {" "}
                           Avg Rank{" "}
-                          <div className="mt-1 font-semibold text-slate-100">
+                          <div className="mt-1 font-semibold text-app-text">
                             {insight.averageRank
                               ? `#${insight.averageRank}`
                               : "No data"}
@@ -16363,7 +16363,7 @@ function AuthenticatedApp({
                         <div className="uppercase tracking-wide text-cyan-300/70">
                           Strongest Keyword
                         </div>{" "}
-                        <div className="mt-1 text-slate-100 font-medium">
+                        <div className="mt-1 text-app-text font-medium">
                           {insight.strongestKeyword
                             ? `${insight.strongestKeyword.keyword} (#${insight.strongestKeyword.rank})`
                             : "No ranked keywords yet"}
@@ -16374,14 +16374,14 @@ function AuthenticatedApp({
                         <div className="uppercase tracking-wide text-cyan-300/70">
                           Next Opportunity
                         </div>{" "}
-                        <div className="mt-1 text-slate-100 font-medium">
+                        <div className="mt-1 text-app-text font-medium">
                           {insight.bestSuggestion
                             ? insight.bestSuggestion.keyword
                             : "No suggestion surfaced yet"}
                         </div>{" "}
                       </div>{" "}
                     </div>{" "}
-                    <div className="mt-auto text-xs font-semibold text-slate-200 bg-slate-950 px-3 py-2 rounded-xl w-full border border-slate-700/80 shadow-inner flex items-center justify-center gap-1.5">
+                    <div className="mt-auto text-xs font-semibold text-app-text bg-app-surface px-3 py-2 rounded-xl w-full border border-app-border/80 shadow-inner flex items-center justify-center gap-1.5">
                       {" "}
                       <span className="text-amber-400 text-sm">&#9733;</span>{" "}
                       {insight.appDetails.score
@@ -16476,55 +16476,55 @@ function AuthenticatedApp({
                           </BarChart>{" "}
                         </ResponsiveContainer>{" "}
                       </div>{" "}
-                      <p className="text-sm text-slate-400 mt-5">
+                      <p className="text-sm text-app-text-muted mt-5">
                         {" "}
                         This gives a fast read on how much ranked keyword
                         coverage each app has, not just who wins on a single
                         term.{" "}
                       </p>{" "}
                       <div className="mt-5 grid gap-3 md:grid-cols-3">
-                        <div className="rounded-xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Coverage leader
                           </p>
-                          <p className="mt-2 text-sm font-semibold text-slate-100">
+                          <p className="mt-2 text-sm font-semibold text-app-text">
                             {compareCoverageLeader?.appDetails.title || "No data"}
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs text-app-text-muted">
                             {compareCoverageLeader
                               ? `${compareCoverageLeader.top100} top-100 rankings`
                               : "Refresh compare analysis to load coverage data."}
                           </p>
                         </div>
-                        <div className="rounded-xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Contested keywords
                           </p>
-                          <p className="mt-2 text-sm font-semibold text-slate-100">
+                          <p className="mt-2 text-sm font-semibold text-app-text">
                             {compareSharedBattles.length}
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs text-app-text-muted">
                             Terms where multiple compared apps already rank.
                           </p>
                         </div>
-                        <div className="rounded-xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Opportunity gaps
                           </p>
-                          <p className="mt-2 text-sm font-semibold text-slate-100">
+                          <p className="mt-2 text-sm font-semibold text-app-text">
                             {compareGapRows.length}
                           </p>
-                          <p className="mt-1 text-xs text-slate-400">
+                          <p className="mt-1 text-xs text-app-text-muted">
                             Keywords with whitespace or uneven coverage.
                           </p>
                         </div>
                       </div>
-                      <div className="mt-5 rounded-2xl border border-slate-700/60 bg-slate-950/45 p-4">
+                      <div className="mt-5 rounded-2xl border border-app-border/60 bg-app-surface/45 p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Coverage ladder
                           </p>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-app-text-muted">
                             {compareCoverageLeaders.length} apps ranked
                           </p>
                         </div>
@@ -16532,22 +16532,22 @@ function AuthenticatedApp({
                           {compareCoverageLeaders.map((insight, index) => (
                             <div
                               key={`coverage-leader-${insight.compareKey}`}
-                              className="flex items-center gap-3 rounded-xl border border-slate-700/50 bg-slate-900/60 px-3 py-2.5"
+                              className="flex items-center gap-3 rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-2.5"
                             >
-                              <div className="w-8 text-center text-xs font-bold text-slate-400">
+                              <div className="w-8 text-center text-xs font-bold text-app-text-muted">
                                 #{index + 1}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-slate-100">
+                                <p className="truncate text-sm font-semibold text-app-text">
                                   {insight.appDetails.title}
                                 </p>
-                                <p className="truncate text-xs text-slate-400">
+                                <p className="truncate text-xs text-app-text-muted">
                                   {insight.top10}/{insight.top30}/{insight.top100} in
                                   top 10/30/100
                                 </p>
                               </div>
-                              <div className="text-right text-xs text-slate-400">
-                                <p className="font-semibold text-slate-100">
+                              <div className="text-right text-xs text-app-text-muted">
+                                <p className="font-semibold text-app-text">
                                   {insight.averageRank
                                     ? `#${insight.averageRank}`
                                     : "No avg"}
@@ -16557,7 +16557,7 @@ function AuthenticatedApp({
                             </div>
                           ))}
                           {compareCoverageLeaders.length === 0 && (
-                            <p className="text-sm text-slate-500">
+                            <p className="text-sm text-app-text-muted">
                               Coverage details appear here after compare analysis
                               loads.
                             </p>
@@ -16587,17 +16587,17 @@ function AuthenticatedApp({
                           compareGapRows.slice(0, 5).map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="rounded-xl border border-slate-700/60 bg-slate-950/50 p-4"
+                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
                             >
                               {" "}
                               <div className="flex items-start justify-between gap-3">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-slate-100">
+                                  <div className="font-semibold text-app-text">
                                     {gapRow.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-slate-400">
+                                  <div className="mt-1 text-xs text-app-text-muted">
                                     {" "}
                                     {gapRow.isWhitespace
                                       ? `Emerging whitespace: suggested across ${gapRow.rankedApps.length + gapRow.missingApps.length} apps, but nobody ranks yet.`
@@ -16623,7 +16623,7 @@ function AuthenticatedApp({
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-app-text-muted">
                             No opportunity gaps yet. Refresh compare analysis to
                             expand the keyword set.
                           </p>
@@ -16658,17 +16658,17 @@ function AuthenticatedApp({
                           compareSharedBattles.map((battle) => (
                             <div
                               key={battle.keyword}
-                              className="rounded-xl border border-slate-700/60 bg-slate-950/50 p-4"
+                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
                             >
                               {" "}
                               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-slate-100">
+                                  <div className="font-semibold text-app-text">
                                     {battle.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-slate-400">
+                                  <div className="mt-1 text-xs text-app-text-muted">
                                     {" "}
                                     {battle.leader.appTitle} leads this battle;
                                     gap to the next ranked app is {battle.gap}{" "}
@@ -16693,7 +16693,7 @@ function AuthenticatedApp({
                                 {battle.rankedApps.map((rankedApp) => (
                                   <span
                                     key={`${battle.keyword}-${rankedApp.appKey}`}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold border ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-slate-900/80 border-slate-700/80 text-slate-300"}`}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold border ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-app-surface-muted/80 border-app-border/80 text-app-text-muted"}`}
                                   >
                                     {" "}
                                     {rankedApp.appTitle} #{rankedApp.rank}{" "}
@@ -16703,7 +16703,7 @@ function AuthenticatedApp({
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-app-text-muted">
                             No overlapping ranked keywords surfaced yet.
                           </p>
                         )}{" "}
@@ -16734,17 +16734,17 @@ function AuthenticatedApp({
                           compareGapRows.map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="rounded-xl border border-slate-700/60 bg-slate-950/50 p-4"
+                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
                             >
                               {" "}
                               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-slate-100">
+                                  <div className="font-semibold text-app-text">
                                     {gapRow.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-slate-400">
+                                  <div className="mt-1 text-xs text-app-text-muted">
                                     {" "}
                                     {gapRow.isWhitespace
                                       ? `Suggested by multiple apps, but none currently rank.`
@@ -16770,7 +16770,7 @@ function AuthenticatedApp({
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-app-text-muted">
                             No gap opportunities surfaced yet.
                           </p>
                         )}{" "}
@@ -16827,7 +16827,7 @@ function AuthenticatedApp({
                         )}{" "}
                       </button>{" "}
                     </form>{" "}
-                    <p className="text-xs text-slate-500 mb-6">
+                    <p className="text-xs text-app-text-muted mb-6">
                       {" "}
                       Relevance is estimated per app, so this section is useful
                       for side-by-side fit as well as rank.{" "}
@@ -16835,18 +16835,18 @@ function AuthenticatedApp({
                     {compareRankings.length > 0 && (
                       <div className="space-y-3">
                         {" "}
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-app-text-muted">
                           Rankings for "{compareKeyword}"
                         </p>{" "}
                         {compareRankings.map((result, index) => (
                           <div
                             key={`${result.appTitle}-${index}`}
-                            className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4 md:flex-row md:items-center md:justify-between"
+                            className="flex flex-col gap-3 rounded-xl border border-app-border/60 bg-app-surface-muted/40 p-4 md:flex-row md:items-center md:justify-between"
                           >
                             {" "}
                             <div>
                               {" "}
-                              <div className="font-medium text-slate-100">
+                              <div className="font-medium text-app-text">
                                 {result.appTitle}
                               </div>{" "}
                               <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -16875,7 +16875,7 @@ function AuthenticatedApp({
                                 #{result.rank}{" "}
                               </span>
                             ) : (
-                              <span className="bg-slate-700 text-slate-400 font-medium px-3 py-1.5 rounded-lg text-sm whitespace-nowrap">
+                              <span className="bg-app-surface-strong text-app-text-muted font-medium px-3 py-1.5 rounded-lg text-sm whitespace-nowrap">
                                 {" "}
                                 &gt; 100{" "}
                               </span>
@@ -16887,7 +16887,7 @@ function AuthenticatedApp({
                   </div>{" "}
                 </div>
               ) : (
-                <div className="card p-8 text-center text-slate-400">
+                <div className="card p-8 text-center text-app-text-muted">
                   {" "}
                   {isAnalyzingCompare ? (
                     <div className="flex items-center justify-center gap-3">
@@ -16921,20 +16921,20 @@ function AuthenticatedApp({
                       </span>
                       Top Charts
                     </h2>
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-app-text-muted">
                       Browse the market directly by store, country, chart type,
                       and category without mixing that workflow into app
                       analysis.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-slate-300">
+                    <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-app-text-muted">
                       {findCountryName(country) || country}
                     </span>
-                    <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-cyan-300">
+                    <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-cyan-300">
                       {getChartTypeLabel(selectedChartType)}
                     </span>
-                    <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-slate-300">
+                    <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-app-text-muted">
                       {selectedChartCategory?.label || "Category"}
                     </span>
                   </div>
@@ -16945,7 +16945,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartType(event.target.value as ChartType)
                     }
-                    className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-200"
+                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2.5 text-sm text-app-text"
                   >
                     {CHART_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -16958,7 +16958,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartCategoryCode(event.target.value)
                     }
-                    className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-200"
+                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2.5 text-sm text-app-text"
                     disabled={
                       isLoadingChartCategories || chartCategories.length === 0
                     }
@@ -16969,7 +16969,7 @@ function AuthenticatedApp({
                       </option>
                     ))}
                   </select>
-                  <div className="rounded-xl border border-slate-700/60 bg-slate-950/45 px-4 py-2.5 text-sm text-slate-400">
+                  <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-2.5 text-sm text-app-text-muted">
                     {chartLoadedAt
                       ? `Loaded ${formatAlertEventTime(chartLoadedAt)}`
                       : isLoadingCharts
@@ -16982,15 +16982,15 @@ function AuthenticatedApp({
                 <div className="card p-6">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                         Leaderboard
                       </p>
-                      <p className="mt-2 text-sm text-slate-400">
+                      <p className="mt-2 text-sm text-app-text-muted">
                         {selectedChartCategory?.label || "Category"} in{" "}
                         {findCountryName(country) || country}.
                       </p>
                     </div>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs text-app-text-muted">
                       {isLoadingCharts ? "Refreshing..." : `${chartEntries.length} rows`}
                     </p>
                   </div>
@@ -16999,12 +16999,12 @@ function AuthenticatedApp({
                       {chartError}
                     </div>
                   ) : isLoadingCharts ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-700/50 bg-slate-900/50 px-4 py-4 text-sm text-slate-400">
+                    <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading chart leaderboard...
                     </div>
                   ) : chartEntries.length === 0 ? (
-                    <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 px-4 py-10 text-center text-sm text-slate-500">
+                    <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-10 text-center text-sm text-app-text-muted">
                       No chart data available for this store / country /
                       category combination right now.
                     </div>
@@ -17019,24 +17019,24 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={`${entry.chartType}-${entry.appId}-page`}
-                            className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : isCompared ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-slate-700/50 bg-slate-900/50"}`}
+                            className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : isCompared ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface-muted/50"}`}
                           >
                             <div
-                              className={`w-10 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : isCompared ? "text-cyan-200" : "text-slate-400"}`}
+                              className={`w-10 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : isCompared ? "text-cyan-200" : "text-app-text-muted"}`}
                             >
                               #{entry.position}
                             </div>
                             <img
                               src={entry.icon}
                               alt=""
-                              className="h-11 w-11 rounded-xl border border-slate-700/50"
+                              className="h-11 w-11 rounded-xl border border-app-border/50"
                               referrerPolicy="no-referrer"
                             />
                             <div className="min-w-0 flex-1">
-                              <p className="truncate text-sm font-semibold text-slate-100">
+                              <p className="truncate text-sm font-semibold text-app-text">
                                 {entry.title}
                               </p>
-                              <p className="truncate text-xs text-slate-400">
+                              <p className="truncate text-xs text-app-text-muted">
                                 {entry.developer}
                               </p>
                             </div>
@@ -17057,31 +17057,31 @@ function AuthenticatedApp({
                 </div>
                 <div className="space-y-6">
                   <div className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       Snapshot Stats
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                      <div className="rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
-                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                      <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                           Rows loaded
                         </p>
-                        <p className="mt-2 font-display text-2xl font-bold text-slate-100">
+                        <p className="mt-2 font-display text-2xl font-bold text-app-text">
                           {chartEntries.length}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
-                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                      <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                           Store
                         </p>
-                        <p className="mt-2 font-display text-2xl font-bold text-slate-100">
+                        <p className="mt-2 font-display text-2xl font-bold text-app-text">
                           {storeType === "ios" ? "iOS" : "Android"}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3">
-                        <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                      <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                        <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                           Selected app
                         </p>
-                        <p className="mt-2 font-display text-2xl font-bold text-slate-100">
+                        <p className="mt-2 font-display text-2xl font-bold text-app-text">
                           {selectedAppChartEntry
                             ? `#${selectedAppChartEntry.position}`
                             : selectedApp
@@ -17092,29 +17092,29 @@ function AuthenticatedApp({
                     </div>
                   </div>
                   <div className="card p-5">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       App Spotlight
                     </p>
                     {selectedApp ? (
-                      <div className="mt-4 rounded-2xl border border-slate-700/60 bg-slate-950/45 p-4">
+                      <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/45 p-4">
                         <div className="flex items-center gap-3">
                           <img
                             src={selectedApp.icon}
                             alt={selectedApp.title}
-                            className="h-14 w-14 rounded-2xl border border-slate-700/50"
+                            className="h-14 w-14 rounded-2xl border border-app-border/50"
                           />
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-100">
+                            <p className="truncate text-sm font-semibold text-app-text">
                               {selectedApp.title}
                             </p>
-                            <p className="truncate text-xs text-slate-400">
+                            <p className="truncate text-xs text-app-text-muted">
                               {selectedApp.developer}
                             </p>
                           </div>
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 px-3 py-3">
-                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                          <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-3">
+                            <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                               Chart rank
                             </p>
                             <p className="mt-2 font-display text-2xl font-bold text-cyan-300">
@@ -17123,23 +17123,23 @@ function AuthenticatedApp({
                                 : "-"}
                             </p>
                           </div>
-                          <div className="rounded-xl border border-slate-700/50 bg-slate-900/50 px-3 py-3">
-                            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                          <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-3">
+                            <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                               Chart type
                             </p>
-                            <p className="mt-2 text-sm font-semibold text-slate-100">
+                            <p className="mt-2 text-sm font-semibold text-app-text">
                               {getChartTypeLabel(selectedChartType)}
                             </p>
                           </div>
                         </div>
-                        <p className="mt-4 text-xs text-slate-400">
+                        <p className="mt-4 text-xs text-app-text-muted">
                           {selectedAppChartEntry
                             ? "The current selection is present in this chart snapshot."
                             : "The current selection is not in the loaded chart slice for this market."}
                         </p>
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-6 text-sm text-slate-500">
+                      <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-6 text-sm text-app-text-muted">
                         Analyze an app first if you want its chart rank pinned
                         against this leaderboard.
                       </div>
@@ -17154,7 +17154,7 @@ function AuthenticatedApp({
             (viewMode === "compare" && comparedApps.length > 0)) && (
             <div className="mt-8 flex justify-end">
               <aside className="w-full xl:max-w-md">
-                <div className="rounded-2xl border border-slate-700/60 bg-slate-950/50 shadow-lg backdrop-blur-sm">
+                <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 shadow-lg backdrop-blur-sm">
                   <button
                     type="button"
                     onClick={() =>
@@ -17164,10 +17164,10 @@ function AuthenticatedApp({
                     aria-expanded={isMarketSnapshotOpen}
                   >
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-app-text-muted">
                         Market Context
                       </p>
-                      <h3 className="mt-2 flex items-center gap-2 text-base font-semibold text-slate-100">
+                      <h3 className="mt-2 flex items-center gap-2 text-base font-semibold text-app-text">
                         <span
                           className="section-header-icon"
                           style={{
@@ -17179,22 +17179,22 @@ function AuthenticatedApp({
                         </span>
                         Market Snapshot
                       </h3>
-                      <p className="mt-2 text-sm text-slate-400">
+                      <p className="mt-2 text-sm text-app-text-muted">
                         {viewMode === "single"
                           ? "Collapsed by default so the core app analysis stays first."
                           : "Keep chart rankings nearby without competing with the compare findings."}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <span className="rounded-full border border-slate-700/70 bg-slate-900/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+                      <span className="rounded-full border border-app-border/70 bg-app-surface-muted/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                         {selectedChartCategory?.label || "Category"}
                       </span>
                       <ChevronDown
-                        className={`h-5 w-5 text-slate-400 transition-transform ${isMarketSnapshotOpen ? "rotate-180" : ""}`}
+                        className={`h-5 w-5 text-app-text-muted transition-transform ${isMarketSnapshotOpen ? "rotate-180" : ""}`}
                       />
                     </div>
                   </button>
-                  <div className="border-t border-slate-900/70 px-5 py-3 text-xs text-slate-500">
+                  <div className="border-t border-slate-900/70 px-5 py-3 text-xs text-app-text-muted">
                     <span>{getChartTypeLabel(selectedChartType)}</span>
                     <span className="mx-2 text-slate-700">/</span>
                     <span>{findCountryName(country) || country}</span>
@@ -17215,7 +17215,7 @@ function AuthenticatedApp({
                           onChange={(event) =>
                             setSelectedChartType(event.target.value as ChartType)
                           }
-                          className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200"
+                          className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
                         >
                           {CHART_TYPE_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -17228,7 +17228,7 @@ function AuthenticatedApp({
                           onChange={(event) =>
                             setSelectedChartCategoryCode(event.target.value)
                           }
-                          className="rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-sm text-slate-200 sm:col-span-2 xl:col-span-1"
+                          className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2 xl:col-span-1"
                           disabled={
                             isLoadingChartCategories || chartCategories.length === 0
                           }
@@ -17242,13 +17242,13 @@ function AuthenticatedApp({
                       </div>
                       {viewMode === "single" && selectedApp ? (
                         <>
-                          <div className="rounded-2xl border border-slate-700/60 bg-slate-900/50 p-4">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/50 p-4">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               {selectedApp.title}
                             </p>
                             <div className="mt-4 flex items-end justify-between gap-3">
                               <div>
-                                <p className="text-sm text-slate-400">
+                                <p className="text-sm text-app-text-muted">
                                   Current chart position
                                 </p>
                                 <p className="mt-2 font-display text-4xl font-bold text-cyan-300">
@@ -17257,16 +17257,16 @@ function AuthenticatedApp({
                                     : "-"}
                                 </p>
                               </div>
-                              <div className="text-right text-xs text-slate-500">
+                              <div className="text-right text-xs text-app-text-muted">
                                 <p>{selectedChartCategory?.label || "Category"}</p>
                                 <p className="mt-1">
                                   {getChartTypeLabel(selectedChartType)}
                                 </p>
                               </div>
                             </div>
-                            <div className="mt-4 rounded-xl border border-slate-700/50 bg-slate-950/60 px-3 py-3 text-sm text-slate-300">
+                            <div className="mt-4 rounded-xl border border-app-border/50 bg-app-surface/60 px-3 py-3 text-sm text-app-text-muted">
                               {isLoadingCharts ? (
-                                <div className="flex items-center gap-2 text-slate-400">
+                                <div className="flex items-center gap-2 text-app-text-muted">
                                   <Loader2 className="h-4 w-4 animate-spin" />
                                   Loading category chart...
                                 </div>
@@ -17274,21 +17274,21 @@ function AuthenticatedApp({
                                 <div className="text-amber-300">{chartError}</div>
                               ) : selectedAppChartEntry ? (
                                 <div>
-                                  <p className="font-semibold text-slate-100">
+                                  <p className="font-semibold text-app-text">
                                     Ranking live in the current snapshot.
                                   </p>
-                                  <p className="mt-1 text-xs text-slate-400">
+                                  <p className="mt-1 text-xs text-app-text-muted">
                                     Use this as a quick benchmark against the
                                     wider category, not just keyword visibility.
                                   </p>
                                 </div>
                               ) : (
                                 <div>
-                                  <p className="font-semibold text-slate-100">
+                                  <p className="font-semibold text-app-text">
                                     This app is not in the loaded top chart
                                     slice.
                                   </p>
-                                  <p className="mt-1 text-xs text-slate-400">
+                                  <p className="mt-1 text-xs text-app-text-muted">
                                     Increase the chart scope later if you want
                                     deeper snapshots beyond the current top 100.
                                   </p>
@@ -17296,12 +17296,12 @@ function AuthenticatedApp({
                               )}
                             </div>
                           </div>
-                          <div className="rounded-2xl border border-slate-700/60 bg-slate-900/50 p-4">
+                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/50 p-4">
                             <div className="mb-3 flex items-center justify-between gap-3">
-                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                 Current leaders
                               </p>
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-app-text-muted">
                                 {isLoadingCharts
                                   ? "Refreshing..."
                                   : `${chartEntries.length} rows`}
@@ -17316,24 +17316,24 @@ function AuthenticatedApp({
                                 return (
                                   <div
                                     key={`${entry.chartType}-${entry.appId}-side`}
-                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-slate-700/50 bg-slate-950/50"}`}
+                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-app-border/50 bg-app-surface/50"}`}
                                   >
                                     <div
-                                      className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-slate-400"}`}
+                                      className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}
                                     >
                                       #{entry.position}
                                     </div>
                                     <img
                                       src={entry.icon}
                                       alt=""
-                                      className="h-10 w-10 rounded-xl border border-slate-700/50"
+                                      className="h-10 w-10 rounded-xl border border-app-border/50"
                                       referrerPolicy="no-referrer"
                                     />
                                     <div className="min-w-0 flex-1">
-                                      <p className="truncate text-sm font-semibold text-slate-100">
+                                      <p className="truncate text-sm font-semibold text-app-text">
                                         {entry.title}
                                       </p>
-                                      <p className="truncate text-xs text-slate-400">
+                                      <p className="truncate text-xs text-app-text-muted">
                                         {entry.developer}
                                       </p>
                                     </div>
@@ -17343,7 +17343,7 @@ function AuthenticatedApp({
                               {!isLoadingCharts &&
                                 !chartError &&
                                 chartEntries.length === 0 && (
-                                  <div className="rounded-xl border border-slate-700/50 bg-slate-950/50 px-3 py-6 text-center text-sm text-slate-500">
+                                  <div className="rounded-xl border border-app-border/50 bg-app-surface/50 px-3 py-6 text-center text-sm text-app-text-muted">
                                     No chart data available for this store /
                                     country / category combination right now.
                                   </div>
@@ -17356,12 +17356,12 @@ function AuthenticatedApp({
                           {chartError}
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-slate-700/60 bg-slate-900/50 p-4">
+                        <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/50 p-4">
                           <div className="mb-3 flex items-center justify-between gap-3">
-                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               Category leaders
                             </p>
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-app-text-muted">
                               {isLoadingCharts
                                 ? "Refreshing..."
                                 : `${chartEntries.length} rows`}
@@ -17369,12 +17369,12 @@ function AuthenticatedApp({
                           </div>
                           <div className="space-y-2">
                             {isLoadingCharts ? (
-                              <div className="flex items-center gap-2 rounded-xl border border-slate-700/50 bg-slate-950/50 px-4 py-4 text-sm text-slate-400">
+                              <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface/50 px-4 py-4 text-sm text-app-text-muted">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 Loading category chart snapshot...
                               </div>
                             ) : chartEntries.length === 0 ? (
-                              <div className="rounded-xl border border-slate-700/50 bg-slate-950/50 px-4 py-4 text-sm text-slate-500">
+                              <div className="rounded-xl border border-app-border/50 bg-app-surface/50 px-4 py-4 text-sm text-app-text-muted">
                                 No chart data available for this combination
                                 right now.
                               </div>
@@ -17386,24 +17386,24 @@ function AuthenticatedApp({
                                 return (
                                   <div
                                     key={`${entry.chartType}-${entry.appId}-compare-side`}
-                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-slate-700/50 bg-slate-950/50"}`}
+                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface/50"}`}
                                   >
                                     <div
-                                      className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-slate-400"}`}
+                                      className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-app-text-muted"}`}
                                     >
                                       #{entry.position}
                                     </div>
                                     <img
                                       src={entry.icon}
                                       alt=""
-                                      className="h-10 w-10 rounded-xl border border-slate-700/50"
+                                      className="h-10 w-10 rounded-xl border border-app-border/50"
                                       referrerPolicy="no-referrer"
                                     />
                                     <div className="min-w-0 flex-1">
-                                      <p className="truncate text-sm font-semibold text-slate-100">
+                                      <p className="truncate text-sm font-semibold text-app-text">
                                         {entry.title}
                                       </p>
-                                      <p className="truncate text-xs text-slate-400">
+                                      <p className="truncate text-xs text-app-text-muted">
                                         {entry.developer}
                                       </p>
                                     </div>

@@ -137,7 +137,7 @@ export default function LandingPage({
   );
 
   return (
-    <div className="landing-shell min-h-screen overflow-x-hidden bg-slate-950 text-slate-200 selection:bg-cyan-500/30">
+    <div className="landing-shell min-h-screen overflow-x-hidden bg-app-surface text-app-text selection:bg-cyan-500/30">
       <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
         <div
           className="absolute left-[-8%] top-[-10%] hidden h-[26rem] w-[26rem] rounded-full opacity-20 blur-[130px] md:block"
@@ -152,13 +152,13 @@ export default function LandingPage({
       <nav className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-4 py-4 sm:px-6 md:px-10 md:py-5">
         <BrandMark size="md" subtitle="Keyword Research" />
 
-        <div className="hidden items-center gap-8 text-sm text-slate-400 lg:flex">
+        <div className="hidden items-center gap-8 text-sm text-app-text-muted lg:flex">
           {primaryNavLinks.map((link) => (
             <button
               key={link.sectionId}
               type="button"
               onClick={() => scrollToSection(link.sectionId)}
-              className="transition-colors hover:text-slate-100"
+              className="transition-colors hover:text-app-text"
             >
               {link.label}
             </button>
@@ -183,7 +183,7 @@ export default function LandingPage({
           <button
             type="button"
             onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-800/80 bg-slate-900/70 text-slate-200 transition-colors hover:border-cyan-500/25 hover:text-white lg:hidden"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-app-border/80 bg-app-surface-muted/70 text-app-text transition-colors hover:border-cyan-500/25 hover:text-app-text lg:hidden"
             aria-label="Toggle navigation menu"
             aria-expanded={isMobileMenuOpen}
             aria-controls="landing-mobile-menu"
@@ -200,15 +200,15 @@ export default function LandingPage({
       {isMobileMenuOpen ? (
         <div
           id="landing-mobile-menu"
-          className="relative z-20 mx-4 -mt-1 rounded-[1.5rem] border border-slate-800/80 bg-slate-950/96 p-4 shadow-[0_24px_70px_rgba(2,6,23,0.38)] lg:hidden sm:mx-6 md:mx-10"
+          className="relative z-20 mx-4 -mt-1 rounded-[1.5rem] border border-app-border/80 bg-app-surface/96 p-4 shadow-[0_24px_70px_rgba(2,6,23,0.38)] lg:hidden sm:mx-6 md:mx-10"
         >
-          <div className="flex flex-col gap-2 text-sm text-slate-300">
+          <div className="flex flex-col gap-2 text-sm text-app-text-muted">
             {primaryNavLinks.map((link) => (
               <button
                 key={link.sectionId}
                 type="button"
                 onClick={() => handleNavClick(link.sectionId)}
-                className="rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04] hover:text-white"
+                className="rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04] hover:text-app-text"
               >
                 {link.label}
               </button>
@@ -236,11 +236,11 @@ export default function LandingPage({
                 <span>Rank Analyzer Pro</span>
               </div>
               
-              <h1 className="mt-6 text-4xl font-black leading-[1.08] tracking-tight text-white sm:text-5xl md:text-6xl lg:text-[4rem]">
+              <h1 className="mt-6 text-4xl font-black leading-[1.08] tracking-tight text-app-text sm:text-5xl md:text-6xl lg:text-[4rem]">
                 Track rankings, compare competitors, and see movement without <span className="text-cyan-400">the clutter.</span>
               </h1>
               
-              <p className="mt-6 max-w-xl text-[16px] leading-7 text-slate-400 md:text-lg md:leading-8">
+              <p className="mt-6 max-w-xl text-[16px] leading-7 text-app-text-muted md:text-lg md:leading-8">
                 Rank Analyzer Pro helps app teams track the right keywords by country, compare competitors, and review what changed from one workspace.
               </p>
               
@@ -256,7 +256,7 @@ export default function LandingPage({
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-500/10 text-cyan-400">
                     <Check className="h-3.5 w-3.5" />
                   </div>
-                  <div className="text-sm text-slate-400 max-w-[200px] leading-snug">
+                  <div className="text-sm text-app-text-muted max-w-[200px] leading-snug">
                     7-day trial, fast setup, and full access from day one.
                   </div>
                 </div>
@@ -266,9 +266,9 @@ export default function LandingPage({
             {/* Right image column - macOS Window */}
             <div className="w-full lg:w-[60%]">
               <div className="w-full lg:w-[110%] xl:w-[115%]">
-                <div className="relative overflow-hidden rounded-[1.5rem] border border-slate-800/80 bg-slate-950 shadow-[0_24px_80px_rgba(2,6,23,0.5)]">
+                <div className="relative overflow-hidden rounded-[1.5rem] border border-app-border/80 bg-app-surface shadow-[0_24px_80px_rgba(2,6,23,0.5)]">
                   {/* macOS Header */}
-                  <div className="flex h-11 w-full items-center gap-2 border-b border-slate-800/80 bg-slate-900/50 px-5">
+                  <div className="flex h-11 w-full items-center gap-2 border-b border-app-border/80 bg-app-surface-muted/50 px-5">
                     <div className="h-3 w-3 rounded-full bg-[#ff5f56]"></div>
                     <div className="h-3 w-3 rounded-full bg-[#ffbd2e]"></div>
                     <div className="h-3 w-3 rounded-full bg-[#27c93f]"></div>
@@ -292,10 +292,10 @@ export default function LandingPage({
         >
           <div className="max-w-3xl">
             <SectionEyebrow>Core Features</SectionEyebrow>
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-5xl">
+            <h2 className="mt-5 text-3xl font-black tracking-tight text-app-text md:text-5xl">
               What the tool actually helps you do
             </h2>
-            <p className="mt-3 max-w-2xl text-base leading-8 text-slate-400">
+            <p className="mt-3 max-w-2xl text-base leading-8 text-app-text-muted">
               Stay focused on the three jobs that matter most: track keywords, compare competitors, and review movement clearly.
             </p>
           </div>
@@ -306,13 +306,13 @@ export default function LandingPage({
               return (
                 <div
                   key={card.title}
-                  className="rounded-[1.25rem] border border-slate-800/80 bg-slate-900/58 p-4 md:p-5"
+                  className="rounded-[1.25rem] border border-app-border/80 bg-app-surface-muted/58 p-4 md:p-5"
                 >
                   <div className="inline-flex rounded-xl border border-cyan-500/18 bg-cyan-500/8 p-2.5 text-cyan-300">
                     <Icon className="h-5 w-5" />
                   </div>
-                  <h3 className="mt-4 text-lg font-bold text-white">{card.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-400">{card.copy}</p>
+                  <h3 className="mt-4 text-lg font-bold text-app-text">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-app-text-muted">{card.copy}</p>
                 </div>
               );
             })}
@@ -320,10 +320,10 @@ export default function LandingPage({
 
           <div className="mt-10 rounded-[1.5rem] border border-cyan-500/10 bg-cyan-950/10 p-6 sm:p-8 md:mt-12 md:p-10">
             <div className="flex flex-col items-center text-center">
-              <h3 className="mb-2 text-xl font-bold text-white">
+              <h3 className="mb-2 text-xl font-bold text-app-text">
                 Everything included in all plans
               </h3>
-              <p className="max-w-2xl text-sm text-slate-400">
+              <p className="max-w-2xl text-sm text-app-text-muted">
                 All workflow features are available on every plan. Only tracked apps, competitor groups, and tracked keyword capacity scale by tier.
               </p>
             </div>
@@ -333,9 +333,9 @@ export default function LandingPage({
                 <div key={cap.label} className="flex flex-col">
                   <div className="flex items-center gap-2">
                      <Check className="h-4 w-4 shrink-0 text-cyan-400" />
-                    <span className="text-sm font-semibold text-slate-200">{cap.label}</span>
+                    <span className="text-sm font-semibold text-app-text">{cap.label}</span>
                   </div>
-                  <span className="ml-6 mt-0.5 text-xs text-slate-500">{cap.sub}</span>
+                  <span className="ml-6 mt-0.5 text-xs text-app-text-muted">{cap.sub}</span>
                 </div>
               ))}
             </div>
@@ -348,10 +348,10 @@ export default function LandingPage({
         >
           <div className="max-w-3xl text-center md:mx-auto">
             <SectionEyebrow>Straightforward Pricing</SectionEyebrow>
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-5xl">
+            <h2 className="mt-5 text-3xl font-black tracking-tight text-app-text md:text-5xl">
               Pick the workflow depth that fits your portfolio
             </h2>
-            <p className="mt-3 text-base leading-8 text-slate-400">
+            <p className="mt-3 text-base leading-8 text-app-text-muted">
               Built for solo builders, growing portfolios, and teams that need a disciplined search-to-tracking workflow.
             </p>
           </div>
@@ -362,18 +362,18 @@ export default function LandingPage({
                 key={plan.name}
                 className={`flex h-full flex-col rounded-[1.5rem] border p-5 ${
                   plan.highlight
-                    ? "border-cyan-400/30 bg-slate-900/82 shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_22px_60px_rgba(2,6,23,0.42)]"
-                    : "border-slate-800/80 bg-slate-900/58"
+                    ? "border-cyan-400/30 bg-app-surface-muted/82 shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_22px_60px_rgba(2,6,23,0.42)]"
+                    : "border-app-border/80 bg-app-surface-muted/58"
                 }`}
               >
                 <div className="flex min-h-[3rem] items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-bold text-slate-100">{plan.name}</div>
-                    <div className="mt-2 text-2xl font-black tracking-tight text-white">
+                    <div className="text-sm font-bold text-app-text">{plan.name}</div>
+                    <div className="mt-2 text-2xl font-black tracking-tight text-app-text">
                       {plan.priceLabel.replace("/mo", "")}
                     </div>
                     {!plan.contactOnly ? (
-                      <div className="mt-0.5 text-xs text-slate-500">/mo</div>
+                      <div className="mt-0.5 text-xs text-app-text-muted">/mo</div>
                     ) : null}
                   </div>
                   {plan.badge ? (
@@ -383,13 +383,13 @@ export default function LandingPage({
                   ) : null}
                 </div>
 
-                <p className="mt-3 text-xs leading-6 text-slate-500">{plan.description}</p>
+                <p className="mt-3 text-xs leading-6 text-app-text-muted">{plan.description}</p>
 
                 <div className="mt-5 flex-1 space-y-2.5">
                   {plan.features.map((point) => (
                     <div
                       key={point}
-                      className="flex items-start gap-2.5 text-[13px] text-slate-300"
+                      className="flex items-start gap-2.5 text-[13px] text-app-text-muted"
                     >
                       <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-300" />
                       <span>{point}</span>
@@ -403,7 +403,7 @@ export default function LandingPage({
                     className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
                       plan.highlight
                         ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
-                        : "border border-slate-700/70 bg-slate-950/78 text-slate-100 hover:bg-slate-900/90"
+                        : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
                     }`}
                   >
                     {plan.cta}
@@ -420,7 +420,7 @@ export default function LandingPage({
         >
           <div className="text-center">
             <SectionEyebrow>FAQ</SectionEyebrow>
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-5xl">
+            <h2 className="mt-5 text-3xl font-black tracking-tight text-app-text md:text-5xl">
               Questions teams ask before they start tracking
             </h2>
           </div>
@@ -439,18 +439,18 @@ export default function LandingPage({
                           : [...current, index],
                       )
                     }
-                    className="flex w-full items-center justify-between rounded-[1rem] border border-slate-800/80 bg-slate-900/58 px-4 py-3.5 text-left text-sm font-medium text-slate-200 transition-colors hover:border-cyan-500/25 sm:px-5 md:text-[15px]"
+                    className="flex w-full items-center justify-between rounded-[1rem] border border-app-border/80 bg-app-surface-muted/58 px-4 py-3.5 text-left text-sm font-medium text-app-text transition-colors hover:border-cyan-500/25 sm:px-5 md:text-[15px]"
                   >
                     <div className="pr-4">
                       <div>{item.question}</div>
                       {isOpen ? (
-                        <div className="mt-2 text-[14px] leading-relaxed text-slate-400">
+                        <div className="mt-2 text-[14px] leading-relaxed text-app-text-muted">
                           {item.answer}
                         </div>
                       ) : null}
                     </div>
                     <ChevronDown
-                      className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${
+                      className={`h-4 w-4 shrink-0 text-app-text-muted transition-transform ${
                         isOpen ? "rotate-180" : ""
                       }`}
                     />
@@ -460,14 +460,14 @@ export default function LandingPage({
             })}
           </div>
 
-          <div className="mt-12 rounded-[1.25rem] border border-slate-800/80 bg-slate-950 px-5 py-6 text-center shadow-[0_24px_60px_rgba(2,6,23,0.34)] sm:px-6 md:mt-14 md:rounded-[1.5rem] md:px-8 md:py-8">
+          <div className="mt-12 rounded-[1.25rem] border border-app-border/80 bg-app-surface px-5 py-6 text-center shadow-[0_24px_60px_rgba(2,6,23,0.34)] sm:px-6 md:mt-14 md:rounded-[1.5rem] md:px-8 md:py-8">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-500/18 bg-cyan-500/8 text-cyan-300">
               <ShieldCheck className="h-5 w-5" />
             </div>
-            <h3 className="mx-auto mt-4 max-w-2xl text-2xl font-black tracking-tight text-white md:text-3xl">
+            <h3 className="mx-auto mt-4 max-w-2xl text-2xl font-black tracking-tight text-app-text md:text-3xl">
               Ready to turn app search into a tracked growth workflow?
             </h3>
-            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-400">
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-app-text-muted">
               Use Rank Analyzer Pro to validate ranked terms, monitor real movement, and review competitors with much less operational noise.
             </p>
             <button
@@ -481,7 +481,7 @@ export default function LandingPage({
         </section>
       </main>
 
-      <footer className="relative z-10 bg-slate-950 py-16 md:py-24">
+      <footer className="relative z-10 bg-app-surface py-16 md:py-24">
         {/* Top subtle border/gradient */}
         <div className="absolute inset-x-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-slate-500/20 to-transparent"></div>
         
@@ -489,23 +489,23 @@ export default function LandingPage({
           <div className="flex flex-col gap-12 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-sm">
               <BrandMark size="sm" subtitle="Keyword Research" />
-              <p className="mt-6 text-sm leading-7 text-slate-500">
+              <p className="mt-6 text-sm leading-7 text-app-text-muted">
                 A focused ASO workspace for keyword tracking, competitor groups, and movement reporting. Validate ranked terms and monitor real movement with much less operational noise.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-8 text-sm sm:grid-cols-3 sm:gap-12 lg:gap-16">
               <div>
-                <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                   Product
                 </h3>
-                <ul className="flex flex-col space-y-3 text-slate-500">
+                <ul className="flex flex-col space-y-3 text-app-text-muted">
                   {primaryNavLinks.map((link) => (
                     <li key={link.sectionId}>
                       <button
                         type="button"
                         onClick={() => scrollToSection(link.sectionId)}
-                        className="transition-colors hover:text-slate-200"
+                        className="transition-colors hover:text-app-text"
                       >
                         {link.label}
                       </button>
@@ -515,14 +515,14 @@ export default function LandingPage({
               </div>
               
               <div>
-                <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                   Legal
                 </h3>
-                <ul className="flex flex-col space-y-3 text-slate-500">
+                <ul className="flex flex-col space-y-3 text-app-text-muted">
                   <li>
                     <button
                       onClick={onOpenPrivacy}
-                      className="transition-colors hover:text-slate-200"
+                      className="transition-colors hover:text-app-text"
                     >
                       Privacy Policy
                     </button>
@@ -530,7 +530,7 @@ export default function LandingPage({
                   <li>
                     <button
                       onClick={onOpenTerms}
-                      className="transition-colors hover:text-slate-200"
+                      className="transition-colors hover:text-app-text"
                     >
                       Terms of Service
                     </button>
@@ -539,10 +539,10 @@ export default function LandingPage({
               </div>
               
               <div className="col-span-2 sm:col-span-1">
-                <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                   Focus
                 </h3>
-                <ul className="flex flex-col space-y-3 text-slate-500">
+                <ul className="flex flex-col space-y-3 text-app-text-muted">
                   <li className="flex items-center gap-2">
                     <div className="h-1 w-1 rounded-full bg-cyan-500" />
                     Search before tracking
@@ -561,7 +561,7 @@ export default function LandingPage({
           </div>
           
           {/* Bottom Copyright */}
-          <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-500/10 pt-8 sm:flex-row text-xs text-slate-500">
+          <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-500/10 pt-8 sm:flex-row text-xs text-app-text-muted">
             <p>© {new Date().getFullYear()} Rank Analyzer Pro. All rights reserved.</p>
           </div>
         </div>

@@ -136,13 +136,13 @@ function UsageBar({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="text-[13px] font-medium text-slate-600 dark:text-slate-300">{label}</span>
+        <span className="text-[13px] font-medium text-slate-600 dark:text-app-text-muted">{label}</span>
         <span className={`text-[13px] font-bold tabular-nums tracking-wide ${textColor}`}>
           {used} / {total === null ? "∞" : total}
         </span>
       </div>
       {total !== null && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-app-surface-strong">
           <div
             className={`h-1.5 rounded-full transition-all duration-700 ${barColor}`}
             style={{ width: `${pct}%` }}
@@ -336,7 +336,7 @@ export function UpgradePage({
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#fafcff] dark:bg-slate-950">
+    <div className="relative min-h-screen w-full bg-[#fafcff] dark:bg-app-surface">
       {/* ── Decorative Background ────────────────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -left-[10%] top-0 h-[600px] w-[600px] rounded-full bg-gradient-to-br from-blue-100/50 to-transparent opacity-60 blur-3xl dark:from-blue-900/20" />
@@ -345,12 +345,12 @@ export function UpgradePage({
       </div>
 
       {/* ── Sticky nav bar ────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/50 dark:border-slate-800/50 bg-white/80 dark:bg-slate-950/80 px-4 py-3 backdrop-blur-md sm:px-6">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/50 dark:border-app-border/50 bg-white/80 dark:bg-app-surface/80 px-4 py-3 backdrop-blur-md sm:px-6">
         <div className="flex items-center gap-2">
           {canReturnToWorkspace ? (
             <button
               onClick={onReturn}
-              className="group inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
+              className="group inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white"
             >
               <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
               Back to workspace
@@ -362,7 +362,7 @@ export function UpgradePage({
             </div>
           )}
           {signedInAccount ? (
-            <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 sm:inline-flex">
+            <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted sm:inline-flex">
               <Mail className="h-3.5 w-3.5" />
               {signedInAccount}
             </div>
@@ -378,7 +378,7 @@ export function UpgradePage({
             <button
               type="button"
               onClick={onSignOut}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white"
             >
               Use different account
             </button>
@@ -387,7 +387,7 @@ export function UpgradePage({
             <button
               onClick={onOpenPortal}
               disabled={isOpeningPortal}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white disabled:opacity-50"
             >
               {isOpeningPortal ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -403,18 +403,18 @@ export function UpgradePage({
       <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-24 pt-16 sm:px-6 md:px-10">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <div className="mb-14 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-slate-900 dark:text-blue-400">
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400">
             <Sparkles className="h-3 w-3" />
             Upgrade your workspace
           </div>
-          <h1 className="mt-8 text-4xl font-black leading-[1.1] tracking-tight text-slate-900 dark:text-white sm:text-[3.5rem]">
+          <h1 className="mt-8 text-4xl font-black leading-[1.1] tracking-tight text-slate-900 dark:text-app-text sm:text-[3.5rem]">
             Pick the depth that fits
             <br />
             <span className="mt-2 inline-block text-blue-600 dark:text-blue-500">
               your portfolio.
             </span>
           </h1>
-          <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-slate-500 dark:text-slate-400">
+          <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-app-text-muted dark:text-app-text-muted">
             Every plan includes all features. Only tracked apps, competitor groups, and keyword capacity scale per tier.
           </p>
         </div>
@@ -422,7 +422,7 @@ export function UpgradePage({
         {/* ── Current plan + usage ───────────────────────────────────────── */}
         {showIntervalToggle ? (
           <div className="mb-12 flex justify-center">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-app-border dark:bg-app-surface-muted">
               {availableIntervals.map((interval) => {
                 const isActive = selectedInterval === interval;
                 return (
@@ -433,7 +433,7 @@ export function UpgradePage({
                     className={`rounded-full px-5 py-2.5 sm:py-2 text-sm font-semibold transition-colors ${
                       isActive
                         ? "bg-blue-600 text-white"
-                        : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                        : "text-slate-600 hover:text-slate-900 dark:text-app-text-muted dark:hover:text-white"
                     }`}
                   >
                     {formatIntervalLabel(interval)}
@@ -446,11 +446,11 @@ export function UpgradePage({
 
         <div className="mb-12 flex flex-col sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Plan card */}
-          <div className="order-2 sm:order-1 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+          <div className="order-2 sm:order-1 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-app-border dark:bg-app-surface-muted/80 backdrop-blur-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
               Your membership
             </p>
-            <p className="mt-4 text-[1.75rem] font-black tracking-tight text-slate-900 dark:text-white">
+            <p className="mt-4 text-[1.75rem] font-black tracking-tight text-slate-900 dark:text-app-text">
               {isActivating
                 ? "Activating trial"
                 : isSelectionRequired
@@ -461,17 +461,17 @@ export function UpgradePage({
                   "Premium"}
             </p>
             {isSelectionRequired ? (
-              <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+              <p className="mt-2 text-xs font-medium text-app-text-muted dark:text-app-text-muted">
                 Select a subscription to start your 7-day trial and unlock the workspace.
               </p>
             ) : null}
             {isActivating ? (
               <div className="mt-3 space-y-3">
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                <p className="text-xs font-medium text-app-text-muted dark:text-app-text-muted">
                   We&apos;re waiting for billing to activate your workspace access.
                 </p>
                 {pendingPlan ? (
-                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:bg-app-surface-strong dark:text-app-text-muted">
                     <CreditCard className="h-3.5 w-3.5" />
                     {pendingPlan.name}
                     {billingStatus?.pendingInterval
@@ -486,7 +486,7 @@ export function UpgradePage({
                       <button
                         type="button"
                         onClick={onRetryBillingStatus}
-                        className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                        className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-app-surface-muted dark:text-amber-300 dark:hover:bg-amber-950/40"
                       >
                         Refresh billing status
                       </button>
@@ -496,7 +496,7 @@ export function UpgradePage({
               </div>
             ) : null}
             {currentPeriodEnd && (
-              <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">Renews {currentPeriodEnd}</p>
+              <p className="mt-1 text-xs font-medium text-app-text-muted dark:text-app-text-muted">Renews {currentPeriodEnd}</p>
             )}
             <div className="mt-5 self-start">
               <div
@@ -526,9 +526,9 @@ export function UpgradePage({
             <div className="flex-1" />
 
             {(billingError || !billingConnected) && (
-              <div className="mt-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+              <div className="mt-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-app-border dark:bg-app-surface-muted/50">
                 <Headphones className="h-5 w-5 shrink-0 text-blue-500" />
-                <p className="text-xs font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+                <p className="text-xs font-medium leading-relaxed text-slate-600 dark:text-app-text-muted">
                   {isLoading
                     ? "Refreshing billing…"
                     : billingError || "Contact support to activate billing access."}
@@ -539,8 +539,8 @@ export function UpgradePage({
 
           {/* Usage bars */}
           {accessState === "active" && billingStatus?.usage && billingStatus?.planLimits ? (
-            <div className="order-1 sm:order-2 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
-              <p className="mb-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+            <div className="order-1 sm:order-2 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-app-border dark:bg-app-surface-muted/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+              <p className="mb-6 text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                 Capacity usage
               </p>
               <div className="flex flex-1 flex-col justify-center space-y-7">
@@ -562,16 +562,16 @@ export function UpgradePage({
               </div>
             </div>
           ) : (
-            <div className="order-1 sm:order-2 rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+            <div className="order-1 sm:order-2 rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-app-border dark:bg-app-surface-muted/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                     Premium capacities
                   </p>
-                  <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                  <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-app-text">
                     Compare plan limits before you start
                   </h3>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted">
                     Switch between plans to see how tracked app, competitor group, and keyword capacity scales.
                   </p>
                 </div>
@@ -580,10 +580,10 @@ export function UpgradePage({
                     <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">
                       Selected plan
                     </p>
-                    <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                    <p className="mt-1 text-sm font-bold text-slate-900 dark:text-app-text">
                       {selectedCapacityPlan.name}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs text-app-text-muted dark:text-app-text-muted">
                       {selectedCapacityPlan.contactOnly
                         ? "Custom terms"
                         : `${selectedCapacityPriceLabel || selectedCapacityPlan.priceLabel} · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
@@ -597,7 +597,7 @@ export function UpgradePage({
                   <div className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300">
                     <ArrowRight className="h-3.5 w-3.5" />
                   </div>
-                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                     Preview limits for
                   </p>
                 </div>
@@ -617,7 +617,7 @@ export function UpgradePage({
                         className={`rounded-2xl border px-4 py-3 text-left transition-all ${
                           isActive
                             ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/15"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-700 dark:hover:bg-slate-800"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text dark:hover:border-blue-700 dark:hover:bg-app-surface-strong"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -627,7 +627,7 @@ export function UpgradePage({
                               className={`mt-1 text-xs ${
                                 isActive
                                   ? "text-blue-100"
-                                  : "text-slate-500 dark:text-slate-400"
+                                  : "text-app-text-muted dark:text-app-text-muted"
                               }`}
                             >
                               {plan.contactOnly
@@ -639,7 +639,7 @@ export function UpgradePage({
                             className={`mt-0.5 h-4 w-4 rounded-full border ${
                               isActive
                                 ? "border-white bg-white"
-                                : "border-slate-300 dark:border-slate-600"
+                                : "border-slate-300 dark:border-app-border"
                             }`}
                           >
                             {isActive ? (
@@ -654,30 +654,30 @@ export function UpgradePage({
               </div>
 
               {selectedCapacityPlan && selectedCapacityLimits ? (
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/50">
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-app-border dark:bg-app-surface/50">
                   {selectedCapacityPlan.contactOnly ? (
                     <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-app-border dark:bg-app-surface-muted/70">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                           Tracked apps
                         </p>
-                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-app-text">
                           {formatCapacityLimit(selectedCapacityLimits.trackedApps, "tracked apps")}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-app-border dark:bg-app-surface-muted/70">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                           Competitor groups
                         </p>
-                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-app-text">
                           {formatCapacityLimit(selectedCapacityLimits.competitorGroups, "competitor groups")}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-app-border dark:bg-app-surface-muted/70">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                           Tracked keywords
                         </p>
-                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-app-text">
                           {formatCapacityLimit(selectedCapacityLimits.trackedKeywords, "tracked keywords")}
                         </p>
                       </div>
@@ -708,19 +708,19 @@ export function UpgradePage({
         </div>
 
         {/* ── Everything included ───────────────────────────────────────── */}
-        <div className="relative mb-12 overflow-hidden rounded-[24px] border border-slate-200/60 bg-slate-50/50 p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/50 sm:p-10 md:p-12">
+        <div className="relative mb-12 overflow-hidden rounded-[24px] border border-slate-200/60 bg-slate-50/50 p-8 shadow-sm dark:border-app-border dark:bg-app-surface-muted/50 sm:p-10 md:p-12">
           {/* Subtle gradient background inside */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f0f7ff] to-transparent dark:from-blue-950/20" />
           
           <div className="relative z-10">
             <div className="mb-10 flex flex-col items-center text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-slate-900 dark:text-blue-400">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400">
                 Every plan includes
               </div>
-              <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-[2rem]">
+              <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-900 dark:text-app-text md:text-[2rem]">
                 All features. Every tier.
               </h2>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted">
                 Features are never gated. Only tracked apps, competitor groups, and keyword slots scale.
               </p>
             </div>
@@ -730,12 +730,12 @@ export function UpgradePage({
                 const Icon = FEATURE_ICONS[cap.label] || CheckCircle2;
                 return (
                   <div key={cap.label} className="flex items-start gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-slate-200/60 bg-white text-blue-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-blue-400">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-slate-200/60 bg-white text-blue-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-blue-400">
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
-                      <div className="text-[13px] font-bold text-slate-900 dark:text-white">{cap.label}</div>
-                      <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{cap.sub}</div>
+                      <div className="text-[13px] font-bold text-slate-900 dark:text-app-text">{cap.label}</div>
+                      <div className="mt-1 text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted">{cap.sub}</div>
                     </div>
                   </div>
                 );
@@ -755,16 +755,16 @@ export function UpgradePage({
             return (
               <div
                 key={plan.id}
-                className={`relative flex h-full flex-col rounded-[20px] bg-white shadow-sm transition-all dark:bg-slate-900/90 backdrop-blur-sm ${
+                className={`relative flex h-full flex-col rounded-[20px] bg-white shadow-sm transition-all dark:bg-app-surface-muted/90 backdrop-blur-sm ${
                   isHighlight
                     ? "border-2 border-blue-600 px-6 pb-6 pt-10 shadow-xl shadow-blue-500/10 z-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
-                    : "border border-slate-200 p-6 dark:border-slate-800 hover:shadow-md"
+                    : "border border-slate-200 p-6 dark:border-app-border hover:shadow-md"
                 }`}
               >
                 {/* Popular banner */}
                 {isHighlight && (
                   <div className="absolute inset-x-0 top-0 flex h-[26px] items-center justify-center rounded-t-[18px] bg-blue-600">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-white">Popular</span>
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-app-text">Popular</span>
                   </div>
                 )}
 
@@ -774,7 +774,7 @@ export function UpgradePage({
                     className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl border ${
                       isHighlight
                         ? "border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-400"
-                        : "border-slate-100 bg-slate-50 text-blue-600 dark:border-slate-800/80 dark:bg-slate-800/50 dark:text-blue-400"
+                        : "border-slate-100 bg-slate-50 text-blue-600 dark:border-app-border/80 dark:bg-app-surface-strong/50 dark:text-blue-400"
                     }`}
                   >
                     <PlanIcon className="h-4 w-4" />
@@ -786,10 +786,10 @@ export function UpgradePage({
 
                 {/* Price */}
                 <div className="mt-5">
-                  <div className="text-[2.25rem] font-black leading-none tracking-tight text-slate-900 dark:text-white">
+                  <div className="text-[2.25rem] font-black leading-none tracking-tight text-slate-900 dark:text-app-text">
                     {(priceLabel || "Custom").replace("/mo", "")}
                   </div>
-                  <div className="mt-2 min-h-[1.25rem] text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  <div className="mt-2 min-h-[1.25rem] text-[11px] font-medium text-app-text-muted dark:text-app-text-muted">
                     {!plan.contactOnly &&
                       `/mo · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
                     {plan.contactOnly && "custom terms"}
@@ -797,19 +797,19 @@ export function UpgradePage({
                 </div>
 
                 {/* Description */}
-                <p className="mt-5 min-h-[3rem] text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                <p className="mt-5 min-h-[3rem] text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted">
                   {plan.description}
                 </p>
 
                 {/* Divider */}
-                <div className="my-5 h-px w-full bg-slate-100 dark:bg-slate-800" />
+                <div className="my-5 h-px w-full bg-slate-100 dark:bg-app-surface-strong" />
 
                 {/* Features */}
                 <div className="flex-1 space-y-3.5">
                   {featureLines.map((line) => (
                     <div
                       key={line}
-                      className="flex items-start gap-3 text-[12px] font-medium text-slate-700 dark:text-slate-300"
+                      className="flex items-start gap-3 text-[12px] font-medium text-slate-700 dark:text-app-text-muted"
                     >
                       <Check
                         className="mt-0.5 h-[14px] w-[14px] shrink-0 text-blue-600 dark:text-blue-400"
@@ -828,25 +828,25 @@ export function UpgradePage({
         </div>
 
         {/* ── Footer ────────────────────────────────────────────────────── */}
-        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-xs font-medium text-slate-500 dark:text-slate-400">
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-xs font-medium text-app-text-muted dark:text-app-text-muted">
           <span className="flex items-center gap-2">
-            <Headphones className="h-3.5 w-3.5 text-slate-400" />
+            <Headphones className="h-3.5 w-3.5 text-app-text-muted" />
             <span>Questions? </span>
             <a
               href="mailto:vantalumstudio@gmail.com"
-              className="text-slate-700 underline-offset-2 transition-colors hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
+              className="text-slate-700 underline-offset-2 transition-colors hover:text-slate-900 hover:underline dark:text-app-text-muted dark:hover:text-app-text"
             >
               Contact support
             </a>
           </span>
           <span className="hidden sm:inline">·</span>
           <span className="flex items-center gap-2">
-            <CircleDollarSign className="h-3.5 w-3.5 text-slate-400" />
+            <CircleDollarSign className="h-3.5 w-3.5 text-app-text-muted" />
             Prices in USD. Cancel anytime.
           </span>
           <span className="hidden sm:inline">·</span>
           <span className="flex items-center gap-2">
-            <Lock className="h-3.5 w-3.5 text-slate-400" />
+            <Lock className="h-3.5 w-3.5 text-app-text-muted" />
             Secure checkout via Stripe.
           </span>
         </div>

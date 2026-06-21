@@ -28,9 +28,9 @@ function RankSparklineTooltip({ active, payload }: TooltipProps) {
   if (!active || !point) return null;
 
   return (
-    <div className="rounded-lg border border-slate-700/80 bg-slate-950/95 px-2.5 py-2 text-[10px] text-slate-200 shadow-2xl backdrop-blur-xl">
-      <p className="font-semibold text-slate-100">{point.fullTime}</p>
-      <p className="mt-1 text-slate-400">
+    <div className="rounded-lg border border-app-border/80 bg-app-surface/95 px-2.5 py-2 text-[10px] text-app-text shadow-2xl backdrop-blur-xl">
+      <p className="font-semibold text-app-text">{point.fullTime}</p>
+      <p className="mt-1 text-app-text-muted">
         Rank:{" "}
         <span className="font-bold text-cyan-300">
           {point.rawRank === -1 ? `Not in top ${point.rankDepth}` : `#${point.rank}`}
@@ -81,7 +81,7 @@ const RankSparkline = React.memo(function RankSparkline({
 
   return (
     <div
-      className={`h-full w-full overflow-hidden rounded-lg border border-slate-900/70 bg-slate-950/35 ${className || ""}`.trim()}
+      className={`h-full w-full overflow-hidden rounded-lg border border-slate-900/70 bg-app-surface/35 ${className || ""}`.trim()}
     >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart

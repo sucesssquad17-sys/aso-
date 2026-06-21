@@ -182,7 +182,7 @@ export function MobileBottomNav({
   onTabChange: (id: WorkspaceViewMode) => void;
 }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95 md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-app-border dark:bg-app-surface/95 md:hidden">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeId === tab.id;
@@ -195,7 +195,7 @@ export function MobileBottomNav({
               "relative flex min-h-[48px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 transition-colors active:scale-95",
               isActive
                 ? "text-cyan-600 dark:text-cyan-400"
-                : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100",
+                : "text-app-text-muted hover:text-slate-900 dark:text-app-text-muted dark:hover:text-app-text",
             )}
           >
             <Icon className="h-5 w-5" />
@@ -232,14 +232,14 @@ export function MobileDataCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/40 md:hidden",
+        "flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-app-border/60 dark:bg-app-surface-muted/40 md:hidden",
         className,
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+            <span className="truncate text-sm font-semibold text-slate-900 dark:text-app-text">
               {title}
             </span>
             {badges?.map((badge, i) => (
@@ -249,7 +249,7 @@ export function MobileDataCard({
             ))}
           </div>
           {subtitle && (
-            <div className="text-xs text-slate-500 dark:text-slate-400">
+            <div className="text-xs text-app-text-muted dark:text-app-text-muted">
               {subtitle}
             </div>
           )}
@@ -257,13 +257,13 @@ export function MobileDataCard({
       </div>
       
       {metrics && metrics.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-950/50">
+        <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 dark:bg-app-surface/50">
           {metrics.map((metric, i) => (
             <div key={i} className="flex flex-col gap-1">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-app-text-muted">
                 {metric.label}
               </span>
-              <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+              <span className="text-sm font-semibold text-slate-900 dark:text-app-text">
                 {metric.value}
               </span>
             </div>

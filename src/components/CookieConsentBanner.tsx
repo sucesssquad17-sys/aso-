@@ -16,21 +16,21 @@ export function CookieConsentBanner({
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[80] flex justify-center px-4 pb-4">
-      <div className="pointer-events-auto w-full max-w-5xl rounded-2xl border border-slate-700/80 bg-slate-950/96 shadow-2xl backdrop-blur-xl">
+      <div className="pointer-events-auto w-full max-w-5xl rounded-2xl border border-app-border/80 bg-app-surface/96 shadow-2xl backdrop-blur-xl">
         <div className="flex flex-col gap-4 p-4 sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="max-w-3xl">
-              <div className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-slate-100">
+              <div className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-app-text">
                 <Cookie className="h-4 w-4 text-cyan-300" />
                 We use cookies
               </div>
-              <p className="text-sm leading-6 text-slate-400">
+              <p className="text-sm leading-6 text-app-text-muted">
                 We use essential cookies and similar browser storage to keep the
                 site secure and working properly. With your permission, we also
                 use optional storage for faster repeat lookups and to remember
                 non-essential preferences.
               </p>
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-app-text-muted">
                 Essential storage is always active.
               </p>
             </div>
@@ -38,7 +38,7 @@ export function CookieConsentBanner({
               <button
                 type="button"
                 onClick={() => setShowOptions((current) => !current)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:border-slate-500/80 hover:text-white"
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/70 bg-app-surface-muted/70 px-4 py-2 text-sm font-semibold text-app-text transition-colors hover:border-slate-500/80 hover:text-app-text"
               >
                 <Settings2 className="h-4 w-4" />
                 {showOptions ? "Hide settings" : "Cookie settings"}
@@ -53,7 +53,7 @@ export function CookieConsentBanner({
                     }),
                   )
                 }
-                className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:border-slate-500/80 hover:text-white"
+                className="rounded-xl border border-app-border/70 bg-app-surface-muted/70 px-4 py-2 text-sm font-semibold text-app-text transition-colors hover:border-slate-500/80 hover:text-app-text"
               >
                 Reject all
               </button>
@@ -75,23 +75,23 @@ export function CookieConsentBanner({
           </div>
 
           {showOptions && (
-            <div className="rounded-2xl border border-slate-700/70 bg-slate-900/65 p-4">
+            <div className="rounded-2xl border border-app-border/70 bg-app-surface-muted/65 p-4">
               <div className="mb-4">
-                <p className="text-sm font-semibold text-slate-100">
+                <p className="text-sm font-semibold text-app-text">
                   Manage cookie preferences
                 </p>
-                <p className="mt-1 text-xs leading-5 text-slate-400">
+                <p className="mt-1 text-xs leading-5 text-app-text-muted">
                   Choose which optional storage features you want to allow.
                 </p>
               </div>
               <div className="grid gap-3 lg:grid-cols-3">
-                <label className="rounded-2xl border border-slate-700/70 bg-slate-950/40 p-4">
+                <label className="rounded-2xl border border-app-border/70 bg-app-surface/40 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-100">
+                      <p className="text-sm font-semibold text-app-text">
                         Essential
                       </p>
-                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                      <p className="mt-2 text-xs leading-5 text-app-text-muted">
                         Required for authentication, security, and core app
                         functionality.
                       </p>
@@ -100,18 +100,18 @@ export function CookieConsentBanner({
                       type="checkbox"
                       checked
                       disabled
-                      className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400 opacity-70"
+                      className="mt-0.5 h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400 opacity-70"
                     />
                   </div>
                 </label>
 
-                <label className="rounded-2xl border border-slate-700/70 bg-slate-950/40 p-4">
+                <label className="rounded-2xl border border-app-border/70 bg-app-surface/40 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-100">
+                      <p className="text-sm font-semibold text-app-text">
                         Performance
                       </p>
-                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                      <p className="mt-2 text-xs leading-5 text-app-text-muted">
                         Stores app, ranking, and search responses locally so
                         repeated checks load faster.
                       </p>
@@ -122,18 +122,18 @@ export function CookieConsentBanner({
                       onChange={(event) =>
                         setPerformanceCache(event.target.checked)
                       }
-                      className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400 focus:ring-cyan-500"
+                      className="mt-0.5 h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400 focus:ring-cyan-500"
                     />
                   </div>
                 </label>
 
-                <label className="rounded-2xl border border-slate-700/70 bg-slate-950/40 p-4">
+                <label className="rounded-2xl border border-app-border/70 bg-app-surface/40 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-100">
+                      <p className="text-sm font-semibold text-app-text">
                         Preferences
                       </p>
-                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                      <p className="mt-2 text-xs leading-5 text-app-text-muted">
                         Remembers non-essential choices like dismissed onboarding
                         panels.
                       </p>
@@ -144,7 +144,7 @@ export function CookieConsentBanner({
                       onChange={(event) =>
                         setPreferenceStorage(event.target.checked)
                       }
-                      className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400 focus:ring-cyan-500"
+                      className="mt-0.5 h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400 focus:ring-cyan-500"
                     />
                   </div>
                 </label>
@@ -160,7 +160,7 @@ export function CookieConsentBanner({
                       }),
                     )
                   }
-                  className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-2 text-sm font-semibold text-slate-200 transition-colors hover:border-slate-500/80 hover:text-white"
+                  className="rounded-xl border border-app-border/70 bg-app-surface-muted/70 px-4 py-2 text-sm font-semibold text-app-text transition-colors hover:border-slate-500/80 hover:text-app-text"
                 >
                   Reject all
                 </button>

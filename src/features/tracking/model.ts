@@ -2103,7 +2103,7 @@ export function getTrackedRankDisplay(trackedKeyword: TrackedKeyword) {
   }
   return {
     label: "Pending",
-    className: "text-slate-400",
+    className: "text-app-text-muted",
   };
 }
 

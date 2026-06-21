@@ -633,7 +633,7 @@ function getTrackedRankDisplay(trackedKeyword: TrackedKeyword) {
   }
   return {
     label: "Pending",
-    className: "text-slate-400",
+    className: "text-app-text-muted",
   };
 }
 
@@ -830,12 +830,12 @@ function CountrySearchSelect({
       >
         {" "}
         <span className="truncate">{selectedLabel}</span>{" "}
-        <span className="text-slate-500 text-xs uppercase">
+        <span className="text-app-text-muted text-xs uppercase">
           {value.toUpperCase()}
         </span>{" "}
       </button>{" "}
       {isOpen && (
-        <div className="absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border border-slate-700/70 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-xl">
+        <div className="absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl">
           {" "}
           <input
             value={query}
@@ -855,17 +855,17 @@ function CountrySearchSelect({
                   setIsOpen(false);
                   setQuery("");
                 }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-slate-300 hover:bg-slate-800/80"}`}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-app-text-muted hover:bg-app-surface-strong/80"}`}
               >
                 {" "}
                 <div className="font-medium">{option.name}</div>{" "}
-                <div className="text-xs text-slate-500 uppercase">
+                <div className="text-xs text-app-text-muted uppercase">
                   {option.code}
                 </div>{" "}
               </button>
             ))}{" "}
             {filteredOptions.length === 0 && (
-              <div className="rounded-xl px-3 py-4 text-sm text-slate-500">
+              <div className="rounded-xl px-3 py-4 text-sm text-app-text-muted">
                 No countries match your search.
               </div>
             )}{" "}
@@ -913,18 +913,18 @@ function CountryMultiSelectModal({
   }, [options, query]);
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
       {" "}
-      <div className="w-full max-w-2xl rounded-3xl border border-slate-700/70 bg-slate-950/95 p-6 shadow-2xl">
+      <div className="w-full max-w-2xl rounded-3xl border border-app-border/70 bg-app-surface/95 p-6 shadow-2xl">
         {" "}
         <div className="flex items-start justify-between gap-4">
           {" "}
           <div>
             {" "}
-            <h3 className="font-display text-xl font-bold text-slate-100">
+            <h3 className="font-display text-xl font-bold text-app-text">
               Track keyword by country
             </h3>{" "}
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-app-text-muted">
               {" "}
               Select countries for{" "}
               <span className="font-medium text-cyan-300">"{keyword}"</span>
@@ -934,7 +934,7 @@ function CountryMultiSelectModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-200"
+            className="rounded-xl p-2 text-app-text-muted transition-colors hover:bg-white/5 hover:text-app-text"
           >
             {" "}
             <X className="w-4 h-4" />{" "}
@@ -955,7 +955,7 @@ function CountryMultiSelectModal({
           {disabledCountries.map((countryCode) => (
             <span
               key={`tracked-${countryCode}`}
-              className="rounded-full border border-slate-700/70 bg-slate-950/60 px-3 py-1 text-xs text-slate-400"
+              className="rounded-full border border-app-border/70 bg-app-surface/60 px-3 py-1 text-xs text-app-text-muted"
             >
               {findCountryName(countryCode)} already tracked
             </span>
@@ -970,12 +970,12 @@ function CountryMultiSelectModal({
             </span>
           ))}{" "}
           {selectedCountries.length === 0 && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-app-text-muted">
               Choose at least one country.
             </span>
           )}{" "}
         </div>{" "}
-        <div className="mt-4 max-h-80 overflow-y-auto space-y-2 rounded-2xl border border-slate-700/60 bg-slate-900/40 p-3">
+        <div className="mt-4 max-h-80 overflow-y-auto space-y-2 rounded-2xl border border-app-border/60 bg-app-surface-muted/40 p-3">
           {" "}
           {filteredOptions.map((option) => {
             const isSelected = selectedCountries.includes(option.code);
@@ -989,18 +989,18 @@ function CountryMultiSelectModal({
                     onToggleCountry(option.code);
                   }
                 }}
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-slate-300 hover:bg-slate-800/80"}`}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-app-text-muted hover:bg-app-surface-strong/80"}`}
               >
                 {" "}
                 <div>
                   {" "}
                   <div className="font-medium">{option.name}</div>{" "}
-                  <div className="text-xs uppercase text-slate-500">
+                  <div className="text-xs uppercase text-app-text-muted">
                     {option.code}
                   </div>{" "}
                 </div>{" "}
                 <div
-                  className={`text-xs font-semibold ${isSelected ? "text-cyan-300" : "text-slate-500"}`}
+                  className={`text-xs font-semibold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}
                 >
                   {" "}
                   {isSelected
@@ -1013,14 +1013,14 @@ function CountryMultiSelectModal({
             );
           })}{" "}
           {filteredOptions.length === 0 && (
-            <div className="rounded-xl px-3 py-4 text-sm text-slate-500">
+            <div className="rounded-xl px-3 py-4 text-sm text-app-text-muted">
               No countries match your search.
             </div>
           )}{" "}
         </div>{" "}
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           {" "}
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-app-text-muted">
             {" "}
             {selectedCountries.length} selected{" "}
           </div>{" "}
@@ -1081,7 +1081,7 @@ function LegalDocumentScreen({
           <button
             type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm font-medium text-slate-400 transition-colors hover:text-slate-200"
+            className="inline-flex items-center gap-2 text-sm font-medium text-app-text-muted transition-colors hover:text-app-text"
           >
             {" "}
             <ArrowLeft className="w-4 h-4" /> Back{" "}
@@ -1094,16 +1094,16 @@ function LegalDocumentScreen({
             {" "}
             <ShieldCheck className="w-3.5 h-3.5" /> Legal{" "}
           </div>{" "}
-          <h1 className="font-display text-3xl font-bold text-white tracking-tight">
+          <h1 className="font-display text-3xl font-bold text-app-text tracking-tight">
             {title}
           </h1>{" "}
-          <p className="text-slate-400 mt-3 text-sm leading-6">
+          <p className="text-app-text-muted mt-3 text-sm leading-6">
             {subtitle}
           </p>{" "}
         </div>{" "}
         <div
           className={`prose prose-sm max-w-none ${
-            themeMode === "light" ? "prose-slate text-slate-600" : "prose-invert text-slate-300"
+            themeMode === "light" ? "prose-slate text-slate-600" : "prose-invert text-app-text-muted"
           }`}
         >
           {" "}
@@ -1329,10 +1329,10 @@ function LoginScreen({
             {" "}
             <ShieldCheck className="w-3.5 h-3.5" /> Secure access{" "}
           </div>{" "}
-          <h1 className="font-display text-3xl font-bold text-white tracking-tight">
+          <h1 className="font-display text-3xl font-bold text-app-text tracking-tight">
             Sign in to Rank Analyzer Pro
           </h1>{" "}
-          <p className="text-slate-400 mt-3 text-sm leading-6">
+          <p className="text-app-text-muted mt-3 text-sm leading-6">
             {" "}
             Use Google or your email and password to access the analyzer
             workspace.{" "}
@@ -1426,12 +1426,12 @@ function LoginScreen({
           {" "}
           <label className="block">
             {" "}
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
               Email
             </span>{" "}
             <div className="relative mt-2">
               {" "}
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />{" "}
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-muted" />{" "}
               <input
                 type="email"
                 value={email}
@@ -1445,12 +1445,12 @@ function LoginScreen({
           </label>{" "}
           <label className="block">
             {" "}
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
               Password
             </span>{" "}
             <div className="relative mt-2">
               {" "}
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />{" "}
+              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-app-text-muted" />{" "}
               <input
                 type="password"
                 value={password}
@@ -1504,9 +1504,9 @@ function LoginScreen({
               type="checkbox"
               checked={legalAccepted}
               onChange={(event) => onLegalAcceptedChange(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400 focus:ring-cyan-500"
+              className="mt-0.5 h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400 focus:ring-cyan-500"
             />{" "}
-            <span className="text-slate-400 leading-6">
+            <span className="text-app-text-muted leading-6">
               {" "}
               I agree to the{" "}
               <button
@@ -1546,13 +1546,13 @@ function LoginScreen({
             {isSignIn ? "Sign in with email" : "Create account"}{" "}
           </button>{" "}
         </form>{" "}
-        <p className="text-xs text-slate-500 leading-6 mt-6 text-center">
+        <p className="text-xs text-app-text-muted leading-6 mt-6 text-center">
           {" "}
           Review our{" "}
           <button
             type="button"
             onClick={onOpenPrivacy}
-            className="text-slate-300 hover:text-white underline underline-offset-4"
+            className="text-app-text-muted hover:text-app-text underline underline-offset-4"
           >
             {" "}
             Privacy Policy{" "}
@@ -1561,7 +1561,7 @@ function LoginScreen({
           <button
             type="button"
             onClick={onOpenTerms}
-            className="text-slate-300 hover:text-white underline underline-offset-4"
+            className="text-app-text-muted hover:text-app-text underline underline-offset-4"
           >
             {" "}
             Terms &amp; Conditions{" "}
@@ -2157,10 +2157,10 @@ function AuthenticatedApp({
           toast(
             <div className="flex flex-col gap-1">
               {" "}
-              <span className="font-semibold text-slate-100">
+              <span className="font-semibold text-app-text">
                 {trackedKeyword.appTitle}
               </span>{" "}
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-app-text-muted">
                 Keyword:{" "}
                 <span className="font-medium text-cyan-400">
                   "{trackedKeyword.keyword}"
@@ -3924,7 +3924,7 @@ function AuthenticatedApp({
     return (
       <ErrorBoundary>
         <div
-          className="min-h-screen text-slate-100 font-sans relative flex items-center justify-center"
+          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
           {" "}
@@ -3934,7 +3934,7 @@ function AuthenticatedApp({
           <div className="card-glow relative z-10 px-8 py-10 text-center">
             {" "}
             <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />{" "}
-            <p className="text-sm uppercase tracking-[0.18em] text-slate-500">
+            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
               Loading account data
             </p>{" "}
           </div>{" "}
@@ -3973,10 +3973,10 @@ function AuthenticatedApp({
             {" "}
             <ShieldCheck className="w-3.5 h-3.5" /> First login{" "}
           </div>{" "}
-          <h1 className="font-display text-3xl font-bold text-white tracking-tight">
+          <h1 className="font-display text-3xl font-bold text-app-text tracking-tight">
             Accept the legal terms
           </h1>{" "}
-          <p className="text-slate-400 mt-3 text-sm leading-6">
+          <p className="text-app-text-muted mt-3 text-sm leading-6">
             {" "}
             Before entering the app for the first time, review and accept the
             Privacy Policy and Terms &amp; Conditions.{" "}
@@ -4012,9 +4012,9 @@ function AuthenticatedApp({
               type="checkbox"
               checked={consentChecked}
               onChange={(event) => setConsentChecked(event.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400 focus:ring-cyan-500"
+              className="mt-0.5 h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400 focus:ring-cyan-500"
             />{" "}
-            <span className="text-slate-400 leading-6">
+            <span className="text-app-text-muted leading-6">
               {" "}
               I have read and agree to the Terms &amp; Conditions and Privacy
               Policy.{" "}
@@ -4039,7 +4039,7 @@ function AuthenticatedApp({
   return (
     <ErrorBoundary>
       <div
-        className="min-h-screen text-slate-100 font-sans relative"
+        className="min-h-screen text-app-text font-sans relative"
         style={{ background: "#020617" }}
       >
         {" "}
@@ -4074,7 +4074,7 @@ function AuthenticatedApp({
                 />{" "}
               </div>{" "}
               <h1
-                className="font-display font-bold tracking-tight text-white flex items-center gap-2 text-base sm:text-lg"
+                className="font-display font-bold tracking-tight text-app-text flex items-center gap-2 text-base sm:text-lg"
                 style={{ letterSpacing: "-0.02em" }}
               >
                 {" "}
@@ -4106,10 +4106,10 @@ function AuthenticatedApp({
                 {" "}
                 <div className="min-w-0">
                   {" "}
-                  <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">
+                  <p className="text-[11px] uppercase tracking-[0.18em] text-app-text-muted">
                     Signed in as
                   </p>{" "}
-                  <p className="text-sm font-semibold text-slate-200 truncate max-w-[180px]">
+                  <p className="text-sm font-semibold text-app-text truncate max-w-[180px]">
                     {" "}
                     {currentUser.displayName ||
                       currentUser.email ||
@@ -4128,7 +4128,7 @@ function AuthenticatedApp({
                 )}{" "}
                 <button
                   onClick={onSignOut}
-                  className="p-2 rounded-xl text-slate-400 hover:text-white transition-all hover:bg-white/5"
+                  className="p-2 rounded-xl text-app-text-muted hover:text-app-text transition-all hover:bg-white/5"
                   title="Sign out"
                 >
                   {" "}
@@ -4140,7 +4140,7 @@ function AuthenticatedApp({
                     onClick={() =>
                       setIsConfirmingDeleteAccount((prev) => !prev)
                     }
-                    className={`p-2 rounded-xl transition-all ${isConfirmingDeleteAccount ? "text-red-300 bg-red-500/10 border border-red-500/20" : "text-slate-400 hover:text-red-300 hover:bg-red-500/10"}`}
+                    className={`p-2 rounded-xl transition-all ${isConfirmingDeleteAccount ? "text-red-300 bg-red-500/10 border border-red-500/20" : "text-app-text-muted hover:text-red-300 hover:bg-red-500/10"}`}
                     title="Delete account"
                   >
                     {" "}
@@ -4159,7 +4159,7 @@ function AuthenticatedApp({
                       <p className="text-sm font-semibold text-red-200 mb-2">
                         Delete this account?
                       </p>{" "}
-                      <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+                      <p className="text-xs text-app-text-muted mb-3 leading-relaxed">
                         {" "}
                         This removes your saved bookmarks, tracked keywords,
                         rank history, and Firebase login for this account.{" "}
@@ -4182,7 +4182,7 @@ function AuthenticatedApp({
                             }
                           }}
                           disabled={isDeletingAccount}
-                          className="flex-1 text-white text-xs font-bold py-2 rounded-lg transition-colors disabled:opacity-60"
+                          className="flex-1 text-app-text text-xs font-bold py-2 rounded-lg transition-colors disabled:opacity-60"
                           style={{ background: "rgba(220,38,38,0.95)" }}
                         >
                           {" "}
@@ -4191,7 +4191,7 @@ function AuthenticatedApp({
                         <button
                           onClick={() => setIsConfirmingDeleteAccount(false)}
                           disabled={isDeletingAccount}
-                          className="flex-1 text-slate-400 text-xs font-bold py-2 rounded-lg transition-colors hover:text-slate-200 disabled:opacity-60"
+                          className="flex-1 text-app-text-muted text-xs font-bold py-2 rounded-lg transition-colors hover:text-app-text disabled:opacity-60"
                           style={{
                             background: "rgba(30,41,59,0.8)",
                             border: "1px solid rgba(51,65,85,0.5)",
@@ -4214,7 +4214,7 @@ function AuthenticatedApp({
                 }}
               >
                 {" "}
-                <Globe className="hidden sm:block w-3.5 h-3.5 text-slate-500 flex-shrink-0" />{" "}
+                <Globe className="hidden sm:block w-3.5 h-3.5 text-app-text-muted flex-shrink-0" />{" "}
                 <CountrySearchSelect
                   value={country}
                   onChange={handleCountryChange}
@@ -4234,7 +4234,7 @@ function AuthenticatedApp({
                 {" "}
                 <button
                   onClick={() => handleStoreTypeChange("android")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 relative z-10 ${storeType === "android" ? "text-slate-950" : "text-slate-400 hover:text-slate-200"}`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 relative z-10 ${storeType === "android" ? "text-slate-950" : "text-app-text-muted hover:text-app-text"}`}
                 >
                   {" "}
                   <Play
@@ -4245,7 +4245,7 @@ function AuthenticatedApp({
                 </button>{" "}
                 <button
                   onClick={() => handleStoreTypeChange("ios")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 relative z-10 ${storeType === "ios" ? "text-slate-950" : "text-slate-400 hover:text-slate-200"}`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 relative z-10 ${storeType === "ios" ? "text-slate-950" : "text-app-text-muted hover:text-app-text"}`}
                 >
                   {" "}
                   <Apple className="w-3.5 h-3.5" /> iOS{" "}
@@ -4267,7 +4267,7 @@ function AuthenticatedApp({
                 {" "}
                 <button
                   onClick={() => setIsConfirmingClear(!isConfirmingClear)}
-                  className={`p-2 rounded-xl transition-all ${isConfirmingClear ? "text-red-400 bg-red-500/10 border border-red-500/20" : "text-slate-500 hover:text-red-400"}`}
+                  className={`p-2 rounded-xl transition-all ${isConfirmingClear ? "text-red-400 bg-red-500/10 border border-red-500/20" : "text-app-text-muted hover:text-red-400"}`}
                   style={{
                     border: isConfirmingClear
                       ? undefined
@@ -4288,7 +4288,7 @@ function AuthenticatedApp({
                     }}
                   >
                     {" "}
-                    <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+                    <p className="text-xs text-app-text-muted mb-3 leading-relaxed">
                       Clear search cache? Bookmarks & tracked keywords are safe.
                     </p>{" "}
                     <div className="flex gap-2">
@@ -4315,14 +4315,14 @@ function AuthenticatedApp({
                             setIsConfirmingClear(false);
                           }
                         }}
-                        className="flex-1 text-white text-xs font-bold py-2 rounded-lg transition-colors"
+                        className="flex-1 text-app-text text-xs font-bold py-2 rounded-lg transition-colors"
                         style={{ background: "rgba(239,68,68,0.9)" }}
                       >
                         Clear
                       </button>{" "}
                       <button
                         onClick={() => setIsConfirmingClear(false)}
-                        className="flex-1 text-slate-400 text-xs font-bold py-2 rounded-lg transition-colors hover:text-slate-200"
+                        className="flex-1 text-app-text-muted text-xs font-bold py-2 rounded-lg transition-colors hover:text-app-text"
                         style={{
                           background: "rgba(30,41,59,0.8)",
                           border: "1px solid rgba(51,65,85,0.5)",
@@ -4346,7 +4346,7 @@ function AuthenticatedApp({
               )}{" "}
               <button
                 onClick={onSignOut}
-                className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white transition-all hover:bg-white/5"
+                className="lg:hidden p-2 rounded-xl text-app-text-muted hover:text-app-text transition-all hover:bg-white/5"
                 title="Sign out"
               >
                 {" "}
@@ -4366,7 +4366,7 @@ function AuthenticatedApp({
                   }
                 }}
                 disabled={isDeletingAccount}
-                className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-red-300 transition-all hover:bg-red-500/10 disabled:opacity-60"
+                className="lg:hidden p-2 rounded-xl text-app-text-muted hover:text-red-300 transition-all hover:bg-red-500/10 disabled:opacity-60"
                 title="Delete account"
               >
                 {" "}
@@ -4403,7 +4403,7 @@ function AuthenticatedApp({
               </div>{" "}
               <button
                 onClick={() => setSuccessMessage(null)}
-                className="text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-white/5"
+                className="text-app-text-muted hover:text-app-text-muted transition-colors p-1 rounded-lg hover:bg-white/5"
               >
                 {" "}
                 <X className="w-4 h-4" />{" "}
@@ -4490,7 +4490,7 @@ function AuthenticatedApp({
             <div className="card-glow p-7 mb-8">
               {" "}
               <h2
-                className="font-display font-bold text-lg text-slate-100 mb-5 flex items-center gap-2.5"
+                className="font-display font-bold text-lg text-app-text mb-5 flex items-center gap-2.5"
                 style={{ letterSpacing: "-0.02em" }}
               >
                 {" "}
@@ -4521,7 +4521,7 @@ function AuthenticatedApp({
                 {" "}
                 <div className="relative flex-1">
                   {" "}
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />{" "}
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-app-text-muted" />{" "}
                   <input
                     id="app-search"
                     name="appSearch"
@@ -4547,7 +4547,7 @@ function AuthenticatedApp({
                         setSearchResults([]);
                         setHasSearched(false);
                       }}
-                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1 rounded-full hover:bg-slate-800 bg-slate-900"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-app-text-muted hover:text-app-text-muted transition-colors p-1 rounded-full hover:bg-app-surface-strong bg-app-surface-muted"
                     >
                       {" "}
                       <X className="w-4 h-4" />{" "}
@@ -4651,10 +4651,10 @@ function AuthenticatedApp({
                         style={{ color: "#475569" }}
                       />{" "}
                     </div>{" "}
-                    <h3 className="text-base font-semibold text-slate-300 mb-1">
+                    <h3 className="text-base font-semibold text-app-text-muted mb-1">
                       No apps found
                     </h3>{" "}
-                    <p className="text-sm text-slate-500">
+                    <p className="text-sm text-app-text-muted">
                       Try adjusting your search term or paste a direct store
                       URL.
                     </p>{" "}
@@ -4669,7 +4669,7 @@ function AuthenticatedApp({
                       {" "}
                       <button
                         onClick={() => setSelectedCategory(null)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "text-slate-950 border-transparent" : "text-slate-400 hover:text-slate-200"}`}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "text-slate-950 border-transparent" : "text-app-text-muted hover:text-app-text"}`}
                         style={
                           selectedCategory === null
                             ? {
@@ -4689,7 +4689,7 @@ function AuthenticatedApp({
                         <button
                           key={cat}
                           onClick={() => setSelectedCategory(cat)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "text-slate-950 border-transparent" : "text-slate-400 hover:text-slate-200"}`}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "text-slate-950 border-transparent" : "text-app-text-muted hover:text-app-text"}`}
                           style={
                             selectedCategory === cat
                               ? {
@@ -4747,14 +4747,14 @@ function AuthenticatedApp({
                             <div className="min-w-0">
                               {" "}
                               <h3
-                                className="font-semibold text-slate-100 line-clamp-1 mb-0.5"
+                                className="font-semibold text-app-text line-clamp-1 mb-0.5"
                                 style={{ fontSize: "0.9375rem" }}
                               >
                                 {app.title}
                               </h3>{" "}
                               <div className="flex flex-wrap items-center gap-2">
                                 {" "}
-                                <p className="text-sm text-slate-500">
+                                <p className="text-sm text-app-text-muted">
                                   {app.developer}
                                 </p>{" "}
                                 {app.category && (
@@ -4812,7 +4812,7 @@ function AuthenticatedApp({
                         </div>
                       ))
                     ) : (
-                      <div className="p-10 text-center text-slate-500 flex flex-col items-center">
+                      <div className="p-10 text-center text-app-text-muted flex flex-col items-center">
                         {" "}
                         <Search className="w-8 h-8 mb-3 opacity-40" /> No apps
                         in this category.{" "}
@@ -4828,7 +4828,7 @@ function AuthenticatedApp({
             <div className="space-y-6">
               {" "}
               <h2
-                className="font-display font-bold text-slate-100 flex items-center gap-3"
+                className="font-display font-bold text-app-text flex items-center gap-3"
                 style={{ fontSize: "1.375rem", letterSpacing: "-0.02em" }}
               >
                 {" "}
@@ -4857,10 +4857,10 @@ function AuthenticatedApp({
                       style={{ color: "#475569" }}
                     />{" "}
                   </div>{" "}
-                  <h3 className="text-base font-semibold text-slate-300 mb-1">
+                  <h3 className="text-base font-semibold text-app-text-muted mb-1">
                     No bookmarks yet
                   </h3>{" "}
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-app-text-muted">
                     Analyze an app and click the bookmark icon to save it here.
                   </p>{" "}
                 </div>
@@ -4901,10 +4901,10 @@ function AuthenticatedApp({
                       />{" "}
                       <div className="flex-1 min-w-0">
                         {" "}
-                        <h3 className="font-semibold text-slate-100 truncate text-sm">
+                        <h3 className="font-semibold text-app-text truncate text-sm">
                           {b.title}
                         </h3>{" "}
-                        <p className="text-xs text-slate-500 truncate mt-0.5">
+                        <p className="text-xs text-app-text-muted truncate mt-0.5">
                           {b.developer}
                         </p>{" "}
                         <div className="flex items-center gap-1.5 mt-1.5">
@@ -4937,7 +4937,7 @@ function AuthenticatedApp({
                             ),
                           );
                         }}
-                        className="p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-slate-500 hover:text-red-400"
+                        className="p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-app-text-muted hover:text-red-400"
                       >
                         {" "}
                         <X className="w-4 h-4" />{" "}
@@ -4968,20 +4968,20 @@ function AuthenticatedApp({
                         </span>
                         Tracked Keywords
                       </h2>
-                      <p className="mt-2 text-sm text-slate-400">
+                      <p className="mt-2 text-sm text-app-text-muted">
                         Focus on the latest rank, region coverage, and what needs attention.
                       </p>
                     </div>
                     {trackedKeywordGroupCount > 0 && (
                       <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-slate-300">
+                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-app-text-muted">
                           {trackedDashboardStats.totalGroups} groups
                         </span>
-                        <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-emerald-300">
+                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-emerald-300">
                           {trackedDashboardStats.rankedCount} ranking
                         </span>
                         {(trackedDashboardStats.pendingCount > 0 || trackedDashboardStats.needsAttentionCount > 0) && (
-                          <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-amber-300">
+                          <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-amber-300">
                             {trackedDashboardStats.pendingCount} pending / {trackedDashboardStats.needsAttentionCount} errors
                           </span>
                         )}
@@ -4993,7 +4993,7 @@ function AuthenticatedApp({
                     <>
                       <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_220px]">
                         <div className="relative">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted" />
                           <input
                             type="text"
                             value={trackSearchTerm}
@@ -5079,13 +5079,13 @@ function AuthenticatedApp({
                   )}
                 </div>
 
-                <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-3 text-xs text-slate-400">
+                <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-xs text-app-text-muted">
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="inline-flex items-center gap-2">
                       <BellRing className="w-4 h-4 text-cyan-400" />
-                      Daily tracking refresh at <span className="text-slate-100">9:00 AM IST</span>
+                      Daily tracking refresh at <span className="text-app-text">9:00 AM IST</span>
                     </div>
-                    <div className="text-slate-500">
+                    <div className="text-app-text-muted">
                       Last refresh: {trackingSchedule.lastRunAt ? new Date(trackingSchedule.lastRunAt).toLocaleString() : "Not yet"}
                     </div>
                   </div>
@@ -5094,13 +5094,13 @@ function AuthenticatedApp({
               {(() => {
                 if (trackedKeywordGroupCount === 0) {
                   return (
-                    <div className="text-center py-16 bg-slate-900/80 rounded-3xl shadow-xl shadow-slate-900/20 border border-slate-700/60">
+                    <div className="text-center py-16 bg-app-surface-muted/80 rounded-3xl shadow-xl shadow-slate-900/20 border border-app-border/60">
                       {" "}
-                      <Bell className="w-12 h-12 text-slate-500 mx-auto mb-4" />{" "}
-                      <p className="text-slate-400 font-medium">
+                      <Bell className="w-12 h-12 text-app-text-muted mx-auto mb-4" />{" "}
+                      <p className="text-app-text-muted font-medium">
                         No keywords tracked yet.
                       </p>{" "}
-                      <p className="text-sm text-slate-500 mt-2">
+                      <p className="text-sm text-app-text-muted mt-2">
                         Search for an app, check a keyword ranking, and click
                         "Track Keyword" to monitor it here.
                       </p>{" "}
@@ -5109,9 +5109,9 @@ function AuthenticatedApp({
                 }
                 if (processedTrackedKeywordGroups.length === 0) {
                   return (
-                    <div className="text-center py-12 bg-slate-900/80 rounded-3xl shadow-xl border border-slate-700/60">
+                    <div className="text-center py-12 bg-app-surface-muted/80 rounded-3xl shadow-xl border border-app-border/60">
                       {" "}
-                      <p className="text-slate-400 font-medium">
+                      <p className="text-app-text-muted font-medium">
                         {" "}
                         No tracked keyword groups for{" "}
                         {trackFilterCountry === "all"
@@ -5166,7 +5166,7 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={group.groupId}
-                            className="rounded-2xl border border-slate-700/60 bg-slate-900/60 shadow-sm"
+                            className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 shadow-sm"
                           >
                             <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1.3fr)_72px_96px_76px_32px] lg:items-center lg:gap-4">
                               {" "}
@@ -5179,17 +5179,17 @@ function AuthenticatedApp({
                                 className="flex items-center gap-3 text-left min-w-0"
                               >
                                 {" "}
-                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
+                                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-app-surface-strong border border-app-border flex items-center justify-center">
                                   {" "}
                                   {group.store === "ios" ? (
-                                    <Apple className="w-3.5 h-3.5 text-slate-300" />
+                                    <Apple className="w-3.5 h-3.5 text-app-text-muted" />
                                   ) : (
-                                    <Play className="w-3.5 h-3.5 text-slate-300" />
+                                    <Play className="w-3.5 h-3.5 text-app-text-muted" />
                                   )}{" "}
                                 </div>{" "}
                                 <div className="min-w-0">
                                   {" "}
-                                  <p className="text-sm font-semibold text-slate-100 truncate leading-tight">
+                                  <p className="text-sm font-semibold text-app-text truncate leading-tight">
                                     {group.appTitle}
                                   </p>{" "}
                                   <p className="text-xs text-cyan-400/80 font-medium truncate mt-0.5">
@@ -5197,7 +5197,7 @@ function AuthenticatedApp({
                                   </p>{" "}
                                 </div>{" "}
                                 <ChevronDown
-                                  className={`w-4 h-4 text-slate-500 flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                                  className={`w-4 h-4 text-app-text-muted flex-shrink-0 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                                 />{" "}
                               </button>{" "}
                               {/* Regions — hidden on mobile */}{" "}
@@ -5214,7 +5214,7 @@ function AuthenticatedApp({
                                     )
                                   }
                                   onClick={(event) => event.stopPropagation()}
-                                  className="rounded-full border border-slate-700/60 bg-slate-800/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-300 outline-none"
+                                  className="rounded-full border border-app-border/60 bg-app-surface-strong/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-app-text-muted outline-none"
                                   aria-label={`Select summary country for ${group.keyword}`}
                                 >
                                   {group.countryViews.map((cv) => (
@@ -5234,10 +5234,10 @@ function AuthenticatedApp({
                                   return (
                                     <span
                                       key={cv.trackedKeyword.country}
-                                      className="inline-flex items-center gap-1 rounded-full bg-slate-800/80 border border-slate-700/60 px-2 py-0.5 text-[10px]"
+                                      className="inline-flex items-center gap-1 rounded-full bg-app-surface-strong/80 border border-app-border/60 px-2 py-0.5 text-[10px]"
                                     >
                                       {" "}
-                                      <span className="text-slate-400">
+                                      <span className="text-app-text-muted">
                                         {cv.trackedKeyword.country.toUpperCase()}
                                       </span>{" "}
                                       <span
@@ -5259,7 +5259,7 @@ function AuthenticatedApp({
                                     {summaryRankDisplay.label}
                                   </span>
                                 ) : (
-                                  <span className="text-xs text-slate-500">
+                                  <span className="text-xs text-app-text-muted">
                                     Pending
                                   </span>
                                 )}{" "}
@@ -5337,7 +5337,7 @@ function AuthenticatedApp({
                             </div>{" "}
                             {/* Expanded detail */}{" "}
                             {isExpanded && (
-                              <div className="px-5 pb-5 pt-2 border-t border-slate-700/40 bg-slate-950/30">
+                              <div className="px-5 pb-5 pt-2 border-t border-app-border/40 bg-app-surface/30">
                                 {" "}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                   {" "}
@@ -5414,7 +5414,7 @@ function AuthenticatedApp({
                                     return (
                                       <div
                                         key={`${group.groupId}:${trackedKeyword.country}`}
-                                        className="rounded-xl border border-slate-700/50 bg-slate-900/60 p-3"
+                                        className="rounded-xl border border-app-border/50 bg-app-surface-muted/60 p-3"
                                       >
                                         {" "}
                                         {/* Country header */}{" "}
@@ -5422,12 +5422,12 @@ function AuthenticatedApp({
                                           {" "}
                                           <div>
                                             {" "}
-                                            <p className="text-[9px] uppercase tracking-widest text-slate-500 font-semibold">
+                                            <p className="text-[9px] uppercase tracking-widest text-app-text-muted font-semibold">
                                               {findCountryName(
                                                 trackedKeyword.country,
                                               )}
                                             </p>{" "}
-                                            <p className="text-xs font-bold text-slate-300 mt-0.5">
+                                            <p className="text-xs font-bold text-app-text-muted mt-0.5">
                                               {trackedKeyword.country.toUpperCase()}
                                             </p>{" "}
                                           </div>{" "}
@@ -5573,7 +5573,7 @@ function AuthenticatedApp({
                                               </ResponsiveContainer>{" "}
                                             </div>{" "}
                                             {validHistory.length > 0 && (
-                                              <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t border-slate-700/40">
+                                              <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t border-app-border/40">
                                                 {" "}
                                                 {[
                                                   {
@@ -5604,10 +5604,10 @@ function AuthenticatedApp({
                                                   ({ label, value, color }) => (
                                                     <div
                                                       key={label}
-                                                      className="text-center bg-slate-800/50 rounded-lg py-1"
+                                                      className="text-center bg-app-surface-strong/50 rounded-lg py-1"
                                                     >
                                                       {" "}
-                                                      <p className="text-[8px] uppercase tracking-wider text-slate-500 font-semibold">
+                                                      <p className="text-[8px] uppercase tracking-wider text-app-text-muted font-semibold">
                                                         {label}
                                                       </p>{" "}
                                                       <p
@@ -5674,7 +5674,7 @@ function AuthenticatedApp({
                       <div className="flex flex-wrap justify-center md:justify-start items-center gap-2.5 mb-1.5">
                         {" "}
                         <h2
-                          className="font-display font-bold text-white"
+                          className="font-display font-bold text-app-text"
                           style={{
                             fontSize: "1.75rem",
                             letterSpacing: "-0.03em",
@@ -5701,7 +5701,7 @@ function AuthenticatedApp({
                           </a>
                         )}{" "}
                       </div>{" "}
-                      <p className="text-slate-400 font-medium">
+                      <p className="text-app-text-muted font-medium">
                         {selectedApp.developer}
                       </p>{" "}
                     </div>{" "}
@@ -5727,38 +5727,38 @@ function AuthenticatedApp({
                           </span>{" "}
                         </button>{" "}
                         {isExportMenuOpen && (
-                          <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-slate-700/70 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-xl">
+                          <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-app-border/70 bg-app-surface/95 p-2 shadow-2xl backdrop-blur-xl">
                             {" "}
                             <button
                               type="button"
                               onClick={() => void handleExportAction("pdf")}
-                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800/80"
+                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-app-text transition-colors hover:bg-app-surface-strong/80"
                             >
                               {" "}
                               <span>Download PDF</span>{" "}
-                              <span className="text-xs text-slate-500">
+                              <span className="text-xs text-app-text-muted">
                                 Report
                               </span>{" "}
                             </button>{" "}
                             <button
                               type="button"
                               onClick={() => void handleExportAction("csv")}
-                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800/80"
+                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-app-text transition-colors hover:bg-app-surface-strong/80"
                             >
                               {" "}
                               <span>Download CSV</span>{" "}
-                              <span className="text-xs text-slate-500">
+                              <span className="text-xs text-app-text-muted">
                                 Data
                               </span>{" "}
                             </button>{" "}
                             <button
                               type="button"
                               onClick={() => void handleExportAction("json")}
-                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800/80"
+                              className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-app-text transition-colors hover:bg-app-surface-strong/80"
                             >
                               {" "}
                               <span>Download JSON</span>{" "}
-                              <span className="text-xs text-slate-500">
+                              <span className="text-xs text-app-text-muted">
                                 Raw
                               </span>{" "}
                             </button>{" "}
@@ -5804,7 +5804,7 @@ function AuthenticatedApp({
                       <span style={{ color: "#fbbf24", fontSize: "1.125rem" }}>
                         â˜…
                       </span>{" "}
-                      <span className="text-sm font-semibold text-slate-200 font-mono">
+                      <span className="text-sm font-semibold text-app-text font-mono">
                         {selectedApp.score
                           ? Number(selectedApp.score).toFixed(1)
                           : "N/A"}
@@ -5817,7 +5817,7 @@ function AuthenticatedApp({
                           className="w-4 h-4"
                           style={{ color: "#64748b" }}
                         />{" "}
-                        <span className="text-sm font-medium text-slate-300">
+                        <span className="text-sm font-medium text-app-text-muted">
                           {selectedApp.installs}
                         </span>{" "}
                       </div>
@@ -5861,12 +5861,12 @@ function AuthenticatedApp({
                   {/* Auto Discovered Rankings */}{" "}
                   <div className="mb-7">
                     {" "}
-                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
+                    <h4 className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-4">
                       Currently Ranking For - Auto-Discovered
                     </h4>{" "}
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       {" "}
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-app-text-muted">
                         {" "}
                         Fast mode checks fewer candidates in the top 100. Deep
                         mode scans a wider keyword set and checks deeper
@@ -5874,7 +5874,7 @@ function AuthenticatedApp({
                       </p>{" "}
                       <div className="flex flex-wrap items-center gap-2">
                         {" "}
-                        <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/60 p-1">
+                        <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
                           {" "}
                           {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                             <button
@@ -5893,7 +5893,7 @@ function AuthenticatedApp({
                                   );
                                 }
                               }}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${discoveryMode === mode ? "bg-emerald-500/20 text-emerald-300" : "text-slate-400 hover:text-slate-200"}`}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${discoveryMode === mode ? "bg-emerald-500/20 text-emerald-300" : "text-app-text-muted hover:text-app-text"}`}
                             >
                               {" "}
                               {mode}{" "}
@@ -5917,7 +5917,7 @@ function AuthenticatedApp({
                       </div>{" "}
                     </div>{" "}
                     {isDiscoveringKeywords ? (
-                      <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <div className="flex items-center gap-2 text-sm text-app-text-muted">
                         {" "}
                         <Loader2 className="w-4 h-4 animate-spin" />{" "}
                         {discoveryMode === "deep"
@@ -5980,7 +5980,7 @@ function AuthenticatedApp({
                                     true,
                                   )
                                 }
-                                className={`bg-slate-900/90 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: r.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400" : "border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400"}`}
+                                className={`bg-app-surface-muted/90 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: r.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400" : "border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400"}`}
                                 title={
                                   trackedKeywordGroupKeys.has(
                                     getTrackedKeywordGroupKey({
@@ -6016,7 +6016,7 @@ function AuthenticatedApp({
                         {keywordSuggestions.map((r, i) => (
                           <div
                             key={i}
-                            className="min-w-0 bg-slate-900/70 border border-cyan-500/20 text-cyan-200 px-4 py-2.5 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:shadow-cyan-500/10 hover:border-cyan-500/40 hover:-translate-y-0.5"
+                            className="min-w-0 bg-app-surface-muted/70 border border-cyan-500/20 text-cyan-200 px-4 py-2.5 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:shadow-cyan-500/10 hover:border-cyan-500/40 hover:-translate-y-0.5"
                           >
                             {" "}
                             <div className="flex items-center gap-2">
@@ -6060,7 +6060,7 @@ function AuthenticatedApp({
                                     false,
                                   )
                                 }
-                                className={`bg-slate-900/90 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: r.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400" : "border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400"}`}
+                                className={`bg-app-surface-muted/90 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: r.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400" : "border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400"}`}
                                 title={
                                   trackedKeywordGroupKeys.has(
                                     getTrackedKeywordGroupKey({
@@ -6091,13 +6091,13 @@ function AuthenticatedApp({
                         ))}{" "}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-app-text-muted">
                         No ranked keywords or suggestions discovered yet.
                       </p>
                     )}{" "}
                   </div>{" "}
                   <div className="divider my-6" />{" "}
-                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">
+                  <h4 className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-4">
                     Check Specific Keyword
                   </h4>{" "}
                   <form
@@ -6142,9 +6142,9 @@ function AuthenticatedApp({
                       }}
                     >
                       {" "}
-                      <p className="text-slate-500 text-sm mb-4">
+                      <p className="text-app-text-muted text-sm mb-4">
                         Ranking for{" "}
-                        <span className="font-semibold text-slate-200">
+                        <span className="font-semibold text-app-text">
                           "{ranking.keyword}"
                         </span>
                       </p>{" "}
@@ -6183,7 +6183,7 @@ function AuthenticatedApp({
                             <img
                               src={selectedApp.icon}
                               alt=""
-                              className="w-12 h-12 rounded-2xl shadow-xl border border-slate-700/50"
+                              className="w-12 h-12 rounded-2xl shadow-xl border border-app-border/50"
                               referrerPolicy="no-referrer"
                             />
                           )}{" "}
@@ -6193,7 +6193,7 @@ function AuthenticatedApp({
                           >
                             #{ranking.rank}
                           </div>{" "}
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-app-text-muted">
                             in{" "}
                             {COUNTRIES.find((c) => c.code === country)?.name ||
                               country}
@@ -6238,7 +6238,7 @@ function AuthenticatedApp({
                               true,
                             )
                           }
-                          className={`text-sm flex items-center gap-1.5 transition-colors font-medium ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: ranking.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "text-amber-400" : "text-slate-500 hover:text-slate-300"}`}
+                          className={`text-sm flex items-center gap-1.5 transition-colors font-medium ${trackedKeywordGroupKeys.has(getTrackedKeywordGroupKey({ keyword: ranking.keyword, appId: selectedAppTrackedId || "", store: storeType })) ? "text-amber-400" : "text-app-text-muted hover:text-app-text-muted"}`}
                         >
                           {" "}
                           {trackedKeywordGroupKeys.has(
@@ -6353,7 +6353,7 @@ function AuthenticatedApp({
                         </BarChart>{" "}
                       </ResponsiveContainer>{" "}
                     </div>{" "}
-                    <p className="text-sm text-slate-400 mt-6 text-center">
+                    <p className="text-sm text-app-text-muted mt-6 text-center">
                       {" "}
                       This chart visualizes estimated demand, estimated
                       difficulty, and estimated app relevance for your top 5
@@ -6694,7 +6694,7 @@ function AuthenticatedApp({
                 <div>
                   {" "}
                   <h2
-                    className="font-display font-bold text-slate-100 flex items-center gap-3"
+                    className="font-display font-bold text-app-text flex items-center gap-3"
                     style={{ fontSize: "1.375rem", letterSpacing: "-0.02em" }}
                   >
                     {" "}
@@ -6713,7 +6713,7 @@ function AuthenticatedApp({
                     </span>{" "}
                     Compare Apps{" "}
                   </h2>{" "}
-                  <p className="mt-2 text-sm text-slate-400">
+                  <p className="mt-2 text-sm text-app-text-muted">
                     {" "}
                     Compare now shows keyword footprint, contested search terms,
                     and whitespace opportunities across the whole set.{" "}
@@ -6721,7 +6721,7 @@ function AuthenticatedApp({
                 </div>{" "}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   {" "}
-                  <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/60 p-1">
+                  <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
                     {" "}
                     {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                       <button
@@ -6732,7 +6732,7 @@ function AuthenticatedApp({
                           if (mode === compareDiscoveryMode) return;
                           setCompareDiscoveryMode(mode);
                         }}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${compareDiscoveryMode === mode ? "bg-violet-500/20 text-violet-200" : "text-slate-400 hover:text-slate-200"}`}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${compareDiscoveryMode === mode ? "bg-violet-500/20 text-violet-200" : "text-app-text-muted hover:text-app-text"}`}
                       >
                         {" "}
                         {mode}{" "}
@@ -6776,38 +6776,38 @@ function AuthenticatedApp({
                       Export Data{" "}
                     </button>{" "}
                     {isExportMenuOpen && (
-                      <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-slate-700/70 bg-slate-950/95 p-2 shadow-2xl backdrop-blur-xl">
+                      <div className="absolute right-0 top-full z-20 mt-2 w-44 rounded-2xl border border-app-border/70 bg-app-surface/95 p-2 shadow-2xl backdrop-blur-xl">
                         {" "}
                         <button
                           type="button"
                           onClick={() => void handleExportAction("pdf")}
-                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800/80"
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-app-text transition-colors hover:bg-app-surface-strong/80"
                         >
                           {" "}
                           <span>Download PDF</span>{" "}
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-app-text-muted">
                             Report
                           </span>{" "}
                         </button>{" "}
                         <button
                           type="button"
                           onClick={() => void handleExportAction("csv")}
-                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800/80"
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-app-text transition-colors hover:bg-app-surface-strong/80"
                         >
                           {" "}
                           <span>Download CSV</span>{" "}
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-app-text-muted">
                             Data
                           </span>{" "}
                         </button>{" "}
                         <button
                           type="button"
                           onClick={() => void handleExportAction("json")}
-                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-slate-200 transition-colors hover:bg-slate-800/80"
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-sm text-app-text transition-colors hover:bg-app-surface-strong/80"
                         >
                           {" "}
                           <span>Download JSON</span>{" "}
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-app-text-muted">
                             Raw
                           </span>{" "}
                         </button>{" "}
@@ -6816,19 +6816,19 @@ function AuthenticatedApp({
                   </div>{" "}
                 </div>{" "}
               </div>{" "}
-              <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-3 text-sm text-slate-400 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-sm text-app-text-muted flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                 {" "}
                 <span>
                   {" "}
                   Analysis mode:{" "}
-                  <span className="font-semibold text-slate-200 uppercase">
+                  <span className="font-semibold text-app-text uppercase">
                     {compareDiscoveryMode}
                   </span>{" "}
                 </span>{" "}
                 <span>
                   {" "}
                   Coverage loaded for{" "}
-                  <span className="font-semibold text-slate-200">
+                  <span className="font-semibold text-app-text">
                     {compareAnalyzedCount}/{comparedApps.length}
                   </span>{" "}
                   apps in{" "}
@@ -6855,12 +6855,12 @@ function AuthenticatedApp({
                 {compareAppInsights.map((insight) => (
                   <div
                     key={insight.compareKey}
-                    className="bg-slate-900/60 p-5 rounded-2xl shadow-lg border border-slate-700/50 relative transition-all hover:shadow-cyan-500/10 hover:border-slate-600 backdrop-blur-sm"
+                    className="bg-app-surface-muted/60 p-5 rounded-2xl shadow-lg border border-app-border/50 relative transition-all hover:shadow-cyan-500/10 hover:border-app-border backdrop-blur-sm"
                   >
                     {" "}
                     <button
                       onClick={() => removeCompareApp(insight.app)}
-                      className="absolute top-3 right-3 p-1.5 bg-slate-800/80 hover:bg-red-500 hover:text-white text-slate-400 rounded-full transition-colors shadow-sm"
+                      className="absolute top-3 right-3 p-1.5 bg-app-surface-strong/80 hover:bg-red-500 hover:text-white text-app-text-muted rounded-full transition-colors shadow-sm"
                     >
                       {" "}
                       <X className="w-3.5 h-3.5" />{" "}
@@ -6868,11 +6868,11 @@ function AuthenticatedApp({
                     <img
                       src={insight.app.icon}
                       alt={insight.app.title}
-                      className="w-16 h-16 rounded-2xl shadow-md mb-4 border border-slate-700/50"
+                      className="w-16 h-16 rounded-2xl shadow-md mb-4 border border-app-border/50"
                     />{" "}
                     <div className="flex items-center gap-1.5 justify-center mb-1">
                       {" "}
-                      <h3 className="font-semibold text-slate-100 text-sm line-clamp-1">
+                      <h3 className="font-semibold text-app-text text-sm line-clamp-1">
                         {insight.app.title}
                       </h3>{" "}
                       {insight.app.url && (
@@ -6880,7 +6880,7 @@ function AuthenticatedApp({
                           href={insight.app.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-cyan-400 hover:text-white transition-colors flex-shrink-0 bg-cyan-500/10 hover:bg-cyan-500 p-1.5 rounded-md"
+                          className="text-cyan-400 hover:text-app-text transition-colors flex-shrink-0 bg-cyan-500/10 hover:bg-cyan-500 p-1.5 rounded-md"
                           title="Open in Store"
                         >
                           {" "}
@@ -6888,24 +6888,24 @@ function AuthenticatedApp({
                         </a>
                       )}{" "}
                     </div>{" "}
-                    <p className="text-[11px] text-slate-400 font-medium line-clamp-1 mb-4">
+                    <p className="text-[11px] text-app-text-muted font-medium line-clamp-1 mb-4">
                       {insight.app.developer}
                     </p>{" "}
                     <div className="w-full space-y-3 mb-4">
                       {" "}
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         {" "}
-                        <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 px-3 py-2 text-slate-300">
+                        <div className="rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-app-text-muted">
                           {" "}
                           Top 10 / 30 / 100{" "}
-                          <div className="mt-1 font-semibold text-slate-100">
+                          <div className="mt-1 font-semibold text-app-text">
                             {insight.top10} / {insight.top30} / {insight.top100}
                           </div>{" "}
                         </div>{" "}
-                        <div className="rounded-xl border border-slate-700/70 bg-slate-950/70 px-3 py-2 text-slate-300">
+                        <div className="rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-app-text-muted">
                           {" "}
                           Avg Rank{" "}
-                          <div className="mt-1 font-semibold text-slate-100">
+                          <div className="mt-1 font-semibold text-app-text">
                             {insight.averageRank
                               ? `#${insight.averageRank}`
                               : "No data"}
@@ -6917,7 +6917,7 @@ function AuthenticatedApp({
                         <div className="uppercase tracking-wide text-emerald-300/70">
                           Strongest Keyword
                         </div>{" "}
-                        <div className="mt-1 text-slate-100 font-medium">
+                        <div className="mt-1 text-app-text font-medium">
                           {insight.strongestKeyword
                             ? `${insight.strongestKeyword.keyword} (#${insight.strongestKeyword.rank})`
                             : "No ranked keywords yet"}
@@ -6928,14 +6928,14 @@ function AuthenticatedApp({
                         <div className="uppercase tracking-wide text-cyan-300/70">
                           Next Opportunity
                         </div>{" "}
-                        <div className="mt-1 text-slate-100 font-medium">
+                        <div className="mt-1 text-app-text font-medium">
                           {insight.bestSuggestion
                             ? insight.bestSuggestion.keyword
                             : "No suggestion surfaced yet"}
                         </div>{" "}
                       </div>{" "}
                     </div>{" "}
-                    <div className="mt-auto text-xs font-semibold text-slate-200 bg-slate-950 px-3 py-2 rounded-xl w-full border border-slate-700/80 shadow-inner flex items-center justify-center gap-1.5">
+                    <div className="mt-auto text-xs font-semibold text-app-text bg-app-surface px-3 py-2 rounded-xl w-full border border-app-border/80 shadow-inner flex items-center justify-center gap-1.5">
                       {" "}
                       <span className="text-amber-400 text-sm">â˜…</span>{" "}
                       {insight.app.score
@@ -7030,7 +7030,7 @@ function AuthenticatedApp({
                           </BarChart>{" "}
                         </ResponsiveContainer>{" "}
                       </div>{" "}
-                      <p className="text-sm text-slate-400 mt-5">
+                      <p className="text-sm text-app-text-muted mt-5">
                         {" "}
                         This gives a fast read on how much ranked keyword
                         coverage each app has, not just who wins on a single
@@ -7059,17 +7059,17 @@ function AuthenticatedApp({
                           compareGapRows.slice(0, 5).map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="rounded-xl border border-slate-700/60 bg-slate-950/50 p-4"
+                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
                             >
                               {" "}
                               <div className="flex items-start justify-between gap-3">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-slate-100">
+                                  <div className="font-semibold text-app-text">
                                     {gapRow.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-slate-400">
+                                  <div className="mt-1 text-xs text-app-text-muted">
                                     {" "}
                                     {gapRow.isWhitespace
                                       ? `Emerging whitespace: suggested across ${gapRow.rankedApps.length + gapRow.missingApps.length} apps, but nobody ranks yet.`
@@ -7095,7 +7095,7 @@ function AuthenticatedApp({
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-app-text-muted">
                             No opportunity gaps yet. Refresh compare analysis to
                             expand the keyword set.
                           </p>
@@ -7130,17 +7130,17 @@ function AuthenticatedApp({
                           compareSharedBattles.map((battle) => (
                             <div
                               key={battle.keyword}
-                              className="rounded-xl border border-slate-700/60 bg-slate-950/50 p-4"
+                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
                             >
                               {" "}
                               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-slate-100">
+                                  <div className="font-semibold text-app-text">
                                     {battle.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-slate-400">
+                                  <div className="mt-1 text-xs text-app-text-muted">
                                     {" "}
                                     {battle.leader.appTitle} leads this battle;
                                     gap to the next ranked app is {battle.gap}{" "}
@@ -7165,7 +7165,7 @@ function AuthenticatedApp({
                                 {battle.rankedApps.map((rankedApp) => (
                                   <span
                                     key={`${battle.keyword}-${rankedApp.appKey}`}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold border ${rankedApp.appKey === battle.leader.appKey ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-slate-900/80 border-slate-700/80 text-slate-300"}`}
+                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold border ${rankedApp.appKey === battle.leader.appKey ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300" : "bg-app-surface-muted/80 border-app-border/80 text-app-text-muted"}`}
                                   >
                                     {" "}
                                     {rankedApp.appTitle} #{rankedApp.rank}{" "}
@@ -7175,7 +7175,7 @@ function AuthenticatedApp({
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-app-text-muted">
                             No overlapping ranked keywords surfaced yet.
                           </p>
                         )}{" "}
@@ -7206,17 +7206,17 @@ function AuthenticatedApp({
                           compareGapRows.map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="rounded-xl border border-slate-700/60 bg-slate-950/50 p-4"
+                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
                             >
                               {" "}
                               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-slate-100">
+                                  <div className="font-semibold text-app-text">
                                     {gapRow.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-slate-400">
+                                  <div className="mt-1 text-xs text-app-text-muted">
                                     {" "}
                                     {gapRow.isWhitespace
                                       ? `Suggested by multiple apps, but none currently rank.`
@@ -7242,7 +7242,7 @@ function AuthenticatedApp({
                             </div>
                           ))
                         ) : (
-                          <p className="text-sm text-slate-500">
+                          <p className="text-sm text-app-text-muted">
                             No gap opportunities surfaced yet.
                           </p>
                         )}{" "}
@@ -7300,7 +7300,7 @@ function AuthenticatedApp({
                         )}{" "}
                       </button>{" "}
                     </form>{" "}
-                    <p className="text-xs text-slate-500 mb-6">
+                    <p className="text-xs text-app-text-muted mb-6">
                       {" "}
                       Relevance is estimated per app, so this section is useful
                       for side-by-side fit as well as rank.{" "}
@@ -7308,18 +7308,18 @@ function AuthenticatedApp({
                     {compareRankings.length > 0 && (
                       <div className="space-y-3">
                         {" "}
-                        <p className="text-sm text-slate-400">
+                        <p className="text-sm text-app-text-muted">
                           Rankings for "{compareKeyword}"
                         </p>{" "}
                         {compareRankings.map((result, index) => (
                           <div
                             key={`${result.appTitle}-${index}`}
-                            className="flex flex-col gap-3 rounded-xl border border-slate-700/60 bg-slate-900/40 p-4 md:flex-row md:items-center md:justify-between"
+                            className="flex flex-col gap-3 rounded-xl border border-app-border/60 bg-app-surface-muted/40 p-4 md:flex-row md:items-center md:justify-between"
                           >
                             {" "}
                             <div>
                               {" "}
-                              <div className="font-medium text-slate-100">
+                              <div className="font-medium text-app-text">
                                 {result.appTitle}
                               </div>{" "}
                               <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -7347,7 +7347,7 @@ function AuthenticatedApp({
                                 #{result.rank}{" "}
                               </span>
                             ) : (
-                              <span className="bg-slate-700 text-slate-400 font-medium px-3 py-1.5 rounded-lg text-sm whitespace-nowrap">
+                              <span className="bg-app-surface-strong text-app-text-muted font-medium px-3 py-1.5 rounded-lg text-sm whitespace-nowrap">
                                 {" "}
                                 &gt; 100{" "}
                               </span>
@@ -7359,7 +7359,7 @@ function AuthenticatedApp({
                   </div>{" "}
                 </div>
               ) : (
-                <div className="card p-8 text-center text-slate-400">
+                <div className="card p-8 text-center text-app-text-muted">
                   {" "}
                   {isAnalyzingCompare ? (
                     <div className="flex items-center justify-center gap-3">
@@ -7635,10 +7635,10 @@ export default function App() {
         <div className="auth-orb auth-orb-indigo" />{" "}
         <div className="auth-panel flex items-center justify-center min-h-[320px]">
           {" "}
-          <div className="flex flex-col items-center gap-4 text-slate-300">
+          <div className="flex flex-col items-center gap-4 text-app-text-muted">
             {" "}
             <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />{" "}
-            <p className="text-sm tracking-[0.18em] uppercase text-slate-500">
+            <p className="text-sm tracking-[0.18em] uppercase text-app-text-muted">
               Checking session
             </p>{" "}
           </div>{" "}

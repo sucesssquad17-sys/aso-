@@ -9,6 +9,12 @@
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   
+  --color-app-surface: var(--bg-app-surface);
+  --color-app-surface-muted: var(--bg-app-surface-muted);
+  --color-app-surface-strong: var(--bg-app-surface-strong);
+  --color-app-border: var(--border-app-border);
+  --color-app-text: var(--text-app-text);
+  --color-app-text-muted: var(--text-app-text-muted);
 }
 
 /* =========================================
@@ -2735,4 +2741,56 @@ select {
   html {
     scroll-behavior: auto;
   }
+}
+
+/* =========================================
+   SEMANTIC THEME VARIABLES
+   ========================================= */
+:root {
+  /* Dark Mode Default */
+  --bg-app-surface: #081325;
+  --bg-app-surface-muted: #0f172a;
+  --bg-app-surface-strong: #1e293b;
+  --border-app-border: rgba(51, 65, 85, 0.5);
+  --text-app-text: #f8fafc;
+  --text-app-text-muted: #94a3b8;
+}
+
+html[data-theme="light"],
+:root[data-theme="light"] {
+  /* Light Mode */
+  --bg-app-surface: #ffffff;
+  --bg-app-surface-muted: #f8fafc;
+  --bg-app-surface-strong: #f1f5f9;
+  --border-app-border: rgba(148, 163, 184, 0.35);
+  --text-app-text: #0f172a;
+  --text-app-text-muted: #64748b;
+}
+
+.app-popover, .app-modal, .app-tooltip {
+  background-color: rgba(10, 15, 35, 0.95);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  color: #f1f5f9;
+}
+html[data-theme="light"] .app-popover,
+html[data-theme="light"] .app-modal,
+html[data-theme="light"] .app-tooltip,
+html:not([data-theme="dark"]) .app-popover,
+html:not([data-theme="dark"]) .app-modal,
+html:not([data-theme="dark"]) .app-tooltip {
+  background-color: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  color: #0f172a;
+}
+
+.app-chip {
+  background-color: rgba(30, 41, 59, 0.6);
+  color: #cbd5e1;
+  border: 1px solid rgba(51, 65, 85, 0.4);
+}
+html[data-theme="light"] .app-chip,
+html:not([data-theme="dark"]) .app-chip {
+  background-color: rgba(148, 163, 184, 0.15);
+  color: #334155;
+  border: 1px solid rgba(148, 163, 184, 0.25);
 }

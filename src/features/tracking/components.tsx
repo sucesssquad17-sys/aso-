@@ -50,12 +50,12 @@ export function CountrySearchSelect({
         className="input-field py-2 w-full text-left flex items-center justify-between gap-3"
       >
         <span className="truncate">{selectedLabel}</span>
-        <span className="text-slate-500 text-xs uppercase">
+        <span className="text-app-text-muted text-xs uppercase">
           {value.toUpperCase()}
         </span>
       </button>
       {isOpen && (
-        <div className="absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border border-slate-700/70 bg-slate-950/95 p-3 shadow-2xl backdrop-blur-xl">
+        <div className="absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -73,16 +73,16 @@ export function CountrySearchSelect({
                   setIsOpen(false);
                   setQuery("");
                 }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-slate-300 hover:bg-slate-900/80"}`}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
               >
                 <div className="font-medium">{option.name}</div>
-                <div className="text-xs text-slate-500 uppercase">
+                <div className="text-xs text-app-text-muted uppercase">
                   {option.code}
                 </div>
               </button>
             ))}
             {filteredOptions.length === 0 && (
-              <div className="rounded-xl px-3 py-4 text-sm text-slate-500">
+              <div className="rounded-xl px-3 py-4 text-sm text-app-text-muted">
                 No countries match your search.
               </div>
             )}
@@ -153,16 +153,16 @@ export function CountryMultiSelectModal({
               onToggleCountry(option.code);
             }
           }}
-          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-slate-300 hover:bg-slate-900/80"}`}
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
         >
           <div>
             <div className="font-medium">{option.name}</div>
-            <div className="text-xs uppercase text-slate-500">
+            <div className="text-xs uppercase text-app-text-muted">
               {option.code}
             </div>
           </div>
           <div
-            className={`text-xs font-semibold ${isSelected ? "text-cyan-300" : "text-slate-500"}`}
+            className={`text-xs font-semibold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}
           >
             {isSelected ? "Selected" : isDisabled ? "Tracked" : "Add"}
           </div>
@@ -173,14 +173,14 @@ export function CountryMultiSelectModal({
   );
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 px-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-3xl border border-slate-700/70 bg-slate-950/95 p-6 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
+      <div className="w-full max-w-2xl rounded-3xl border border-app-border/70 bg-app-surface/95 p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h3 className="font-display text-xl font-bold text-slate-100">
+            <h3 className="font-display text-xl font-bold text-app-text">
               Track keyword by country
             </h3>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-app-text-muted">
               Select countries for{" "}
               <span className="font-medium text-cyan-300">"{keyword}"</span>.
             </p>
@@ -188,7 +188,7 @@ export function CountryMultiSelectModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-200"
+            className="rounded-xl p-2 text-app-text-muted transition-colors hover:bg-white/5 hover:text-app-text"
           >
             <X className="w-4 h-4" />
           </button>
@@ -206,7 +206,7 @@ export function CountryMultiSelectModal({
           {disabledCountries.map((countryCode) => (
             <span
               key={`tracked-${countryCode}`}
-              className="rounded-full border border-slate-700/70 bg-slate-950/60 px-3 py-1 text-xs text-slate-400"
+              className="rounded-full border border-app-border/70 bg-app-surface/60 px-3 py-1 text-xs text-app-text-muted"
             >
               {findCountryName(countryCode)} already tracked
             </span>
@@ -220,12 +220,12 @@ export function CountryMultiSelectModal({
             </span>
           ))}
           {selectedCountries.length === 0 && (
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-app-text-muted">
               Choose at least one country.
             </span>
           )}
         </div>
-        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border border-slate-700/60 bg-slate-900/40 p-3">
+        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border border-app-border/60 bg-app-surface-muted/40 p-3">
           {query.trim() ? (
             <>{filteredOptions.map(renderCountryButton)}</>
           ) : (
@@ -238,8 +238,8 @@ export function CountryMultiSelectModal({
                   {priorityOptions.map(renderCountryButton)}
                 </div>
               </div>
-              <div className="border-t border-slate-700/50 pt-3">
-                <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <div className="border-t border-app-border/50 pt-3">
+                <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                   All Countries
                 </p>
                 <div className="space-y-2">
@@ -249,13 +249,13 @@ export function CountryMultiSelectModal({
             </>
           )}
           {filteredOptions.length === 0 && (
-            <div className="rounded-xl px-3 py-4 text-sm text-slate-500">
+            <div className="rounded-xl px-3 py-4 text-sm text-app-text-muted">
               No countries match your search.
             </div>
           )}
         </div>
         <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-xs text-slate-500">
+          <div className="text-xs text-app-text-muted">
             {selectedCountries.length} selected
           </div>
           <div className="flex gap-3">

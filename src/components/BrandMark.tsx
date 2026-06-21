@@ -217,7 +217,7 @@ export function BrandMark({
         <div className="flex items-center gap-2 min-w-0">
           <span
             className={cn(
-              "brand-title truncate font-display font-bold tracking-tight text-slate-100",
+              "brand-title truncate font-display font-bold tracking-tight text-app-text",
               config.title,
             )}
           >
@@ -235,7 +235,7 @@ export function BrandMark({
         {subtitle ? (
           <p
             className={cn(
-              "brand-subtitle mt-1 truncate font-semibold uppercase text-slate-500",
+              "brand-subtitle mt-1 truncate font-semibold uppercase text-app-text-muted",
               config.subtitle,
             )}
           >

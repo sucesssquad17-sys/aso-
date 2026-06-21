@@ -226,14 +226,14 @@ function formatDelta(delta: number) {
 function getChangeTone(delta: number) {
   if (delta > 0) return "text-cyan-300 bg-cyan-500/12 border-cyan-500/20";
   if (delta < 0) return "text-rose-300 bg-rose-500/12 border-rose-500/20";
-  return "text-slate-300 bg-slate-900/80 border-slate-700/70";
+  return "text-app-text-muted bg-app-surface-muted/80 border-app-border/70";
 }
 
 function getRankTone(rank: number) {
   if (rank === -1) return "text-rose-300";
   if (rank <= 3) return "text-cyan-300";
   if (rank <= 10) return "text-cyan-300";
-  return "text-slate-200";
+  return "text-app-text";
 }
 
 function getYAxisDomainFromSeries(values: number[]) {
@@ -306,8 +306,8 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-slate-700/70 bg-slate-950/95 px-3 py-2 text-xs text-slate-200 shadow-2xl">
-      <p className="font-semibold text-slate-100">{label}</p>
+    <div className="rounded-xl border border-app-border/70 bg-app-surface/95 px-3 py-2 text-xs text-app-text shadow-2xl">
+      <p className="font-semibold text-app-text">{label}</p>
       <div className="mt-2 space-y-1.5">
         {payload.map((entry) => (
           <div
@@ -315,7 +315,7 @@ function ChartTooltip({
             className="flex items-center justify-between gap-3"
           >
             <span
-              className="inline-flex items-center gap-2 text-slate-400"
+              className="inline-flex items-center gap-2 text-app-text-muted"
             >
               <span
                 className="h-2 w-2 rounded-full"
@@ -323,7 +323,7 @@ function ChartTooltip({
               />
               {entry.name}
             </span>
-            <span className="font-semibold text-slate-100">
+            <span className="font-semibold text-app-text">
               {typeof entry.value === "number" ? `#${entry.value.toFixed(1)}` : "-"}
             </span>
           </div>
@@ -347,12 +347,12 @@ function ReportSection({
   return (
     <WorkspacePanel tone="muted">
       <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-700/70 bg-slate-900/80">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-app-border/70 bg-app-surface-muted/80">
           <Icon className="h-4 w-4 text-cyan-300" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
-          <p className="mt-1 text-sm text-slate-400">{description}</p>
+          <h3 className="text-lg font-semibold text-app-text">{title}</h3>
+          <p className="mt-1 text-sm text-app-text-muted">{description}</p>
         </div>
       </div>
       {children}
@@ -376,13 +376,13 @@ function CompactStatGrid({
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-4"
+          className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-4"
         >
           <div className="workspace-chip-label">{item.label}</div>
-          <div className="mt-1 text-2xl font-display font-bold text-white">
+          <div className="mt-1 text-2xl font-display font-bold text-app-text">
             {item.value}
           </div>
-          <div className="mt-2 text-xs text-slate-400">{item.hint}</div>
+          <div className="mt-2 text-xs text-app-text-muted">{item.hint}</div>
         </div>
       ))}
     </div>
@@ -399,7 +399,7 @@ function MovementRowsList({
   return (
     <>
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-700/70 bg-slate-950/35 px-4 py-6 text-sm text-slate-500">
+        <div className="rounded-2xl border border-dashed border-app-border/70 bg-app-surface/35 px-4 py-6 text-sm text-app-text-muted">
           No movement rows available for this selection.
         </div>
       ) : (
@@ -409,22 +409,22 @@ function MovementRowsList({
               key={row.id}
               type="button"
               onClick={() => onSelectKeyword(row.keyword)}
-              className="w-full overflow-hidden rounded-2xl border border-slate-700/70 bg-slate-950/45 px-4 py-4 text-left transition-colors hover:border-cyan-500/30 hover:bg-slate-900/70"
+              className="w-full overflow-hidden rounded-2xl border border-app-border/70 bg-app-surface/45 px-4 py-4 text-left transition-colors hover:border-cyan-500/30 hover:bg-app-surface-muted/70"
             >
               <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-slate-100">
+                    <span className="text-sm font-semibold text-app-text">
                       {row.keyword}
                     </span>
-                    <span className="rounded-full border border-slate-700/70 bg-slate-900/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                    <span className="rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-app-text-muted">
                       {row.store === "ios" ? "iOS" : "Play"}
                     </span>
-                    <span className="rounded-full border border-slate-700/70 bg-slate-900/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                    <span className="rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-app-text-muted">
                       {row.country.toUpperCase()}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-slate-400">{row.historyLabel}</p>
+                  <p className="mt-1 text-sm text-app-text-muted">{row.historyLabel}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span
@@ -432,22 +432,22 @@ function MovementRowsList({
                   >
                     {formatDelta(row.delta)}
                   </span>
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-app-text-muted">
                     {row.trendLabel}
                   </span>
                 </div>
               </div>
               <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_108px_108px_132px]">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                     App
                   </p>
-                  <p className="mt-1 truncate text-sm text-slate-200">
+                  <p className="mt-1 truncate text-sm text-app-text">
                     {row.appTitle}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                     Start
                   </p>
                   <p className={`mt-1 text-sm font-semibold ${getRankTone(row.previousRank)}`}>
@@ -455,7 +455,7 @@ function MovementRowsList({
                   </p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                     Current
                   </p>
                   <p className={`mt-1 text-sm font-semibold ${getRankTone(row.currentRank)}`}>
@@ -530,14 +530,14 @@ function TabbedMovementSection({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="workspace-chip-label">{title}</div>
-          <h3 className="mt-1 text-lg font-semibold text-slate-100">
+          <h3 className="mt-1 text-lg font-semibold text-app-text">
             {description}
           </h3>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-app-text-muted">
             {activeTab.panelDescription}
           </p>
         </div>
-        <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/60 p-1">
+        <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
           {tabConfig.map((tab) => (
             <button
               key={tab.key}
@@ -546,7 +546,7 @@ function TabbedMovementSection({
               className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] transition-colors ${
                 activeTab.key === tab.key
                   ? "bg-cyan-500/15 text-cyan-200"
-                  : "text-slate-400 hover:text-slate-200"
+                  : "text-app-text-muted hover:text-app-text"
               }`}
             >
               {tab.label}
@@ -1693,10 +1693,10 @@ export default function ReportsWorkspace({
         <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="workspace-chip-label">Reports</div>
-            <h2 className="mt-1 text-xl font-semibold text-slate-100">
+            <h2 className="mt-1 text-xl font-semibold text-app-text">
               Rank movement analysis
             </h2>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-app-text-muted">
               Review movement trends, drill into keywords, and compare competitor groups from one workspace.
             </p>
           </div>
@@ -1709,7 +1709,7 @@ export default function ReportsWorkspace({
                 className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                   reportMode === option.key
                     ? "bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
-                    : "bg-slate-950/45 text-slate-400 border border-slate-700/70 hover:text-slate-200"
+                    : "bg-app-surface/45 text-app-text-muted border border-app-border/70 hover:text-app-text"
                 }`}
               >
                 {option.label}
@@ -1726,7 +1726,7 @@ export default function ReportsWorkspace({
               className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition-colors ${
                 period === option.key
                   ? "bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
-                  : "bg-slate-950/45 text-slate-400 border border-slate-700/70 hover:text-slate-200"
+                  : "bg-app-surface/45 text-app-text-muted border border-app-border/70 hover:text-app-text"
               }`}
             >
               {option.label}
@@ -1785,7 +1785,7 @@ export default function ReportsWorkspace({
             </div>
             {hasKeywordDrilldown ? (
               <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
-                <span className="text-sm text-slate-300">
+                <span className="text-sm text-app-text-muted">
                   Viewing keyword drilldown for{" "}
                   <span className="font-semibold text-cyan-200">
                     {reportKeywordFilter}
@@ -1794,7 +1794,7 @@ export default function ReportsWorkspace({
                 <button
                   type="button"
                   onClick={() => setReportKeywordFilter("all")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
+                  className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Back to all keywords
@@ -1806,7 +1806,7 @@ export default function ReportsWorkspace({
           <WorkspacePanel tone="muted">
             <div className="mb-4">
               <div className="workspace-chip-label">Quick Summary</div>
-              <h3 className="mt-1 text-lg font-semibold text-slate-100">
+              <h3 className="mt-1 text-lg font-semibold text-app-text">
                 What changed in this period
               </h3>
             </div>
@@ -1866,14 +1866,14 @@ export default function ReportsWorkspace({
             >
               <div>
                 <div className="workspace-chip-label">Secondary Overview</div>
-                <h3 className="mt-1 text-lg font-semibold text-slate-100">
+                <h3 className="mt-1 text-lg font-semibold text-app-text">
                   Ranking coverage at a glance
                 </h3>
-                <p className="mt-1 text-sm text-slate-400">
+                <p className="mt-1 text-sm text-app-text-muted">
                   Expand for the fuller tracked distribution and monitoring snapshot.
                 </p>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/60 px-3 py-2 text-xs font-semibold text-slate-200">
+              <span className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-xs font-semibold text-app-text">
                 {isTrackedOverviewOpen ? "Hide overview" : "Show overview"}
                 {isTrackedOverviewOpen ? (
                   <ChevronUp className="h-4 w-4" />
@@ -1889,7 +1889,7 @@ export default function ReportsWorkspace({
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="workspace-chip-label">Overview</div>
-                      <h4 className="mt-1 text-xl font-semibold text-slate-100">
+                      <h4 className="mt-1 text-xl font-semibold text-app-text">
                         Ranking coverage at a glance
                       </h4>
                     </div>
@@ -1907,37 +1907,37 @@ export default function ReportsWorkspace({
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                     <div className="workspace-mini-stat">
                       <div className="workspace-chip-label">Keyword Groups</div>
-                      <div className="mt-1 text-3xl font-display font-bold text-white">
+                      <div className="mt-1 text-3xl font-display font-bold text-app-text">
                         {trackedOverview.keywordGroups}
                       </div>
-                      <div className="mt-2 text-xs text-slate-400">
+                      <div className="mt-2 text-xs text-app-text-muted">
                         Tracked group count
                       </div>
                     </div>
                     <div className="workspace-mini-stat">
                       <div className="workspace-chip-label">Top 10 Rankings</div>
-                      <div className="mt-1 text-3xl font-display font-bold text-white">
+                      <div className="mt-1 text-3xl font-display font-bold text-app-text">
                         {trackedOverview.top10Count}
                       </div>
-                      <div className="mt-2 text-xs text-slate-400">
+                      <div className="mt-2 text-xs text-app-text-muted">
                         Across all countries
                       </div>
                     </div>
                     <div className="workspace-mini-stat">
                       <div className="workspace-chip-label">#1-3 Positions</div>
-                      <div className="mt-1 text-3xl font-display font-bold text-white">
+                      <div className="mt-1 text-3xl font-display font-bold text-app-text">
                         {trackedOverview.top3Count}
                       </div>
-                      <div className="mt-2 text-xs text-slate-400">
+                      <div className="mt-2 text-xs text-app-text-muted">
                         Highest-value placements
                       </div>
                     </div>
                     <div className="workspace-mini-stat">
                       <div className="workspace-chip-label">Apps Tracked</div>
-                      <div className="mt-1 text-3xl font-display font-bold text-white">
+                      <div className="mt-1 text-3xl font-display font-bold text-app-text">
                         {trackedOverview.trackedAppCount}
                       </div>
-                      <div className="mt-2 text-xs text-slate-400">
+                      <div className="mt-2 text-xs text-app-text-muted">
                         Apps with active monitored keywords
                       </div>
                     </div>
@@ -1947,15 +1947,15 @@ export default function ReportsWorkspace({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="workspace-chip-label">Rank Distribution</div>
-                      <h4 className="mt-1 text-xl font-semibold text-slate-100">
+                      <h4 className="mt-1 text-xl font-semibold text-app-text">
                         Current tracked spread
                       </h4>
                     </div>
                     <div className="text-right">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                         Avg rank
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-slate-300">
+                      <div className="mt-1 text-sm font-semibold text-app-text-muted">
                         {trackedOverview.averageRank
                           ? trackedOverview.averageRank.toFixed(1)
                           : "-"}
@@ -2019,16 +2019,16 @@ export default function ReportsWorkspace({
                       {trackedDistributionItems.map((item) => (
                         <div
                           key={item.label}
-                          className="flex items-center justify-between rounded-2xl border border-slate-700/60 bg-slate-950/45 px-4 py-3"
+                          className="flex items-center justify-between rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3"
                         >
-                          <div className="inline-flex items-center gap-2 text-sm font-semibold text-slate-200">
+                          <div className="inline-flex items-center gap-2 text-sm font-semibold text-app-text">
                             <span
                               className="h-2.5 w-2.5 rounded-full"
                               style={{ background: item.color }}
                             />
                             {item.label}
                           </div>
-                          <span className="text-xl font-display font-bold text-white">
+                          <span className="text-xl font-display font-bold text-app-text">
                             {item.value}
                           </span>
                         </div>
@@ -2085,7 +2085,7 @@ export default function ReportsWorkspace({
             </div>
             {hasKeywordDrilldown ? (
               <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
-                <span className="text-sm text-slate-300">
+                <span className="text-sm text-app-text-muted">
                   Viewing keyword drilldown for{" "}
                   <span className="font-semibold text-cyan-200">
                     {reportKeywordFilter}
@@ -2094,7 +2094,7 @@ export default function ReportsWorkspace({
                 <button
                   type="button"
                   onClick={() => setReportKeywordFilter("all")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-slate-200 transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
+                  className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Back to all keywords
@@ -2114,7 +2114,7 @@ export default function ReportsWorkspace({
               <WorkspacePanel tone="muted">
                 <div className="mb-4">
                   <div className="workspace-chip-label">Comparison Summary</div>
-                  <h3 className="mt-1 text-lg font-semibold text-slate-100">
+                  <h3 className="mt-1 text-lg font-semibold text-app-text">
                     Who is winning and where the gaps are
                   </h3>
                 </div>
@@ -2128,16 +2128,16 @@ export default function ReportsWorkspace({
                 <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <div className="workspace-chip-label">ASO Change Summary</div>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-100">
+                    <h3 className="mt-1 text-lg font-semibold text-app-text">
                       Recent competitor metadata changes
                     </h3>
-                    <p className="mt-2 text-sm text-slate-400">
+                    <p className="mt-2 text-sm text-app-text-muted">
                       Brief reporting coverage for title, description, icon,
                       category, and screenshot updates across all tracked
                       countries in this competitor group.
                     </p>
                   </div>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-app-text-muted">
                     Detailed ASO history and alert setup stays in Competitors.
                   </div>
                 </div>
@@ -2146,12 +2146,12 @@ export default function ReportsWorkspace({
                   columnsClassName="xl:grid-cols-4"
                 />
                 {recentCompetitorAsoDiffs.length === 0 ? (
-                  <div className="mt-4 rounded-2xl border border-dashed border-slate-700/60 bg-slate-950/45 px-4 py-6 text-sm text-slate-400">
+                  <div className="mt-4 rounded-2xl border border-dashed border-app-border/60 bg-app-surface/45 px-4 py-6 text-sm text-app-text-muted">
                     {selectedCompetitorAsoStatus.emptyMessage}
                   </div>
                 ) : (
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-slate-700/60 bg-slate-950/45">
-                    <div className="hidden lg:grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-slate-700/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="mt-5 overflow-hidden rounded-2xl border border-app-border/60 bg-app-surface/45">
+                    <div className="hidden lg:grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       <div>Detected</div>
                       <div>App</div>
                       <div>Country</div>
@@ -2160,17 +2160,17 @@ export default function ReportsWorkspace({
                     {recentCompetitorAsoDiffs.map((diff) => (
                       <div
                         key={diff.diffId}
-                        className="flex flex-col lg:grid lg:grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-slate-800/80 px-4 py-3 text-sm text-slate-300 last:border-b-0"
+                        className="flex flex-col lg:grid lg:grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-app-border/80 px-4 py-3 text-sm text-app-text-muted last:border-b-0"
                       >
-                        <div className="text-xs text-slate-400">
+                        <div className="text-xs text-app-text-muted">
                           <span className="lg:hidden font-semibold mr-1">Detected:</span>
                           {formatReportDateTime(diff.detectedAt)}
                         </div>
-                        <div className="font-semibold text-slate-100">
+                        <div className="font-semibold text-app-text">
                           {diff.appTitle}
                         </div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                          <span className="lg:hidden text-slate-500 mr-1">Country:</span>
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                          <span className="lg:hidden text-app-text-muted mr-1">Country:</span>
                           {diff.country}
                         </div>
                         <div className="min-w-0">
@@ -2178,13 +2178,13 @@ export default function ReportsWorkspace({
                             {diff.changedFields.map((field) => (
                               <span
                                 key={`${diff.diffId}:${field}`}
-                                className="rounded-full border border-slate-700/60 bg-slate-900/70 px-2 py-1 text-[10px] font-semibold text-slate-200"
+                                className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-2 py-1 text-[10px] font-semibold text-app-text"
                               >
                                 {field}
                               </span>
                             ))}
                           </div>
-                          <p className="mt-2 text-xs leading-relaxed text-slate-400">
+                          <p className="mt-2 text-xs leading-relaxed text-app-text-muted">
                             {diff.changes.map((change) => change.summary).join(" ")}
                           </p>
                         </div>
@@ -2260,7 +2260,7 @@ export default function ReportsWorkspace({
                 icon={Swords}
               >
                 {competitorKeywordBattles.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-700/70 bg-slate-950/35 px-4 py-6 text-sm text-slate-500">
+                  <div className="rounded-2xl border border-dashed border-app-border/70 bg-app-surface/35 px-4 py-6 text-sm text-app-text-muted">
                     No overlapping ranked keywords surfaced for this group and period.
                   </div>
                 ) : (
@@ -2268,14 +2268,14 @@ export default function ReportsWorkspace({
                     {competitorKeywordBattles.map((battle) => (
                       <div
                         key={battle.keyword}
-                        className="rounded-2xl border border-slate-700/70 bg-slate-950/45 px-4 py-4"
+                        className="rounded-2xl border border-app-border/70 bg-app-surface/45 px-4 py-4"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-100">
+                            <p className="text-sm font-semibold text-app-text">
                               {battle.keyword}
                             </p>
-                            <p className="mt-1 text-xs text-slate-500">
+                            <p className="mt-1 text-xs text-app-text-muted">
                               {battle.rankedApps.length} apps currently rank here
                             </p>
                           </div>
@@ -2291,7 +2291,7 @@ export default function ReportsWorkspace({
                           {battle.rankedApps.map((app) => (
                             <span
                               key={`${battle.keyword}-${app.appKey}`}
-                              className="rounded-full border border-slate-700/70 bg-slate-900/80 px-2.5 py-1 text-xs text-slate-300"
+                              className="rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2.5 py-1 text-xs text-app-text-muted"
                             >
                               {app.title} #{app.lastRank}
                             </span>

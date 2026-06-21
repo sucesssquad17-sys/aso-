@@ -68,14 +68,14 @@ const PLAN_STYLES: Record<
   }
 > = {
   free: {
-    accent: "text-slate-300",
+    accent: "text-app-text-muted",
     icon: ShieldCheck,
     border: "border-white/[0.07]",
     tint: "bg-white/[0.04]",
     glow: "from-white/[0.03] via-transparent to-transparent",
   },
   indie: {
-    accent: "text-slate-300",
+    accent: "text-app-text-muted",
     icon: Sparkles,
     border: "border-white/[0.07]",
     tint: "bg-white/[0.03]",
@@ -89,7 +89,7 @@ const PLAN_STYLES: Record<
     glow: "from-cyan-500/12 via-transparent to-transparent",
   },
   pro: {
-    accent: "text-slate-300",
+    accent: "text-app-text-muted",
     icon: Radar,
     border: "border-white/[0.07]",
     tint: "bg-white/[0.03]",
@@ -143,7 +143,7 @@ export function BillingPaywall({
     ? "border-amber-500/20 bg-amber-500/10 text-amber-100"
     : billingConnected
       ? "border-cyan-500/20 bg-cyan-500/10 text-cyan-100"
-      : "border-slate-700/70 bg-slate-900/70 text-slate-300";
+      : "border-app-border/70 bg-app-surface-muted/70 text-app-text-muted";
   const bannerText = billingError
     ? billingError
     : billingConnected
@@ -151,7 +151,7 @@ export function BillingPaywall({
       : "Plan selection is available. Contact support for billing access.";
 
   return (
-    <div className="workspace-shell relative min-h-screen overflow-hidden font-sans text-slate-100">
+    <div className="workspace-shell relative min-h-screen overflow-hidden font-sans text-app-text">
       <div className="bg-orb bg-orb-1" />
       <div className="bg-orb bg-orb-2" />
       <div className="bg-orb bg-orb-3" />
@@ -169,12 +169,12 @@ export function BillingPaywall({
                 </span>
               </div>
 
-              <h1 className="max-w-3xl text-3xl font-black tracking-tight text-white sm:text-4xl md:text-5xl">
+              <h1 className="max-w-3xl text-3xl font-black tracking-tight text-app-text sm:text-4xl md:text-5xl">
                 Upgrade when you need more coverage, not more complexity.
               </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-400 md:text-base">
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-app-text-muted md:text-base">
                 You're signed in as{" "}
-                <span className="font-semibold text-slate-200">
+                <span className="font-semibold text-app-text">
                   {currentUserLabel}
                 </span>
                 . Start with the 7-day trial, then choose a plan that matches
@@ -209,19 +209,19 @@ export function BillingPaywall({
                     key={item.label}
                     className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4"
                   >
-                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-app-text-muted">
                       {item.label}
                     </p>
-                    <p className="mt-2 text-base font-semibold text-slate-100">
+                    <p className="mt-2 text-base font-semibold text-app-text">
                       {item.value}
                     </p>
-                    <p className="mt-1 text-xs text-slate-400">{item.hint}</p>
+                    <p className="mt-1 text-xs text-app-text-muted">{item.hint}</p>
                   </div>
                 ))}
               </div>
               {billingStatus?.usage && billingStatus?.planLimits ? (
                 <div className="mt-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-app-text-muted">
                     Current usage
                   </p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -247,16 +247,16 @@ export function BillingPaywall({
                     ].map((item) => (
                       <div
                         key={item.label}
-                        className="rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-3"
+                        className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3"
                       >
-                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-app-text-muted">
                           {item.label}
                         </p>
-                        <p className="mt-1 text-sm font-semibold text-slate-100">
+                        <p className="mt-1 text-sm font-semibold text-app-text">
                           {item.value}
                         </p>
                         {"hint" in item && item.hint ? (
-                          <p className="mt-1 text-[11px] text-slate-500">{item.hint}</p>
+                          <p className="mt-1 text-[11px] text-app-text-muted">{item.hint}</p>
                         ) : null}
                       </div>
                     ))}
@@ -269,10 +269,10 @@ export function BillingPaywall({
           <aside className="workspace-panel flex flex-col gap-5 p-5 sm:p-6">
             <div>
               <div className="workspace-chip-label">Current Access</div>
-              <h2 className="mt-2 text-2xl font-semibold text-slate-100">
+              <h2 className="mt-2 text-2xl font-semibold text-app-text">
                 {billingStatus?.isPremium ? "Premium active" : "7-day trial"}
               </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 {formatStatusLabel(billingStatus?.subscriptionStatus)}
               </p>
             </div>
@@ -300,12 +300,12 @@ export function BillingPaywall({
               ].map((row) => (
                 <div
                   key={row.label}
-                  className="flex items-center justify-between gap-4 rounded-2xl border border-slate-700/60 bg-slate-950/40 px-4 py-3"
+                  className="flex items-center justify-between gap-4 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3"
                 >
-                  <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">
+                  <span className="text-xs font-bold uppercase tracking-[0.16em] text-app-text-muted">
                     {row.label}
                   </span>
-                  <span className="text-sm font-medium text-slate-200">
+                  <span className="text-sm font-medium text-app-text">
                     {row.value}
                   </span>
                 </div>
@@ -327,7 +327,7 @@ export function BillingPaywall({
                       "rounded-full px-3 py-1.5 text-xs font-semibold transition-colors",
                       selectedInterval === interval
                         ? "bg-cyan-400 text-black"
-                        : "text-slate-300 hover:text-white",
+                        : "text-app-text-muted hover:text-white",
                     )}
                   >
                     {formatBillingIntervalLabel(interval)}
@@ -336,11 +336,11 @@ export function BillingPaywall({
               </div>
             ) : null}
 
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-950/40 p-4">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 p-4">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-app-text-muted">
                 Everything included in every plan
               </p>
-              <p className="mt-1.5 text-xs leading-5 text-slate-500">
+              <p className="mt-1.5 text-xs leading-5 text-app-text-muted">
                 {PRICING_INCLUDED_COPY}
               </p>
               <ul className="mt-3 space-y-2">
@@ -348,14 +348,14 @@ export function BillingPaywall({
                   <li key={item.label} className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-400" />
                     <div>
-                      <p className="text-xs font-medium text-slate-200">{item.label}</p>
-                      <p className="text-[11px] text-slate-500">{item.sub}</p>
+                      <p className="text-xs font-medium text-app-text">{item.label}</p>
+                      <p className="text-[11px] text-app-text-muted">{item.sub}</p>
                     </div>
                   </li>
                 ))}
               </ul>
               <div className="hidden">
-              <p className="mt-1.5 text-xs leading-5 text-slate-500">
+              <p className="mt-1.5 text-xs leading-5 text-app-text-muted">
                 All features on all plans — only slots & keywords scale.
               </p>
               <ul className="mt-3 space-y-2">
@@ -372,8 +372,8 @@ export function BillingPaywall({
                   <li key={item.label} className="flex items-start gap-2.5">
                     <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-400" />
                     <div>
-                      <p className="text-xs font-medium text-slate-200">{item.label}</p>
-                      <p className="text-[11px] text-slate-500">{item.sub}</p>
+                      <p className="text-xs font-medium text-app-text">{item.label}</p>
+                      <p className="text-[11px] text-app-text-muted">{item.sub}</p>
                     </div>
                   </li>
                 ))}
@@ -394,7 +394,7 @@ export function BillingPaywall({
                   type="button"
                   onClick={onOpenPortal}
                   disabled={isOpeningPortal}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-semibold text-app-text transition-colors hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isOpeningPortal ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -436,8 +436,8 @@ export function BillingPaywall({
                 className={cn(
                   "relative flex h-full flex-col overflow-hidden rounded-[24px] border p-5 shadow-[0_24px_80px_rgba(0,0,0,0.6)] sm:rounded-[28px] sm:p-6",
                   plan.highlight
-                    ? "border-cyan-500/25 bg-slate-900"
-                    : "border-white/[0.07] bg-slate-950",
+                    ? "border-cyan-500/25 bg-app-surface-muted"
+                    : "border-white/[0.07] bg-app-surface",
                   planStyle.border,
                 )}
               >
@@ -474,31 +474,31 @@ export function BillingPaywall({
                   </div>
 
                   <div className="mb-5">
-                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-app-text-muted">
                       {plan.name}
                     </p>
                     <div className="mt-3 flex items-end gap-2">
-                      <span className="text-4xl font-black text-slate-100">
+                      <span className="text-4xl font-black text-app-text">
                         {getPlanPriceLabel(billingStatus, plan, selectedInterval) ||
                           "Contact us"}
                       </span>
                     </div>
-                    <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                    <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-app-text-muted">
                       {plan.contactOnly
                         ? "Custom terms"
                         : `${formatBillingIntervalLabel(selectedInterval)} billing`}
                     </p>
-                    <p className="mt-3 min-h-[66px] text-sm leading-6 text-slate-400">
+                    <p className="mt-3 min-h-[66px] text-sm leading-6 text-app-text-muted">
                       {plan.description}
                     </p>
                   </div>
 
-                  <div className="mb-6 flex-1 rounded-2xl border border-white/[0.06] bg-slate-950 p-4">
+                  <div className="mb-6 flex-1 rounded-2xl border border-white/[0.06] bg-app-surface p-4">
                     <ul className="space-y-3">
                       {plan.features.map((feature) => (
                         <li
                           key={feature}
-                          className="flex items-start gap-2.5 text-sm leading-6 text-slate-300"
+                          className="flex items-start gap-2.5 text-sm leading-6 text-app-text-muted"
                         >
                           <CheckCircle2 className={cn("mt-0.5 h-4 w-4 shrink-0", planStyle.accent)} />
                           <span>{feature}</span>
@@ -512,7 +512,7 @@ export function BillingPaywall({
                     {plan.contactOnly ? (
                       <a
                         href="mailto:vantalumstudio@gmail.com"
-                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-bold text-white transition-colors hover:bg-white/[0.08]"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-bold text-app-text transition-colors hover:bg-white/[0.08]"
                       >
                         <Mail className="h-4 w-4" />
                         {actionLabel}
@@ -539,12 +539,12 @@ export function BillingPaywall({
                         </button>
                         <div className="min-h-[32px]">
                           {!supportsSelectedInterval && !isCurrentPlan ? (
-                            <p className="text-center text-xs text-slate-500">
+                            <p className="text-center text-xs text-app-text-muted">
                               {formatBillingIntervalLabel(selectedInterval)} billing is not available right now
                             </p>
                           ) : null}
                           {!billingConnected && !isCurrentPlan && supportsSelectedInterval ? (
-                            <p className="text-center text-xs text-slate-500">
+                            <p className="text-center text-xs text-app-text-muted">
                               Contact support to activate this plan
                             </p>
                           ) : null}

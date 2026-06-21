@@ -283,21 +283,21 @@ export function AlertRuleManagerModal({
   if (!isOpen || !group) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-4xl rounded-3xl border border-slate-700/60 bg-slate-950/95 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-700/50 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-4xl rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-app-border/50 px-6 py-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
               Alerts
             </p>
-            <h3 className="mt-1 font-display text-xl font-bold text-slate-100">
+            <h3 className="mt-1 font-display text-xl font-bold text-app-text">
               {group.appTitle} - "{group.keyword}"
             </h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-900 hover:text-slate-200"
+            className="rounded-xl p-2 text-app-text-muted transition-colors hover:bg-app-surface-muted hover:text-app-text"
           >
             <X className="h-4 w-4" />
           </button>
@@ -333,7 +333,7 @@ export function AlertRuleManagerModal({
                     setSelectedCountries(group.countries);
                     setEditingRuleId(null);
                   }}
-                  className="rounded-full border border-slate-700/60 bg-slate-900/70 px-3 py-1.5 text-xs font-semibold text-slate-300 transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
+                  className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-3 py-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
                   title={preset.description}
                 >
                   {preset.label}
@@ -341,10 +341,10 @@ export function AlertRuleManagerModal({
               ))}
             </div>
 
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
+            <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
               <div className="grid gap-5 md:grid-cols-2">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Countries
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -361,7 +361,7 @@ export function AlertRuleManagerModal({
                                 : [...prev, countryCode],
                             )
                           }
-                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${isSelected ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-200" : "border-slate-700/60 bg-slate-950/50 text-slate-400 hover:border-slate-500 hover:text-slate-200"}`}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${isSelected ? "border-cyan-500/40 bg-cyan-500/10 text-cyan-200" : "border-app-border/60 bg-app-surface/50 text-app-text-muted hover:border-slate-500 hover:text-app-text"}`}
                         >
                           {countryCode.toUpperCase()}
                         </button>
@@ -371,11 +371,11 @@ export function AlertRuleManagerModal({
                 </div>
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Delivery
                   </p>
                   <div className="mt-3 space-y-3">
-                    <label className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-950/50 px-3 py-2 text-sm text-slate-300">
+                    <label className="flex items-center justify-between rounded-xl border border-app-border/60 bg-app-surface/50 px-3 py-2 text-sm text-app-text-muted">
                       <span>In-app notifications</span>
                       <input
                         type="checkbox"
@@ -383,10 +383,10 @@ export function AlertRuleManagerModal({
                         onChange={(event) =>
                           setInAppEnabled(event.target.checked)
                         }
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </label>
-                    <label className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-950/50 px-3 py-2 text-sm text-slate-300">
+                    <label className="flex items-center justify-between rounded-xl border border-app-border/60 bg-app-surface/50 px-3 py-2 text-sm text-app-text-muted">
                       <span>Push notifications</span>
                       <input
                         type="checkbox"
@@ -394,10 +394,10 @@ export function AlertRuleManagerModal({
                         onChange={(event) => {
                           void handlePushToggle(event.target.checked);
                         }}
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </label>
-                    <label className="flex items-center justify-between rounded-xl border border-slate-700/60 bg-slate-950/50 px-3 py-2 text-sm text-slate-300">
+                    <label className="flex items-center justify-between rounded-xl border border-app-border/60 bg-app-surface/50 px-3 py-2 text-sm text-app-text-muted">
                       <span>Email alerts</span>
                       <input
                         type="checkbox"
@@ -405,7 +405,7 @@ export function AlertRuleManagerModal({
                         onChange={(event) =>
                           setEmailEnabled(event.target.checked)
                         }
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                        className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                       />
                     </label>
                   </div>
@@ -413,8 +413,8 @@ export function AlertRuleManagerModal({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                 Conditions
               </p>
               <div className="mt-3 space-y-3">
@@ -422,9 +422,9 @@ export function AlertRuleManagerModal({
                   (conditionType) => (
                     <div
                       key={conditionType}
-                      className="rounded-xl border border-slate-700/60 bg-slate-950/50 px-3 py-3"
+                      className="rounded-xl border border-app-border/60 bg-app-surface/50 px-3 py-3"
                     >
-                      <label className="flex items-center justify-between gap-3 text-sm text-slate-300">
+                      <label className="flex items-center justify-between gap-3 text-sm text-app-text-muted">
                         <span>{ALERT_CONDITION_LABELS[conditionType]}</span>
                         <input
                           type="checkbox"
@@ -435,7 +435,7 @@ export function AlertRuleManagerModal({
                               [conditionType]: event.target.checked,
                             }))
                           }
-                          className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-400"
+                          className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                         />
                       </label>
                       {conditionNeedsThreshold(conditionType) && (
@@ -478,27 +478,27 @@ export function AlertRuleManagerModal({
           </div>
 
           <div className="space-y-3">
-            <div className="rounded-2xl border border-slate-700/60 bg-slate-900/60 p-4">
-              <h4 className="text-sm font-semibold text-slate-100">
+            <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
+              <h4 className="text-sm font-semibold text-app-text">
                 Existing rules
               </h4>
               <div className="mt-3 space-y-3">
                 {groupRules.length === 0 ? (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-app-text-muted">
                     No alert rules yet. Start with a preset or create your own.
                   </p>
                 ) : (
                   groupRules.map((rule) => (
                     <div
                       key={rule.id}
-                      className="rounded-2xl border border-slate-700/60 bg-slate-950/40 p-3"
+                      className="rounded-2xl border border-app-border/60 bg-app-surface/40 p-3"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-slate-100">
+                          <div className="text-sm font-semibold text-app-text">
                             {buildAlertRuleSummary(rule)}
                           </div>
-                          <div className="mt-1 text-xs text-slate-500">
+                          <div className="mt-1 text-xs text-app-text-muted">
                             {rule.countries
                               .map((country) => country.toUpperCase())
                               .join(", ")}
