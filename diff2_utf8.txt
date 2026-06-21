@@ -1,0 +1,1300 @@
+﻿diff --git a/src/components/LandingPage.tsx b/src/components/LandingPage.tsx
+index 0da66c9..614157f 100644
+--- a/src/components/LandingPage.tsx
++++ b/src/components/LandingPage.tsx
+@@ -1,14 +1,7 @@
+-import React from 'react';
+-import { motion } from 'motion/react';
+-import { 
+-  TrendingUp, 
+-  Search, 
+-  BarChart3, 
+-  Globe, 
+-  ShieldCheck, 
+-  Star,
+-  ChevronRight,
+-  ArrowRight
++import React, { useEffect, useState } from 'react';
++import { motion, AnimatePresence } from 'motion/react';
++import {
++  Search, BarChart3, Globe, Star, ArrowRight, TrendingUp, TrendingDown, Zap, CheckCircle, ShieldCheck, LockKeyhole, Cloud, BellRing, Bell, RefreshCw
+ } from 'lucide-react';
+ 
+ interface LandingPageProps {
+@@ -17,206 +10,1131 @@ interface LandingPageProps {
+   onOpenTerms: () => void;
+ }
+ 
+-export default function LandingPage({ 
+-  onGetStarted, 
+-  onOpenPrivacy, 
+-  onOpenTerms 
++const BRAND_NAME = "Rank Analyzer Pro";
++
++const ACCENT_STYLES = {
++  blue: {
++    text: "#60a5fa",
++    border: "rgba(96, 165, 250,0.22)",
++    soft: "rgba(96, 165, 250,0.1)",
++    glow: "rgba(96, 165, 250,0.12)",
++  },
++  emerald: {
++    text: "#34d399",
++    border: "rgba(52,211,153,0.22)",
++    soft: "rgba(16,185,129,0.1)",
++    glow: "rgba(16,185,129,0.12)",
++  },
++  indigo: {
++    text: "#818cf8",
++    border: "rgba(129,140,248,0.22)",
++    soft: "rgba(129,140,248,0.1)",
++    glow: "rgba(129,140,248,0.12)",
++  },
++  rose: {
++    text: "#fb7185",
++    border: "rgba(251,113,133,0.22)",
++    soft: "rgba(244,63,94,0.1)",
++    glow: "rgba(244,63,94,0.12)",
++  },
++} as const;
++
++type AccentKey = keyof typeof ACCENT_STYLES;
++
++const STEPS = [
++  { id: 1, label: "Paste App URL", icon: Search, color: "blue" },
++  { id: 2, label: "Discover Keywords", icon: Zap, color: "emerald" },
++  { id: 3, label: "Track Rankings", icon: BarChart3, color: "indigo" },
++];
++
++const KEYWORDS_DEMO = [
++  { kw: "workout tracker", volume: "High", difficulty: "Med", rank: 3, prev: 14, color: "#10b981", graph: "M0,28 C20,26 30,22 50,16 S80,8 100,4" },
++  { kw: "fitness log app",  volume: "High", difficulty: "Low", rank: 7, prev: 19, color: "#3b82f6", graph: "M0,26 C15,24 35,18 55,13 S82,7 100,5" },
++  { kw: "gym routine planner", volume: "Med", difficulty: "Low", rank: 1, prev: 5, color: "#818cf8", graph: "M0,22 C25,18 45,12 65,8 S88,4 100,2" },
++];
++
++const DISCOVERY_DEMO = [
++  { keyword: "workout tracker", rank: 3, volume: 92, difficulty: 45, relevance: 89 },
++  { keyword: "fitness log app", rank: 8, volume: 87, difficulty: 31, relevance: 84 },
++  { keyword: "gym routine planner", rank: 1, volume: 74, difficulty: 28, relevance: 91 },
++];
++
++const TRACKED_DEMO = [
++  {
++    app: "FitLife Pro",
++    keyword: "workout tracker",
++    country: "United States",
++    rank: 3,
++    previous: 14,
++    checked: "2h ago",
++    color: "#10b981",
++    graph: "M0,27 C20,24 40,18 60,13 S84,7 100,4",
++  },
++  {
++    app: "FitLife Pro",
++    keyword: "fitness log app",
++    country: "United States",
++    rank: 8,
++    previous: 19,
++    checked: "2h ago",
++    color: "#60a5fa",
++    graph: "M0,26 C18,24 36,18 58,14 S82,10 100,8",
++  },
++];
++
++const HOW_IT_WORKS_CARDS = [
++  {
++    step: "01",
++    title: "Add your app",
++    body: "Paste an App Store or Google Play URL and we instantly pull the app into your workspace.",
++    icon: Search,
++    accent: "blue" as AccentKey,
++  },
++  {
++    step: "02",
++    title: "Track keywords daily",
++    body: "Choose the terms that matter and let the dashboard refresh rankings automatically every day.",
++    icon: BarChart3,
++    accent: "emerald" as AccentKey,
++  },
++  {
++    step: "03",
++    title: "Get ranking alerts",
++    body: "See wins, drops, and competitor movement before they turn into lost visibility.",
++    icon: Zap,
++    accent: "indigo" as AccentKey,
++  },
++];
++
++const PROOF_CARDS: Array<{ title: string; body: string; accent: AccentKey; icon: typeof Search }> = [
++  {
++    title: "Visible keyword discovery",
++    body: "Search for an app, run discovery, and inspect ranked terms before committing to a paid workflow.",
++    accent: "blue",
++    icon: Search,
++  },
++  {
++    title: "Daily tracking you can audit",
++    body: "Tracked keyword groups show latest rank, country coverage, and refresh timing inside the same dashboard.",
++    accent: "emerald",
++    icon: BellRing,
++  },
++  {
++    title: "Competitor workflows, not just charts",
++    body: "Build a battle group, compare shared terms, and keep one persistent view of the keywords that matter.",
++    accent: "indigo",
++    icon: Globe,
++  },
++];
++
++const FAQS = [
++  {
++    question: "Can I cancel anytime?",
++    answer: "Yes. Every paid plan can be canceled without a contract lock-in, and your access stays active through the current billing period.",
++  },
++  {
++    question: "Do you support both Google Play and the App Store?",
++    answer: "Yes. The platform is built for both stores, with keyword discovery, rank tracking, and competitor monitoring across iOS and Android.",
++  },
++  {
++    question: "What happens when I hit my keyword limit?",
++    answer: "You can remove lower-priority terms to free space, or upgrade when you want to track a broader portfolio.",
++  },
++  {
++    question: "Do I need a credit card to test it?",
++    answer: "No. You can start exploring and tracking your first app before committing to a paid plan.",
++  },
++];
++
++const TRUST_BADGES = [
++  { label: "Secured by Firebase", icon: ShieldCheck },
++  { label: "Google Cloud Powered", icon: Cloud },
++  { label: "256-bit Encryption", icon: LockKeyhole },
++];
++
++const BENEFIT_CARDS: Array<{ title: string; sub: string; icon: typeof Search; accent: AccentKey }> = [
++  { title: "Save Time", sub: "Automate manual rank checks", icon: Zap, accent: "blue" },
++  { title: "Spot Trends", sub: "Monitor daily rank changes", icon: TrendingUp, accent: "emerald" },
++  { title: "Track Rivals", sub: "Monitor battle groups and shared keywords", icon: Search, accent: "indigo" },
++  { title: "Grow Faster", sub: "Increase organic installs", icon: BarChart3, accent: "rose" },
++];
++
++const FEATURE_CARDS: Array<{ title: string; body: string; icon: typeof Search; accent: AccentKey }> = [
++  {
++    icon: Search,
++    accent: "blue",
++    title: "Deep Keyword Discovery",
++    body: "Uncover high-volume, low-competition keywords your competitors are missing. Scrape autocomplete suggestions instantly across iOS and Android.",
++  },
++  {
++    icon: BarChart3,
++    accent: "emerald",
++    title: "Automated Daily Tracking",
++    body: "Set it and forget it. Backend workers check your app's rank for every tracked keyword every day so history stays usable.",
++  },
++  {
++    icon: TrendingUp,
++    accent: "rose",
++    title: "Competitor Group Tracking",
++    body: "Build a battle group with your app and one rival, analyze shared gaps, and monitor the same keywords across both apps in one chart.",
++  },
++  {
++    icon: Globe,
++    accent: "indigo",
++    title: "Multi-Country Support",
++    body: "Analyze rankings and discover localized keywords in 60+ countries and storefronts to support every market you care about.",
++  },
++];
++
++const ABOUT_STATS: Array<{ num: string; label: string; accent: AccentKey }> = [
++  { num: "60+", label: "Countries and storefronts supported", accent: "blue" },
++  { num: "2", label: "App stores covered: iOS and Android", accent: "emerald" },
++  { num: "1-20", label: "Competitor groups across plans", accent: "indigo" },
++  { num: "24h", label: "Automated daily rank refresh cycle", accent: "rose" },
++];
++
++function StepDemoContent({ step }: { step: number }) {
++  const [typed, setTyped] = useState(0);
++  const url = "https://apps.apple.com/app/id123456789";
++
++  useEffect(() => {
++    if (step !== 1) return;
++    setTyped(0);
++    let i = 0;
++    const timer = setInterval(() => { i++; setTyped(i); if (i >= url.length) clearInterval(timer); }, 38);
++    return () => clearInterval(timer);
++  }, [step]);
++
++  if (step === 1) return (
++    <div className="flex h-full w-full flex-col gap-4">
++      <div className="rounded-[26px] border border-slate-700/60 bg-slate-950/55 p-5 shadow-[0_24px_80px_rgba(2,6,23,0.35)]">
++        <div className="mb-5 flex items-center gap-3">
++          <div
++            className="flex h-9 w-9 items-center justify-center rounded-xl"
++            style={{ background: "rgba(96, 165, 250,0.1)", border: "1px solid rgba(96, 165, 250,0.2)" }}
++          >
++            <Search className="h-4 w-4 text-blue-400" />
++          </div>
++          <div className="flex items-center gap-2">
++            <h3 className="text-base font-bold text-slate-100">Find an App to Analyze</h3>
++            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-blue-300">
++              Live Search
++            </span>
++          </div>
++        </div>
++        <div className="flex flex-col gap-3 sm:flex-row">
++          <div
++            className="relative flex h-14 flex-1 items-center overflow-hidden rounded-2xl px-4"
++            style={{ background: "rgba(10,15,35,0.85)", border: "1px solid rgba(51,65,85,0.55)" }}
++          >
++            <Search className="mr-3 h-5 w-5 shrink-0 text-slate-500" />
++            <span className="font-mono text-sm text-slate-200 whitespace-nowrap">{url.slice(0, typed)}</span>
++            <motion.span
++              className="ml-0.5 inline-block h-5 w-0.5 bg-blue-400"
++              animate={{ opacity: [1, 0, 1] }}
++              transition={{ repeat: Infinity, duration: 0.8 }}
++            />
++          </div>
++          <motion.button
++            className="inline-flex h-14 items-center justify-center gap-2 rounded-2xl px-6 text-sm font-bold text-black"
++            style={{ background: "linear-gradient(135deg,#60a5fa 0%,#10b981 100%)", boxShadow: "0 12px 30px rgba(96, 165, 250,0.18)" }}
++            animate={typed >= url.length ? { scale: [1, 0.97, 1.03, 1] } : {}}
++            transition={{ duration: 0.35, delay: 0.1 }}
++          >
++            <Search className="h-4 w-4" />
++            Search
++          </motion.button>
++        </div>
++        <div className="mt-4 rounded-2xl border border-slate-700/50 bg-slate-900/75 p-3">
++          <div className="flex items-center gap-3 rounded-2xl border border-slate-700/50 bg-slate-950/60 px-4 py-3">
++            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-500/20 bg-blue-500/10 text-lg font-black text-blue-300">
++              F
++            </div>
++            <div className="min-w-0 flex-1">
++              <div className="flex items-center gap-2">
++                <p className="truncate font-semibold text-slate-100">FitLife Pro</p>
++                <span className="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
++                  iOS
++                </span>
++              </div>
++              <p className="truncate text-xs text-slate-500">Health & Fitness ΓÇó Ready to analyze</p>
++            </div>
++            <button className="rounded-xl border border-blue-500/25 bg-blue-500/10 px-3 py-2 text-xs font-bold text-blue-300">
++              Analyze
++            </button>
++          </div>
++        </div>
++      </div>
++      <div className="flex flex-wrap gap-3">
++        {["Search apps or paste a store URL", "Same entry point as the real dashboard", "Ready for iOS and Android"].map((s, i) => (
++          <motion.div
++            key={s}
++            initial={{ opacity: 0, y: 6 }}
++            animate={{ opacity: 1, y: 0 }}
++            transition={{ delay: 0.3 + i * 0.12 }}
++            className="rounded-full border border-slate-700/60 bg-slate-900/70 px-3 py-1.5 text-xs font-semibold text-slate-300"
++          >
++            {s}
++          </motion.div>
++        ))}
++      </div>
++    </div>
++  );
++
++  if (step === 2) return (
++    <div className="flex h-full w-full flex-col gap-4">
++      <div className="rounded-[26px] border border-slate-700/60 bg-slate-950/55 p-5 shadow-[0_24px_80px_rgba(2,6,23,0.35)]">
++        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
++          <div>
++            <h3 className="text-base font-bold text-slate-100">Discovered Rankings</h3>
++            <p className="mt-1 text-xs text-slate-500">
++              Fast mode checks fewer candidates in the top 100. Deep mode scans a wider keyword set and checks deeper rankings.
++            </p>
++          </div>
++          <div className="flex flex-wrap items-center gap-2">
++            <div className="inline-flex rounded-xl border border-slate-700/70 bg-slate-900/60 p-1">
++              {["fast", "deep"].map((mode) => (
++                <div
++                  key={mode}
++                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide ${mode === "deep" ? "bg-blue-500/20 text-blue-300" : "text-slate-400"}`}
++                >
++                  {mode}
++                </div>
++              ))}
++            </div>
++            <div className="inline-flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-semibold text-blue-300">
++              <RefreshCw className="h-3.5 w-3.5" />
++              Refresh Scan
++            </div>
++          </div>
++        </div>
++        <div className="flex flex-wrap gap-3">
++          {DISCOVERY_DEMO.map((item, i) => (
++            <motion.div
++              key={item.keyword}
++              initial={{ opacity: 0, y: 10 }}
++              animate={{ opacity: 1, y: 0 }}
++              transition={{ delay: i * 0.1 }}
++              className="relative flex min-w-[220px] flex-1 flex-col gap-1.5 rounded-2xl border border-blue-500/20 bg-blue-950/30 px-4 py-3 text-sm text-blue-200 shadow-lg shadow-blue-500/5"
++            >
++              <div className="flex items-center gap-2">
++                <div className="flex h-5 w-5 items-center justify-center rounded-md border border-blue-500/30 bg-blue-500/10 text-[10px] font-black text-blue-300">
++                  F
++                </div>
++                <span className="font-semibold">{item.keyword}</span>
++                <span className="rounded-md bg-blue-500/20 px-2 py-0.5 text-xs font-bold text-blue-300">
++                  #{item.rank}
++                </span>
++              </div>
++              <div className="flex flex-wrap items-center gap-2.5 text-xs font-medium text-blue-300/85">
++                <span>Est. Vol: {item.volume}</span>
++                <span>Est. Diff: {item.difficulty}</span>
++                <span>Est. Rel: {item.relevance}</span>
++              </div>
++              <div className="absolute -right-2 -top-2 rounded-full border border-blue-500/30 bg-slate-950 p-1.5 text-blue-300 shadow-lg">
++                <BellRing className="h-3.5 w-3.5" />
++              </div>
++            </motion.div>
++          ))}
++        </div>
++        <div className="mt-4 rounded-2xl border border-slate-700/50 bg-slate-900/70 p-4">
++          <p className="mb-3 text-xs font-bold uppercase tracking-widest text-slate-500">Check Specific Keyword</p>
++          <div className="flex flex-col gap-3 sm:flex-row">
++            <div className="flex-1 rounded-xl border border-slate-700/50 bg-slate-950/70 px-4 py-3 text-sm text-slate-400">
++              Enter a keyword to check rank...
++            </div>
++            <div className="inline-flex items-center justify-center rounded-xl bg-blue-500 px-5 py-3 text-sm font-bold text-black">
++              Check Rank
++            </div>
++          </div>
++        </div>
++      </div>
++    </div>
++  );
++
++  if (step === 3) return (
++    <div className="flex h-full w-full flex-col gap-4">
++      <div className="rounded-[26px] border border-slate-700/60 bg-slate-950/55 p-5 shadow-[0_24px_80px_rgba(2,6,23,0.35)]">
++        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
++          <div>
++            <div className="flex items-center gap-3">
++              <div
++                className="flex h-9 w-9 items-center justify-center rounded-xl"
++                style={{ background: "rgba(96, 165, 250,0.1)", border: "1px solid rgba(96, 165, 250,0.2)" }}
++              >
++                <BellRing className="h-4 w-4 text-blue-400" />
++              </div>
++              <h3 className="text-base font-bold text-slate-100">Tracked Keyword Charts</h3>
++            </div>
++            <p className="mt-2 text-sm text-slate-400">
++              Show only the ranking trend visuals from the tracked-keyword workflow.
++            </p>
++          </div>
++          <div className="flex flex-wrap items-center gap-2 text-xs">
++            <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-slate-300">
++              FitLife Pro
++            </span>
++            <span className="rounded-full border border-slate-700/60 bg-slate-950/45 px-3 py-1.5 text-blue-300">
++              Last refresh Today, 9:00 AM
++            </span>
++          </div>
++        </div>
++
++        <div className="mt-5 grid gap-4 xl:grid-cols-2">
++          {TRACKED_DEMO.map((item, i) => (
++            <motion.div
++              key={item.keyword}
++              initial={{ opacity: 0, y: 10 }}
++              animate={{ opacity: 1, y: 0 }}
++              transition={{ delay: i * 0.12 }}
++              className="rounded-3xl border border-slate-700/70 bg-slate-900/65 p-5 shadow-xl shadow-black/25"
++            >
++              <div className="flex items-start justify-between gap-4">
++                <div className="min-w-0">
++                  <div className="flex items-center gap-2">
++                    <p className="truncate font-semibold text-slate-100">{item.keyword}</p>
++                    <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-blue-300">
++                      {item.country}
++                    </span>
++                  </div>
++                  <p className="mt-1 text-xs text-slate-500">
++                    {item.app} ΓÇó checked {item.checked}
++                  </p>
++                </div>
++                <div className="flex flex-col items-end">
++                  <span className="text-3xl font-black leading-none text-white">#{item.rank}</span>
++                  <span
++                    className="mt-1 inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-bold"
++                    style={{ color: "#34d399", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}
++                  >
++                    <TrendingUp className="h-3 w-3" /> +{item.previous - item.rank}
++                  </span>
++                </div>
++              </div>
++
++              <div className="mt-5 rounded-2xl border border-slate-700/60 bg-slate-950/55 p-4">
++                <div className="mb-3 flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500">
++                  <span>Rank Trend</span>
++                  <span>Last 7 checks</span>
++                </div>
++                <svg className="h-36 w-full" viewBox="0 0 100 30" preserveAspectRatio="none">
++                  <defs>
++                    <linearGradient id={`tracked-demo-large-${i}`} x1="0" y1="0" x2="0" y2="1">
++                      <stop offset="0%" stopColor={item.color} stopOpacity="0.32" />
++                      <stop offset="100%" stopColor={item.color} stopOpacity="0" />
++                    </linearGradient>
++                  </defs>
++                  {[20, 40, 60, 80].map((line) => (
++                    <line
++                      key={line}
++                      x1={line}
++                      y1="0"
++                      x2={line}
++                      y2="30"
++                      stroke="rgba(71,85,105,0.24)"
++                      strokeDasharray="1.5 2"
++                    />
++                  ))}
++                  {[6, 15, 24].map((line) => (
++                    <line
++                      key={line}
++                      x1="0"
++                      y1={line}
++                      x2="100"
++                      y2={line}
++                      stroke="rgba(71,85,105,0.24)"
++                      strokeDasharray="1.5 2"
++                    />
++                  ))}
++                  <motion.path
++                    d={`${item.graph} L100,30 L0,30 Z`}
++                    fill={`url(#tracked-demo-large-${i})`}
++                    initial={{ opacity: 0 }}
++                    animate={{ opacity: 1 }}
++                    transition={{ delay: 0.3 + i * 0.12 }}
++                  />
++                  <motion.path
++                    d={item.graph}
++                    fill="none"
++                    stroke={item.color}
++                    strokeWidth="2.4"
++                    strokeLinecap="round"
++                    initial={{ pathLength: 0, opacity: 0 }}
++                    animate={{ pathLength: 1, opacity: 1 }}
++                    transition={{ duration: 0.9, delay: 0.18 + i * 0.1 }}
++                  />
++                </svg>
++                <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
++                  <span>7d ago</span>
++                  <span>Today</span>
++                </div>
++              </div>
++            </motion.div>
++          ))}
++        </div>
++      </div>
++    </div>
++  );
++
++  return null;
++}
++
++function HowItWorksDemo() {
++  const [step, setStep] = useState(1);
++
++  const activeStep = STEPS.find(s => s.id === step)!;
++
++  return (
++    <motion.div
++      initial={{ opacity: 0, y: 44 }}
++      animate={{ opacity: 1, y: 0 }}
++      transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
++      className="mt-16 w-full max-w-5xl relative"
++    >
++      {/* Glow */}
++      <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-blue-500/20 to-blue-500/10 blur-sm pointer-events-none" />
++
++      <div className="relative rounded-2xl border border-slate-700/70 bg-slate-900/90 overflow-hidden shadow-2xl backdrop-blur-2xl">
++        {/* Window bar */}
++        <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-900 bg-slate-950/60">
++          <div className="flex gap-2">
++            <div className="w-3 h-3 rounded-full bg-rose-500/80"/>
++            <div className="w-3 h-3 rounded-full bg-amber-500/80"/>
++            <div className="w-3 h-3 rounded-full bg-blue-500/80"/>
++          </div>
++          <div className="text-xs text-slate-500 font-mono">{BRAND_NAME} - Dashboard</div>
++          <div className="w-14"/>
++        </div>
++
++        {/* Step pills */}
++        <div className="flex items-center gap-0 border-b border-slate-900 bg-slate-950/30 px-5">
++          {STEPS.map((s, i) => {
++            const Icon = s.icon;
++            const active = step === s.id;
++            const done = step > s.id;
++            return (
++              <React.Fragment key={s.id}>
++                <button
++                  onClick={() => setStep(s.id)}
++                  className={`flex items-center gap-2 px-4 py-3.5 text-sm font-medium transition-all border-b-2 ${
++                    active
++                      ? 'border-blue-400 text-blue-300'
++                      : done
++                        ? 'border-blue-500/40 text-blue-400/70'
++                        : 'border-transparent text-slate-500 hover:text-slate-300'
++                  }`}
++                >
++                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
++                    done ? 'bg-blue-500 text-white' : active ? 'bg-blue-500 text-black' : 'bg-slate-700 text-slate-400'
++                  }`}>
++                    {done ? <CheckCircle className="w-3 h-3"/> : s.id}
++                  </div>
++                  <span className="hidden sm:inline">{s.label}</span>
++                </button>
++                {i < STEPS.length - 1 && <div className="w-6 h-px bg-slate-700 mx-1 shrink-0"/>}
++              </React.Fragment>
++            );
++          })}
++        </div>
++
++        {/* Step content */}
++        <div className="flex min-h-[540px] items-start p-5 md:p-8">
++          <AnimatePresence mode="wait">
++            <motion.div key={step} className="h-full w-full"
++              initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
++              transition={{ duration: 0.3 }}
++            >
++              <StepDemoContent step={step} />
++            </motion.div>
++          </AnimatePresence>
++        </div>
++
++        {/* Navigation */}
++        <div className="flex items-center justify-between px-5 md:px-8 py-4 border-t border-slate-900 bg-slate-950/30">
++          <button
++            onClick={() => setStep(s => Math.max(1, s - 1))}
++            disabled={step === 1}
++            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
++          >
++            Back
++          </button>
++          <div className="flex gap-1.5">
++            {STEPS.map(s => (
++              <button key={s.id} onClick={() => setStep(s.id)}
++                className={`w-2 h-2 rounded-full transition-all ${step === s.id ? 'bg-blue-400 w-5' : step > s.id ? 'bg-blue-500' : 'bg-slate-600'}`}
++              />
++            ))}
++          </div>
++          {step < 3 ? (
++            <button
++              onClick={() => setStep(s => Math.min(3, s + 1))}
++              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-500 text-black text-sm font-bold hover:from-blue-400 hover:to-blue-400 transition-all shadow-md shadow-blue-500/20"
++            >
++              Next
++            </button>
++          ) : (
++            <button
++              onClick={() => setStep(1)}
++              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-blue-500/20 border border-blue-500/40 text-blue-400 text-sm font-bold hover:bg-blue-500/30 transition-all"
++            >
++              Restart
++            </button>
++          )}
++        </div>
++      </div>
++    </motion.div>
++  );
++}
++
++export default function LandingPage({
++  onGetStarted,
++  onOpenPrivacy,
++  onOpenTerms,
+ }: LandingPageProps) {
++  const [isAnnual, setIsAnnual] = useState(true);
++
+   return (
+-    <div className="min-h-screen bg-slate-950 text-slate-200 overflow-x-hidden selection:bg-cyan-500/30">
+-      {/* Background Decorative Elements */}
++    <div className="landing-shell min-h-screen bg-slate-950 text-slate-200 overflow-x-hidden selection:bg-blue-500/30">
++      {/* Background */}
+       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+-        <div 
+-          className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] opacity-20"
+-          style={{ background: 'radial-gradient(circle, #06b6d4 0%, transparent 70%)' }}
+-        />
+-        <div 
+-          className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-20"
+-          style={{ background: 'radial-gradient(circle, #10b981 0%, transparent 70%)' }}
+-        />
+-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.015] mix-blend-overlay"></div>
++        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full blur-[120px] opacity-20"
++          style={{ background: 'radial-gradient(circle, #3b82f6 0%, transparent 70%)' }} />
++        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full blur-[120px] opacity-20"
++          style={{ background: 'radial-gradient(circle, #10b981 0%, transparent 70%)' }} />
+       </div>
+ 
+-      {/* Navigation */}
+-      <nav className="relative z-10 flex items-center justify-between px-6 py-6 md:px-12 lg:px-24">
+-        <div className="flex items-center gap-3">
+-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-400 to-emerald-400 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+-            <TrendingUp className="w-5 h-5 text-slate-950" strokeWidth={2.5} />
++      {/* Nav */}
++      <nav className="relative z-20 flex items-center justify-between gap-3 border-b border-slate-900/50 bg-slate-950/60 px-4 py-4 backdrop-blur-xl sm:px-6 sm:py-5 md:px-12 lg:px-16 sticky top-0">
++        <button
++          type="button"
++          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
++          className="flex min-w-0 items-center gap-3 rounded-xl transition-opacity hover:opacity-90"
++          aria-label="Go to top"
++        >
++          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-400 to-blue-400 flex items-center justify-center shadow-lg shadow-blue-500/20">
++            <Search className="w-4 h-4 text-black" strokeWidth={2.5} />
+           </div>
+-          <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-slate-100 to-slate-300 bg-clip-text text-transparent">
+-            Rank Analyzer <span className="text-cyan-400 font-extrabold">Pro</span>
++          <span className="hidden truncate text-lg font-bold tracking-tight text-slate-100 sm:inline">
++            {BRAND_NAME}
++          </span>
++          <span className="truncate text-base font-bold tracking-tight text-slate-100 sm:hidden">
++            Rank Analyzer
+           </span>
+-        </div>
+-        <button 
+-          onClick={onGetStarted}
+-          className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-800 hover:bg-slate-700 text-sm font-medium transition-colors border border-slate-700 hover:border-slate-600"
+-        >
+-          Sign In
+         </button>
++        {/* Center nav links */}
++        <div className="hidden md:flex items-center gap-1">
++          {[
++            { label: 'Features', id: 'features' },
++            { label: 'Pricing', id: 'pricing' },
++            { label: 'About', id: 'about' },
++          ].map(({ label, id }) => (
++            <button key={id}
++              onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })}
++              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-100 hover:bg-slate-900/60 transition-all">
++              {label}
++            </button>
++          ))}
++        </div>
++        <div className="flex items-center gap-2 sm:gap-3">
++          <button
++            onClick={onGetStarted}
++            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-500 to-blue-500 px-3 py-2 text-sm font-bold text-black shadow-md shadow-blue-500/20 transition-all hover:from-blue-400 hover:to-blue-400 sm:px-4"
++          >
++            <ArrowRight className="w-3.5 h-3.5" />
++            Sign In
++          </button>
++        </div>
+       </nav>
+ 
+-      {/* Hero Section */}
+-      <main className="relative z-10 flex flex-col items-center justify-center px-6 pt-20 pb-32 text-center md:pt-32 md:pb-40">
+-        <motion.div
+-          initial={{ opacity: 0, y: 20 }}
+-          animate={{ opacity: 1, y: 0 }}
+-          transition={{ duration: 0.6, ease: "easeOut" }}
+-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-950/40 border border-cyan-800/50 text-cyan-400 text-sm font-medium mb-8 backdrop-blur-sm"
+-        >
+-          <Star className="w-4 h-4 fill-cyan-400" />
+-          The Ultimate ASO Intelligence Tool
++      {/* Hero */}
++      <main className="relative z-10 flex flex-col items-center justify-center px-4 pt-16 pb-24 text-center sm:px-6 md:pt-32 md:pb-36">
++        {/* Animated ambient glow behind hero */}
++        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-64 bg-blue-500/20 blur-[100px] rounded-full pointer-events-none" />
++
++        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
++          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/80 border border-slate-700/50 text-blue-400 text-sm font-semibold mb-8 backdrop-blur-md shadow-lg shadow-blue-500/10">
++          <Star className="w-4 h-4 fill-blue-400" /> The Ultimate ASO Intelligence Platform
+         </motion.div>
+ 
+-        <motion.h1 
+-          initial={{ opacity: 0, y: 20 }}
+-          animate={{ opacity: 1, y: 0 }}
+-          transition={{ duration: 0.6, delay: 0.1, ease: "easeOut" }}
+-          className="text-5xl md:text-7xl font-extrabold tracking-tight max-w-4xl leading-[1.1] mb-6"
+-        >
+-          Dominate the App Stores with{" "}
+-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-emerald-400">
+-            Precision Tracking
++        <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.1 }}
++          className="relative mb-8 max-w-5xl text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-100 sm:text-5xl md:text-7xl">
++          Stop guessing.{" "}
++          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-blue-400 to-blue-400 bg-[length:200%_auto] animate-gradient">
++            Start ranking.
+           </span>
+         </motion.h1>
+ 
+-        <motion.p 
+-          initial={{ opacity: 0, y: 20 }}
+-          animate={{ opacity: 1, y: 0 }}
+-          transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+-          className="text-lg md:text-xl text-slate-400 max-w-2xl mb-10 leading-relaxed"
+-        >
+-          Discover untapped keywords, monitor daily rank fluctuations, and outsmart your competitors. Rank Analyzer Pro gives you the insights to climb the charts on iOS and Android.
++        <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.2 }}
++          className="mb-10 max-w-2xl text-base leading-relaxed text-slate-400 sm:text-lg md:mb-12 md:text-xl">
++          The ASO tool built for <span className="text-slate-200 font-semibold">indie developers and lean teams</span>. Track rankings, uncover high-volume opportunities, and monitor competitors from <span className="text-blue-300 font-semibold">$9/month</span>.
+         </motion.p>
+ 
+-        <motion.div
+-          initial={{ opacity: 0, y: 20 }}
+-          animate={{ opacity: 1, y: 0 }}
+-          transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
+-          className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
+-        >
+-          <button 
++        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.3 }}
++          className="relative z-20 flex w-full flex-col items-stretch gap-4 sm:w-auto sm:flex-row sm:items-center sm:gap-5">
++          <button
+             onClick={onGetStarted}
+-            className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold text-lg transition-all shadow-[0_0_30px_rgba(6,182,212,0.3)] hover:shadow-[0_0_40px_rgba(6,182,212,0.5)] hover:scale-105 active:scale-95"
++            className="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-blue-500 to-blue-500 hover:from-blue-400 hover:to-blue-400 text-black font-bold text-lg transition-all shadow-[0_0_30px_rgba(59, 130, 246,0.3)] hover:shadow-[0_0_40px_rgba(59, 130, 246,0.5)] hover:-translate-y-1"
+           >
+-            Get Started Now
+             <ArrowRight className="w-5 h-5" />
++            Track Your First App Free
+           </button>
+         </motion.div>
+ 
+-        {/* Mock UI Preview */}
+-        <motion.div 
+-          initial={{ opacity: 0, y: 40 }}
++        <motion.div
++          initial={{ opacity: 0, y: 16 }}
+           animate={{ opacity: 1, y: 0 }}
+-          transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+-          className="mt-20 w-full max-w-5xl relative"
++          transition={{ duration: 0.6, delay: 0.4 }}
++          className="mt-10 flex flex-wrap items-center justify-center gap-3 text-sm text-slate-400"
+         >
+-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent z-10" />
+-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-2 backdrop-blur-xl shadow-2xl overflow-hidden relative">
+-            <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-800/50 bg-slate-900">
+-              <div className="w-3 h-3 rounded-full bg-rose-500/50" />
+-              <div className="w-3 h-3 rounded-full bg-amber-500/50" />
+-              <div className="w-3 h-3 rounded-full bg-emerald-500/50" />
++          {["No credit card required", "iOS + Android support", "Daily automated rank updates"].map((item) => (
++            <div
++              key={item}
++              className="rounded-full border border-slate-700/60 bg-slate-900/70 px-4 py-2 font-medium text-slate-300"
++            >
++              {item}
+             </div>
+-            {/* Fake dashboard content */}
+-            <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4 opacity-50">
+-              <div className="h-32 rounded-xl bg-slate-800/50 border border-slate-700/30" />
+-              <div className="h-32 rounded-xl bg-slate-800/50 border border-slate-700/30" />
+-              <div className="h-32 rounded-xl bg-slate-800/50 border border-slate-700/30" />
+-              <div className="md:col-span-3 h-64 rounded-xl bg-slate-800/50 border border-slate-700/30 mt-4" />
+-            </div>
+-          </div>
++          ))}
+         </motion.div>
++
++        <div className="mt-20 grid w-full max-w-6xl gap-6 md:grid-cols-3">
++          {HOW_IT_WORKS_CARDS.map(({ step, title, body, icon: Icon, accent }) => (
++            <motion.div
++              key={step}
++              initial={{ opacity: 0, y: 22 }}
++              animate={{ opacity: 1, y: 0 }}
++              transition={{ duration: 0.5, delay: 0.2 + Number(step) * 0.08 }}
++              className="rounded-3xl border border-slate-900 bg-slate-900/55 p-6 text-left shadow-xl backdrop-blur-xl"
++            >
++              <div className="mb-5 flex items-center justify-between">
++                <div
++                  className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950"
++                  style={{
++                    color: ACCENT_STYLES[accent].text,
++                    border: `1px solid ${ACCENT_STYLES[accent].border}`,
++                    background: ACCENT_STYLES[accent].soft,
++                  }}
++                >
++                  <Icon className="h-5 w-5" />
++                </div>
++                <span className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">{step}</span>
++              </div>
++              <h3 className="mb-3 text-xl font-bold text-slate-100">{title}</h3>
++              <p className="text-sm leading-relaxed text-slate-400">{body}</p>
++            </motion.div>
++          ))}
++        </div>
++
++        {/* How It Works label */}
++        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}
++          className="mt-24 mb-4 flex items-center gap-4 text-sm font-bold text-slate-500 uppercase tracking-widest w-full max-w-3xl mx-auto">
++          <div className="h-px flex-1 bg-gradient-to-r from-transparent to-slate-700"/> 
++          Live Product Preview
++          <div className="h-px flex-1 bg-gradient-to-l from-transparent to-slate-700"/>
++        </motion.div>
++
++        <p className="max-w-2xl text-sm leading-relaxed text-slate-400">
++          Explore the workflow before signing up. This preview shows the exact kind of keyword selection, rank tracking, and movement alerts users see inside the dashboard.
++        </p>
++
++        <HowItWorksDemo />
+       </main>
+ 
+-      {/* Social Proof Section */}
+-      <section className="relative z-10 py-20 border-y border-slate-800/50 bg-slate-900/30">
+-        <div className="max-w-6xl mx-auto px-6 text-center">
+-          <p className="text-sm font-semibold tracking-widest uppercase text-slate-500 mb-8">
+-            Trusted by indie developers and ASO experts worldwide
+-          </p>
+-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 items-center justify-center opacity-70">
+-            <div className="flex flex-col items-center gap-2">
+-              <div className="text-3xl font-bold text-slate-300">5M+</div>
+-              <div className="text-xs text-slate-500 uppercase tracking-wider">Keywords Tracked</div>
+-            </div>
+-            <div className="flex flex-col items-center gap-2">
+-              <div className="text-3xl font-bold text-slate-300">10k+</div>
+-              <div className="text-xs text-slate-500 uppercase tracking-wider">Apps Analyzed</div>
+-            </div>
+-            <div className="flex flex-col items-center gap-2">
+-              <div className="text-3xl font-bold text-slate-300">24/7</div>
+-              <div className="text-xs text-slate-500 uppercase tracking-wider">Automated Refresh</div>
+-            </div>
+-            <div className="flex flex-col items-center gap-2">
+-              <div className="text-3xl font-bold text-slate-300">2</div>
+-              <div className="text-xs text-slate-500 uppercase tracking-wider">Stores Supported</div>
++      {/* Benefits strip */}
++      <section className="relative z-10 py-24 border-y border-slate-900/80 bg-slate-950/50 backdrop-blur-xl">
++        <div className="max-w-7xl mx-auto px-6">
++          <div className="text-center mb-16">
++            <h2 className="text-3xl md:text-4xl font-bold text-slate-100 mb-4">Why top developers choose us</h2>
++            <p className="text-slate-400">Everything you need to execute a winning ASO strategy.</p>
++          </div>
++          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
++            {BENEFIT_CARDS.map((benefit) => {
++              const accent = ACCENT_STYLES[benefit.accent];
++              return (
++              <div key={benefit.title} className="relative group rounded-2xl bg-slate-900/60 border border-slate-700/50 p-6 overflow-hidden transition-all hover:-translate-y-1 hover:border-slate-600 shadow-lg">
++                <div
++                  className="absolute top-0 right-0 w-32 h-32 rounded-full blur-[40px] -mr-10 -mt-10 transition-opacity group-hover:opacity-100 opacity-50"
++                  style={{ background: accent.glow }}
++                />
++                <div
++                  className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform"
++                  style={{ color: accent.text }}
++                >
++                  <benefit.icon className="w-6 h-6" />
++                </div>
++                <h3 className="text-xl font-bold text-slate-100 mb-2">{benefit.title}</h3>
++                <p className="text-sm text-slate-400 font-medium">{benefit.sub}</p>
++              </div>
++            );})}
++          </div>
++        </div>
++      </section>
++
++      <section className="relative z-10 bg-slate-950 py-24">
++        <div className="mx-auto max-w-7xl px-6">
++          <div className="mb-14 text-center">
++            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-400">
++              Product Confidence
+             </div>
++            <h2 className="mb-4 text-4xl font-extrabold text-slate-100 md:text-5xl">What you can verify before you sign up</h2>
++            <p className="mx-auto max-w-2xl text-lg text-slate-400">
++              See the workflow, inspect the surfaces, and understand exactly what the product helps you monitor before you create an account.
++            </p>
++          </div>
++          <div className="grid gap-6 lg:grid-cols-3">
++            {PROOF_CARDS.map(({ title, body, icon: Icon, accent }) => (
++              <div key={title} className="relative overflow-hidden rounded-3xl border border-slate-900 bg-slate-900/60 p-7 shadow-xl">
++                <div
++                  className="mb-5 inline-flex rounded-2xl p-3"
++                  style={{ background: ACCENT_STYLES[accent].soft, border: `1px solid ${ACCENT_STYLES[accent].border}` }}
++                >
++                  <Icon className="h-5 w-5" style={{ color: ACCENT_STYLES[accent].text }} />
++                </div>
++                <h3 className="mb-3 text-xl font-bold text-slate-100">{title}</h3>
++                <p className="text-base leading-relaxed text-slate-400">{body}</p>
++              </div>
++            ))}
+           </div>
+         </div>
+       </section>
+ 
+-      {/* Features Grid */}
+-      <section className="relative z-10 py-32">
+-        <div className="max-w-6xl mx-auto px-6">
++      {/* Features */}
++      <section id="features" className="relative z-10 py-32 bg-slate-950">
++        <div className="max-w-7xl mx-auto px-6">
+           <div className="text-center mb-20">
+-            <h2 className="text-3xl md:text-5xl font-bold mb-6">Everything you need to rank higher</h2>
+-            <p className="text-slate-400 max-w-2xl mx-auto text-lg">
++            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest mb-6">
++              Powerful Features
++            </div>
++            <h2 className="text-4xl md:text-5xl font-extrabold mb-6 text-slate-100">Everything you need to rank higher</h2>
++            <p className="text-slate-400 max-w-2xl mx-auto text-lg leading-relaxed">
+               Stop guessing what works. Use data-driven insights to optimize your app store listings and monitor your true ranking performance.
+             </p>
+           </div>
++          <div className="grid lg:grid-cols-2 xl:grid-cols-4 gap-6">
++            {FEATURE_CARDS.map(({ icon: Icon, accent, title, body }) => (
++              <div key={title} className="relative p-7 rounded-3xl bg-slate-900/40 border border-slate-900 hover:border-slate-700 transition-all duration-300 group overflow-hidden">
++                <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: `linear-gradient(135deg, ${ACCENT_STYLES[accent].glow}, transparent)` }} />
++                <div className="relative w-14 h-14 rounded-2xl bg-slate-950 border border-slate-900 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-inner" style={{ color: ACCENT_STYLES[accent].text, background: ACCENT_STYLES[accent].soft }}>
++                  <Icon className="w-7 h-7" />
++                </div>
++                <h3 className="relative text-xl font-bold mb-3 text-slate-100">{title}</h3>
++                <p className="relative text-slate-400 leading-relaxed text-sm font-medium">{body}</p>
++              </div>
++            ))}
++          </div>
++        </div>
++      </section>
+ 
+-          <div className="grid md:grid-cols-3 gap-8">
+-            {/* Feature 1 */}
+-            <div className="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 hover:border-cyan-500/30 transition-colors group">
+-              <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+-                <Search className="w-7 h-7 text-cyan-400" />
++      {/* Competitor Spy Callout */}
++      <section className="relative z-10 py-24 bg-slate-950">
++        <div className="max-w-7xl mx-auto px-6">
++          <div className="grid lg:grid-cols-2 gap-16 items-center">
++            {/* Left: copy */}
++            <div>
++              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-widest mb-6">
++                Competitor Intelligence
+               </div>
+-              <h3 className="text-xl font-bold mb-3 text-slate-200">Deep Keyword Discovery</h3>
+-              <p className="text-slate-400 leading-relaxed">
+-                Uncover high-volume, low-competition keywords that your competitors are missing. Scrape autocomplete suggestions across iOS and Android.
++              <h2 className="text-4xl md:text-5xl font-extrabold text-slate-100 mb-6 leading-tight">
++                Track your <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-pink-400">competitive set</span>,
++                not isolated apps
++              </h2>
++              <p className="text-slate-400 text-lg leading-relaxed mb-8">
++                Enterprise ASO suites often price competitor monitoring far above what indie teams can justify. {BRAND_NAME} keeps it focused: build one battle group with your app plus one rival, surface contested keywords and gaps, then watch those rankings move together over time.
+               </p>
++              <div className="flex flex-col gap-4">
++                {[
++                  { step: "01", text: "Choose your app and add one direct rival" },
++                  { step: "02", text: "Analyze shared battles, gaps, and strongest keywords" },
++                  { step: "03", text: "Track the best keywords with one multi-app chart per term" },
++                ].map(({ step, text }) => (
++                  <div key={step} className="flex items-start gap-4">
++                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center shrink-0 text-rose-400 text-xs font-black">{step}</div>
++                    <p className="text-slate-300 font-medium pt-1.5">{text}</p>
++                  </div>
++                ))}
++              </div>
+             </div>
+-
+-            {/* Feature 2 */}
+-            <div className="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 hover:border-emerald-500/30 transition-colors group">
+-              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+-                <BarChart3 className="w-7 h-7 text-emerald-400" />
++            {/* Right: mini mock UI */}
++            <div className="relative">
++              <div className="absolute -inset-4 bg-rose-500/5 blur-3xl rounded-full pointer-events-none" />
++              <div className="relative rounded-2xl border border-slate-700/60 bg-slate-900/80 overflow-hidden shadow-2xl backdrop-blur-xl">
++                <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-900 bg-slate-950/60">
++                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500/70"/>
++                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/70"/>
++                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500/70"/>
++                  <span className="ml-2 text-xs text-slate-500 font-mono">Tracking - Competitor Groups</span>
++                </div>
++                <div className="p-5 flex flex-col gap-3">
++                  {[
++                    { name: "Headspace", kw: "meditation app", rank: 2, color: "#f43f5e", up: false, delta: -1 },
++                    { name: "Calm", kw: "sleep sounds", rank: 4, color: "#fb923c", up: true, delta: 3 },
++                    { name: "Insight Timer", kw: "guided meditation", rank: 7, color: "#a78bfa", up: true, delta: 5 },
++                  ].map((item, i) => (
++                    <motion.div key={item.name}
++                      initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 + i * 0.15 }}
++                      className="flex items-center gap-3 px-4 py-3 rounded-xl"
++                      style={{ background: 'rgba(15,23,42,0.7)', border: '1px solid rgba(51,65,85,0.5)' }}>
++                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0" style={{ background: `${item.color}18`, border: `1px solid ${item.color}30`, color: item.color }}>C</div>
++                      <div className="flex-1 min-w-0">
++                        <p className="text-sm font-semibold text-slate-100 truncate">{item.name}</p>
++                        <p className="text-xs truncate" style={{ color: '#60a5fa' }}>'{item.kw}'</p>
++                      </div>
++                      <div className="flex flex-col items-end shrink-0">
++                        <span className="text-xl font-black text-white">#{item.rank}</span>
++                        <span className={`text-xs font-bold flex items-center gap-0.5 px-1.5 py-0.5 rounded-full mt-0.5`}
++                          style={{ color: item.up ? '#34d399' : '#f87171', background: item.up ? 'rgba(16,185,129,0.1)' : 'rgba(244,63,94,0.1)', border: `1px solid ${item.up ? 'rgba(16,185,129,0.2)' : 'rgba(244,63,94,0.2)'}` }}>
++                          {item.up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />} {item.up ? '+' : ''}{item.delta}
++                        </span>
++                      </div>
++                    </motion.div>
++                  ))}
++                  <div className="mt-1 text-center text-xs text-slate-600 font-medium">Updated daily - automated</div>
++                </div>
+               </div>
+-              <h3 className="text-xl font-bold mb-3 text-slate-200">Automated Daily Tracking</h3>
+-              <p className="text-slate-400 leading-relaxed">
+-                Set it and forget it. Our backend workers check your app's rank for crucial keywords every single day, keeping your history up to date.
+-              </p>
+             </div>
++          </div>
++        </div>
++      </section>
++
++      {/* Pricing */}
++      <section id="pricing" className="relative z-10 py-28 bg-slate-950 border-t border-slate-900/60">
++        <div className="max-w-5xl mx-auto px-6">
++          <div className="text-center mb-16">
++            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest mb-5">
++              Simple Pricing
++            </div>
++            <h2 className="text-4xl md:text-5xl font-extrabold text-slate-100 mb-4">Pick your plan. Cancel anytime.</h2>
++            <p className="text-slate-400 text-lg mb-8">Start with a 7-day free trial. No credit card required.</p>
++            
++            {/* Toggle */}
++            <div className="flex items-center justify-center gap-3 mt-4 mb-10">
++              <span className={`text-sm font-semibold transition-colors ${!isAnnual ? 'text-slate-200' : 'text-slate-500'}`}>Monthly</span>
++              <button 
++                onClick={() => setIsAnnual(!isAnnual)}
++                className="relative inline-flex h-7 w-14 items-center rounded-full bg-slate-900 border border-slate-700 transition-colors duration-300 ease-out focus:outline-none"
++              >
++                <span className={`inline-block h-5 w-5 transform rounded-full bg-blue-400 transition-transform duration-300 ease-out will-change-transform ${isAnnual ? 'translate-x-8' : 'translate-x-1'}`} />
++              </button>
++              <span className={`text-sm font-semibold flex items-center gap-1.5 transition-colors ${isAnnual ? 'text-slate-200' : 'text-slate-500'}`}>
++                Annually
++                <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[10px] uppercase tracking-wider font-bold">Save 20%</span>
++              </span>
++            </div>
++          </div>
++          <div className="grid md:grid-cols-2 lg:grid-cols-6 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
++            {[
++              {
++                name: 'Free', priceMonthly: '$0', priceAnnual: '$0', desc: 'Just enough to test the waters.', cta: 'Track 1 App Free', layoutClass: 'lg:col-span-2 xl:col-span-1',
++                features: ['1 app tracked', '1 competitor group', '10 keywords/country', 'All Pro features included']
++              },
++              {
++                name: 'Indie', priceMonthly: '$9', priceAnnual: '$7', desc: 'For solo developers.', cta: 'Start 7-Day Trial', layoutClass: 'lg:col-span-2 xl:col-span-1',
++                features: ['3 apps tracked', '2 competitor groups', '50 keywords/country', 'All Pro features included']
++              },
++              {
++                name: 'Starter', priceMonthly: '$29', priceAnnual: '$23', desc: 'For growing portfolios.', cta: 'Start 7-Day Trial', highlight: true, badge: 'Popular', layoutClass: 'lg:col-span-2 xl:col-span-1',
++                features: ['7 apps tracked', '5 competitor groups', '150 keywords/country', 'All Pro features included']
++              },
++              {
++                name: 'Pro', priceMonthly: '$79', priceAnnual: '$65', desc: 'Complete keyword intelligence.', cta: 'Start 7-Day Trial', layoutClass: 'lg:col-span-3 xl:col-span-1',
++                features: ['Unlimited apps', '20 competitor groups', '500 keywords/country', 'All Pro features included']
++              },
++              {
++                name: 'Agency', priceMonthly: 'Custom', priceAnnual: 'Custom', desc: 'For enterprise portfolios.', cta: 'Contact Us', isContact: true, layoutClass: 'md:col-span-2 lg:col-span-3 xl:col-span-1',
++                features: ['Custom apps', 'Unlimited competitor groups', '2000+ keywords/country', 'All Pro features included']
++              }
++            ].map(plan => {
++              const currentPrice = isAnnual ? plan.priceAnnual : plan.priceMonthly;
++              return (
++              <div key={plan.name} className={`relative rounded-3xl p-6 flex flex-col ${plan.layoutClass} ${plan.highlight ? 'border border-blue-500/30 bg-slate-900/80 shadow-2xl shadow-blue-500/10' : 'border border-slate-700/60 bg-slate-900/60 opacity-90'}`}>
++                {plan.highlight && (
++                  <>
++                    <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-blue-500 to-blue-500 rounded-t-3xl" />
++                    <div className="absolute -top-8 -right-8 w-32 h-32 bg-blue-500/10 blur-2xl rounded-full pointer-events-none" />
++                    <div className="absolute top-4 right-4 px-2.5 py-1 rounded-full bg-gradient-to-r from-blue-500/20 to-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-black uppercase tracking-wide">{plan.badge}</div>
++                  </>
++                )}
++                <div className="mb-6">
++                  <p className={`text-xs font-bold uppercase tracking-widest mb-2 ${plan.highlight ? 'text-blue-400' : 'text-slate-400'}`}>{plan.name}</p>
++                  <div className="flex items-end gap-1">
++                    <span className="text-4xl font-black text-slate-100">{currentPrice}</span>
++                    {currentPrice !== 'Custom' && <span className="text-slate-400 mb-1 ml-1 text-sm">/mo</span>}
++                  </div>
++                  <p className="text-slate-500 text-xs mt-2 min-h-[32px]">{plan.desc}</p>
++                </div>
++                <ul className="flex flex-col gap-2.5 mb-8 flex-1">
++                  {plan.features.map(f => (
++                    <li key={f} className={`flex items-start gap-2.5 text-xs ${plan.highlight ? 'text-slate-300' : 'text-slate-400'}`}>
++                      <CheckCircle className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${plan.highlight ? 'text-blue-400' : 'text-slate-600'}`} />
++                      <span className="leading-snug">{f}</span>
++                    </li>
++                  ))}
++                </ul>
++                <button onClick={plan.isContact ? () => window.location.href = 'mailto:support@rankanalyzerpro.com' : onGetStarted}
++                  className={`w-full py-3 rounded-xl font-bold transition-all text-xs ${
++                    plan.highlight 
++                      ? 'bg-gradient-to-r from-blue-500 to-blue-500 hover:from-blue-400 hover:to-blue-400 text-black shadow-lg shadow-blue-500/20 hover:-translate-y-0.5' 
++                      : 'border border-slate-600 bg-slate-900 hover:bg-slate-700 text-slate-200 hover:-translate-y-0.5'
++                  }`}>
++                  {plan.cta}
++                </button>
++              </div>
++            );})}
++          </div>
++          <p className="text-center text-slate-600 text-sm mt-8">Up to 80% cheaper than traditional enterprise ASO suites. Cancel anytime. No questions asked.</p>
++        </div>
++      </section>
+ 
+-            {/* Feature 3 */}
+-            <div className="p-8 rounded-3xl bg-slate-900/40 border border-slate-800 hover:border-indigo-500/30 transition-colors group">
+-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+-                <Globe className="w-7 h-7 text-indigo-400" />
++      {/* About */}
++      <section id="about" className="relative z-10 py-28 border-t border-slate-900/60">
++        <div className="max-w-5xl mx-auto px-6">
++          <div className="grid md:grid-cols-2 gap-16 items-center">
++            <div>
++              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest mb-6">
++                About
+               </div>
+-              <h3 className="text-xl font-bold mb-3 text-slate-200">Multi-Country Support</h3>
++              <h2 className="text-4xl md:text-5xl font-extrabold text-slate-100 mb-6 leading-tight">
++                Built by a developer,<br/>
++                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-400">for developers</span>
++              </h2>
++              <p className="text-slate-400 text-lg leading-relaxed mb-6">
++                {BRAND_NAME} was built out of frustration. Enterprise ASO tools cost hundreds per month, which puts basic rank visibility out of reach for many indie developers and small teams.
++              </p>
+               <p className="text-slate-400 leading-relaxed">
+-                Analyze rankings and keywords in over 60+ countries and storefronts to perfect your localization strategy and go global.
++                This tool gives you the same core intelligence - keyword discovery, daily rank tracking, multi-country support, competitor monitoring - at a price that makes sense for a solo developer or small team.
+               </p>
+             </div>
++            <div className="flex flex-col gap-5">
++              {ABOUT_STATS.map(({ num, label, accent }) => (
++                <div key={label} className={`flex items-center gap-5 p-5 rounded-2xl bg-slate-900/60 border border-slate-700/50`}>
++                  <div className="text-3xl font-black min-w-[4rem] text-center" style={{ color: ACCENT_STYLES[accent].text }}>{num}</div>
++                  <p className="text-slate-300 font-medium text-sm">{label}</p>
++                </div>
++              ))}
++            </div>
+           </div>
+         </div>
+       </section>
+ 
+-      {/* Footer */}
+-      <footer className="relative z-10 border-t border-slate-800 bg-slate-950 py-12">
+-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+-          <div className="flex items-center gap-2">
+-            <TrendingUp className="w-5 h-5 text-cyan-500" />
+-            <span className="font-semibold text-slate-300">Rank Analyzer Pro</span>
++      <section id="faq" className="relative z-10 border-t border-slate-900/60 bg-slate-950 py-24">
++        <div className="mx-auto max-w-5xl px-6">
++          <div className="mb-12 text-center">
++            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-400">
++              FAQ
++            </div>
++            <h2 className="mb-4 text-4xl font-extrabold text-slate-100 md:text-5xl">Everything prospects ask before they start</h2>
++            <p className="mx-auto max-w-2xl text-lg text-slate-400">
++              Answers about billing, store support, and plan limits so you know what to expect before you start tracking.
++            </p>
++          </div>
++          <div className="space-y-4">
++            {FAQS.map(({ question, answer }) => (
++              <details
++                key={question}
++                className="group rounded-3xl border border-slate-900 bg-slate-900/60 p-6 shadow-lg open:border-blue-500/30 open:bg-slate-900/80"
++              >
++                <summary className="cursor-pointer list-none pr-8 text-left text-lg font-bold text-slate-100 marker:hidden">
++                  {question}
++                  <span className="float-right text-blue-400 transition-transform group-open:rotate-45">+</span>
++                </summary>
++                <p className="mt-4 max-w-3xl text-sm leading-relaxed text-slate-400">{answer}</p>
++              </details>
++            ))}
+           </div>
+-          
+-          <div className="flex items-center gap-6 text-sm text-slate-500">
+-            <button onClick={onOpenPrivacy} className="hover:text-cyan-400 transition-colors">Privacy Policy</button>
+-            <button onClick={onOpenTerms} className="hover:text-cyan-400 transition-colors">Terms of Service</button>
++        </div>
++      </section>
++
++      {/* Final CTA */}
++      <section className="relative z-10 py-24 mb-12">
++        <div className="max-w-5xl mx-auto px-6">
++          <div className="relative rounded-3xl p-10 md:p-16 text-center overflow-hidden border border-blue-500/20 bg-slate-900/80 shadow-2xl">
++            {/* CTA Background Glows */}
++            <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-900/40 via-slate-900/0 to-slate-900/0 pointer-events-none" />
++            <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-500/10 blur-[80px] pointer-events-none" />
++            
++            <h2 className="relative text-3xl md:text-5xl font-extrabold text-white mb-6">
++              Ready to grow your app organically?
++            </h2>
++            <p className="relative text-lg text-slate-300 mb-10 max-w-2xl mx-auto">
++              Use {BRAND_NAME} to discover untapped keywords, monitor rank movement, and keep your ASO workflow in one place.
++            </p>
++            <button
++              onClick={onGetStarted}
++              className="relative inline-flex items-center justify-center gap-3 px-10 py-5 rounded-xl bg-gradient-to-r from-blue-500 to-blue-500 hover:from-blue-400 hover:to-blue-400 text-black font-extrabold text-lg transition-all shadow-[0_0_40px_rgba(59, 130, 246,0.4)] hover:shadow-[0_0_60px_rgba(59, 130, 246,0.6)] hover:-translate-y-1"
++            >
++              <Zap className="w-5 h-5 fill-black" />
++              Track Your First App Free
++            </button>
++            <p className="relative text-sm text-slate-500 mt-6 font-medium">No credit card required to start searching.</p>
++          </div>
++        </div>
++      </section>
++
++      {/* Footer */}
++      <footer className="relative z-10 border-t border-slate-900 bg-slate-950">
++        <div className="max-w-7xl mx-auto px-6 py-16">
++          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
++            {/* Brand */}
++            <div className="col-span-2 md:col-span-1">
++              <button
++                type="button"
++                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
++                className="mb-4 flex items-center gap-2.5 rounded-xl text-left transition-opacity hover:opacity-90"
++                aria-label="Go to top"
++              >
++                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-400 to-blue-400 flex items-center justify-center">
++                  <Search className="w-4 h-4 text-black" strokeWidth={2.5} />
++                </div>
++                <span className="font-bold text-slate-200">{BRAND_NAME}</span>
++              </button>
++              <p className="text-sm text-slate-500 leading-relaxed">The affordable ASO intelligence tool built for indie developers and small teams.</p>
++              <div className="mt-5 flex flex-wrap gap-2">
++                {TRUST_BADGES.map(({ label, icon: Icon }) => (
++                  <div
++                    key={label}
++                    className="inline-flex items-center gap-2 rounded-full border border-slate-900 bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-400"
++                  >
++                    <Icon className="h-3.5 w-3.5 text-blue-400" />
++                    {label}
++                  </div>
++                ))}
++              </div>
++            </div>
++            {/* Product */}
++            <div>
++              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Product</p>
++              <div className="flex flex-col gap-3">
++                {[
++                  { label: 'Features', id: 'features' },
++                  { label: 'Pricing', id: 'pricing' },
++                  { label: 'How It Works', id: 'features' },
++                ].map(({ label, id }) => (
++                  <button key={label} onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })}
++                    className="text-sm text-slate-500 hover:text-blue-400 transition-colors text-left">{label}</button>
++                ))}
++                <button onClick={onGetStarted} className="text-sm text-slate-500 hover:text-blue-400 transition-colors text-left">Sign In</button>
++              </div>
++            </div>
++            {/* Company */}
++            <div>
++              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Company</p>
++              <div className="flex flex-col gap-3">
++                <button onClick={() => document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' })}
++                  className="text-sm text-slate-500 hover:text-blue-400 transition-colors text-left">About</button>
++                <a href="mailto:support@rankanalyzerpro.com" className="text-sm text-slate-500 hover:text-blue-400 transition-colors text-left">Contact</a>
++              </div>
++            </div>
++            {/* Legal */}
++            <div>
++              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Legal</p>
++              <div className="flex flex-col gap-3">
++                <button onClick={onOpenPrivacy} className="text-sm text-slate-500 hover:text-blue-400 transition-colors text-left">Privacy Policy</button>
++                <button onClick={onOpenTerms} className="text-sm text-slate-500 hover:text-blue-400 transition-colors text-left">Terms of Service</button>
++              </div>
++            </div>
+           </div>
+-          
+-          <div className="text-sm text-slate-600">
+-            &copy; {new Date().getFullYear()} Rank Analyzer Pro. All rights reserved.
++          <div className="pt-8 border-t border-slate-900 flex flex-col md:flex-row items-center justify-between gap-4">
++            <p className="text-sm text-slate-600">┬⌐ {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.</p>
++            <p className="text-xs text-slate-700">Not affiliated with Apple Inc. or Google LLC.</p>
+           </div>
+         </div>
+       </footer>

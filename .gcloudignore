@@ -1,0 +1,10 @@
+.git
+node_modules
+dist
+build
+.env
+.firebase
+.npm
+google-cloud-sdk
+gcloud.zip
+*.log

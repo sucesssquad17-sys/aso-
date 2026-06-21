@@ -1,0 +1,43 @@
+# .dockerignore — exclude files not needed in Docker builds
+
+# Dev / build artifacts
+node_modules/
+dist/
+*.log
+*.map
+
+# Data & local state
+data/
+temp-*
+tmp-*
+
+# Logs
+server-*.log
+server-*.err.log
+server-*.out.log
+dev-check.log
+prod-check.log
+firebase-debug.log
+
+# Environment files (secrets must be injected via Cloud Run env vars or Secret Manager)
+.env
+.env.local
+.env.*.local
+
+# Scripts for theme dev only
+theme-script*.cjs
+bg_classes*.txt
+
+# IDE & OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Firebase local config (not needed in container)
+.firebaserc
+firebase-debug.log

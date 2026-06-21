@@ -1,0 +1,83 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedInAs(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function protectedBillingFields() {
+      return [
+        'billingProvider',
+        'billingEmail',
+        'dodoCustomerId',
+        'dodoSubscriptionId',
+        'dodoProductId',
+        'subscriptionTier',
+        'isPremium',
+        'paypalSubscriptionId',
+        'paypalPlanId',
+        'subscriptionStatus',
+        'subscriptionCurrentPeriodEnd',
+        'subscriptionCancelAtPeriodEnd',
+        'subscriptionUpdatedAt'
+      ];
+    }
+
+    function protectedWorkspaceFields() {
+      return [
+        'bookmarks',
+        'trackedApps',
+        'trackedKeywords',
+        'rankHistory',
+        'appAnalysisSnapshots',
+        'competitorGroups',
+        'competitorGroupSnapshots',
+        'competitorTrackedKeywords',
+        'competitorRankHistory',
+        'trackingSchedule',
+        'alertRules',
+        'notificationSettings',
+        'migratedFromLocalAt',
+        'updatedAt'
+      ];
+    }
+
+    function createDoesNotSetBillingFields() {
+      return !request.resource.data.keys().hasAny(protectedBillingFields()) &&
+        !request.resource.data.keys().hasAny(protectedWorkspaceFields());
+    }
+
+    function updateDoesNotChangeBillingFields() {
+      return !request.resource.data.diff(resource.data).changedKeys().hasAny(protectedBillingFields()) &&
+        !request.resource.data.diff(resource.data).changedKeys().hasAny(protectedWorkspaceFields());
+    }
+
+    // By default, deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Allow users to read their own documents in a "users" collection
+    match /users/{userId} {
+      allow read: if isSignedInAs(userId);
+      allow create: if isSignedInAs(userId) && createDoesNotSetBillingFields();
+      allow update: if isSignedInAs(userId) && updateDoesNotChangeBillingFields();
+      allow delete: if isSignedInAs(userId);
+
+      match /alert_events/{eventId} {
+        allow read: if isSignedInAs(userId);
+        allow write: if false;
+      }
+
+      match /push_tokens/{tokenId} {
+        allow read, write: if false;
+      }
+
+      // Allow users to read/write other subcollections under their user document
+      match /{subcollection=**} {
+        allow read, write: if isSignedInAs(userId);
+      }
+    }
+  }
+}

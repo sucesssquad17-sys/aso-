@@ -1,0 +1,671 @@
+import React from "react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BarChart3,
+  Bell,
+  Briefcase,
+  Check,
+  CheckCircle2,
+  CircleDollarSign,
+  CreditCard,
+  ExternalLink,
+  FileText,
+  Gift,
+  Globe,
+  Headphones,
+  Loader2,
+  Lock,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Swords,
+  TrendingUp,
+  Users,
+  Zap,
+} from "lucide-react";
+import {
+  type BillingAccessState,
+  PUBLIC_BILLING_PLANS,
+  DEFAULT_PUBLIC_BILLING_PLAN_IDS,
+  getAvailableBillingIntervals,
+  getPlanBillingIntervals,
+  getPlanPriceLabel,
+  PRICING_INCLUDED_CAPABILITIES,
+  type BillingInterval,
+  type BillingPlanDefinition,
+  type BillingPlanId,
+  type BillingStatus,
+} from "../../lib/billing";
+import { getBillingPlanRank, getPlanLimitFeatureLines } from "../../lib/planLimits";
+
+interface UpgradePageProps {
+  billingStatus: BillingStatus | null;
+  accessState: BillingAccessState;
+  billingError: string | null;
+  isLoading: boolean;
+  isStartingCheckout: boolean;
+  isOpeningPortal: boolean;
+  currentUserLabel: string;
+  currentUserEmail?: string | null;
+  isPollingActivation?: boolean;
+  activationTimedOut?: boolean;
+  onStartCheckout: (planId: BillingPlanId, interval: BillingInterval) => void;
+  onOpenPortal: () => void;
+  onRetryBillingStatus: () => void;
+  onSignOut: () => void;
+  onReturn?: () => void;
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function getCurrentPlanId(billingStatus: BillingStatus | null): BillingPlanId {
+  if (!billingStatus?.isPremium) return "free";
+  const id = billingStatus.subscriptionTier;
+  if (id === "indie" || id === "starter" || id === "pro" || id === "agency") return id;
+  return "free";
+}
+
+function formatIntervalLabel(interval?: BillingInterval | null) {
+  return interval === "yearly" ? "Yearly" : "Monthly";
+}
+
+const FEATURE_ICONS: Record<string, React.ElementType> = {
+  "App Store & Google Play tracking": Globe,
+  "Keyword rank tracking": TrendingUp,
+  "Competitor analysis": Swords,
+  "Daily automated monitoring": Zap,
+  "Rank change alerts": Bell,
+  "Trend charts & history": BarChart3,
+  "Competitor battle mode": Users,
+  "PDF reports & data export": FileText,
+};
+
+const PLAN_ICONS: Record<string, React.ElementType> = {
+  "free": Gift,
+  "indie": Users,
+  "starter": Star,
+  "pro": Zap,
+  "agency": Briefcase,
+};
+
+function UsageBar({
+  used,
+  total,
+  label,
+}: {
+  used: number;
+  total: number | null;
+  label: string;
+}) {
+  const pct =
+    total === null
+      ? 0
+      : Math.min(100, Math.round((used / Math.max(total, 1)) * 100));
+  const isNear = pct >= 80;
+  const isAt = pct >= 100;
+
+  const textColor = isAt
+    ? "text-red-600 dark:text-red-400"
+    : isNear
+      ? "text-amber-600 dark:text-amber-400"
+      : "text-blue-600 dark:text-blue-400";
+      
+  const barColor = isAt
+    ? "bg-red-500"
+    : isNear
+      ? "bg-amber-400"
+      : "bg-blue-600";
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="text-[13px] font-medium text-slate-600 dark:text-slate-300">{label}</span>
+        <span className={`text-[13px] font-bold tabular-nums tracking-wide ${textColor}`}>
+          {used} / {total === null ? "∞" : total}
+        </span>
+      </div>
+      {total !== null && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+          <div
+            className={`h-1.5 rounded-full transition-all duration-700 ${barColor}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function UpgradePage({
+  billingStatus,
+  accessState,
+  billingError,
+  isLoading,
+  isStartingCheckout,
+  isOpeningPortal,
+  currentUserLabel,
+  currentUserEmail,
+  isPollingActivation = false,
+  activationTimedOut = false,
+  onStartCheckout,
+  onOpenPortal,
+  onRetryBillingStatus,
+  onSignOut,
+  onReturn,
+}: UpgradePageProps) {
+  const availableIntervals = getAvailableBillingIntervals(billingStatus);
+  const [selectedInterval, setSelectedInterval] = React.useState<BillingInterval>(
+    availableIntervals[0] || "monthly",
+  );
+
+  React.useEffect(() => {
+    if (!availableIntervals.includes(selectedInterval)) {
+      setSelectedInterval(availableIntervals[0] || "monthly");
+    }
+  }, [availableIntervals, selectedInterval]);
+
+  const currentPeriodEnd = formatDate(billingStatus?.currentPeriodEnd);
+  const availablePlans = new Set(
+    billingStatus?.availablePlans || DEFAULT_PUBLIC_BILLING_PLAN_IDS,
+  );
+  const billingConnected = Boolean(
+    billingStatus?.configured && billingStatus?.productConfigured,
+  );
+  const currentPlanId = getCurrentPlanId(billingStatus);
+  const currentPlanRank = getBillingPlanRank(currentPlanId);
+  const isPremium = billingStatus?.isPremium;
+  const pendingPlan =
+    PUBLIC_BILLING_PLANS.find((plan) => plan.id === billingStatus?.pendingPlanId) ||
+    null;
+  const isSelectionRequired = accessState === "selection_required";
+  const isActivating = accessState === "activating";
+  const showIntervalToggle = availableIntervals.length > 1;
+  const disablePlanSelection = isPollingActivation;
+  const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
+  const signedInAccount = currentUserEmail || currentUserLabel;
+
+  const renderCta = (plan: BillingPlanDefinition) => {
+    const isCurrentPlan = currentPlanId === plan.id;
+    const isPendingPlan = billingStatus?.pendingPlanId === plan.id;
+    const isDowngrade =
+      Boolean(isPremium) && getBillingPlanRank(plan.id) < currentPlanRank;
+    const supportsInterval =
+      plan.id === "free" ||
+      plan.contactOnly ||
+      getPlanBillingIntervals(billingStatus, plan.id).includes(selectedInterval);
+    const canChoose =
+      plan.id !== "free" &&
+      !plan.contactOnly &&
+      availablePlans.has(plan.id) &&
+      billingConnected &&
+      supportsInterval &&
+      !isDowngrade;
+
+    const highlightCta =
+      "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+    
+    const normalCta =
+      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 dark:border-blue-900 bg-transparent px-4 py-3 text-sm font-bold text-blue-600 dark:text-blue-400 transition-all hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-800 dark:hover:bg-blue-950/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+    
+    const currentCta =
+      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-600 bg-transparent px-4 py-3 text-sm font-bold text-blue-600 dark:text-blue-400 cursor-default";
+
+    if (disablePlanSelection) {
+      return (
+        <button
+          type="button"
+          disabled
+          className={plan.highlight ? highlightCta : normalCta}
+        >
+          {isPendingPlan ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Activating trial
+            </>
+          ) : (
+            "Please wait"
+          )}
+        </button>
+      );
+    }
+
+    if (isCurrentPlan) {
+      return (
+        <div className={currentCta}>
+          Current plan
+        </div>
+      );
+    }
+
+    if (plan.contactOnly) {
+      return (
+        <a href="mailto:vantalumstudio@gmail.com" className={normalCta}>
+          <Mail className="h-4 w-4" />
+          {plan.cta}
+        </a>
+      );
+    }
+
+    if (plan.id === "free") {
+      if (isDowngrade) {
+        return (
+          <button type="button" disabled className={normalCta}>
+            Downgrade unavailable
+          </button>
+        );
+      }
+
+      return (
+        <button type="button" onClick={onReturn} className={normalCta}>
+          <ArrowLeft className="h-4 w-4" />
+          {plan.cta}
+        </button>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => onStartCheckout(plan.id, selectedInterval)}
+        disabled={isStartingCheckout || !canChoose}
+        className={plan.highlight ? highlightCta : normalCta}
+      >
+        {isStartingCheckout ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : null}
+        {isDowngrade ? "Downgrade unavailable" : plan.cta}
+      </button>
+    );
+  };
+
+  return (
+    <div className="relative min-h-screen w-full bg-[#fafcff] dark:bg-slate-950">
+      {/* ── Decorative Background ────────────────────────────────────────── */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-[10%] top-0 h-[600px] w-[600px] rounded-full bg-gradient-to-br from-blue-100/50 to-transparent opacity-60 blur-3xl dark:from-blue-900/20" />
+        <div className="absolute -right-[5%] top-[5%] h-[700px] w-[700px] rounded-full bg-gradient-to-bl from-blue-50/60 to-transparent opacity-80 blur-3xl dark:from-blue-900/10" />
+        <div className="absolute left-0 top-0 h-[500px] w-full" style={{ backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+      </div>
+
+      {/* ── Sticky nav bar ────────────────────────────────────────────────── */}
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/50 dark:border-slate-800/50 bg-white/80 dark:bg-slate-950/80 px-4 py-3 backdrop-blur-md sm:px-6">
+        <div className="flex items-center gap-2">
+          {canReturnToWorkspace ? (
+            <button
+              onClick={onReturn}
+              className="group inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+              Back to workspace
+            </button>
+          ) : (
+            <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300">
+              <Lock className="h-3.5 w-3.5" />
+              {isActivating ? "Trial activation pending" : "Plan selection required"}
+            </div>
+          )}
+          {signedInAccount ? (
+            <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 sm:inline-flex">
+              <Mail className="h-3.5 w-3.5" />
+              {signedInAccount}
+            </div>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2">
+          {billingStatus?.environment === "test" && (
+            <span className="rounded-md bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 shadow-sm border border-amber-200/50 dark:bg-amber-900/20 dark:border-amber-800/50 dark:text-amber-500">
+              Test mode
+            </span>
+          )}
+          {accessState !== "active" ? (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white"
+            >
+              Use different account
+            </button>
+          ) : null}
+          {accessState === "active" && billingStatus?.customerPortalAvailable && (
+            <button
+              onClick={onOpenPortal}
+              disabled={isOpeningPortal}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-white disabled:opacity-50"
+            >
+              {isOpeningPortal ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <ExternalLink className="h-3.5 w-3.5" />
+              )}
+              Billing portal
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-24 pt-16 sm:px-6 md:px-10">
+        {/* ── Hero ──────────────────────────────────────────────────────── */}
+        <div className="mb-14 text-center">
+          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-slate-900 dark:text-blue-400">
+            <Sparkles className="h-3 w-3" />
+            Upgrade your workspace
+          </div>
+          <h1 className="mt-8 text-4xl font-black leading-[1.1] tracking-tight text-slate-900 dark:text-white sm:text-[3.5rem]">
+            Pick the depth that fits
+            <br />
+            <span className="mt-2 inline-block text-blue-600 dark:text-blue-500">
+              your portfolio.
+            </span>
+          </h1>
+          <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-slate-500 dark:text-slate-400">
+            Every plan includes all features. Only tracked apps, competitor groups, and keyword capacity scale per tier.
+          </p>
+        </div>
+
+        {/* ── Current plan + usage ───────────────────────────────────────── */}
+        {showIntervalToggle ? (
+          <div className="mb-12 flex justify-center">
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              {availableIntervals.map((interval) => {
+                const isActive = selectedInterval === interval;
+                return (
+                  <button
+                    key={interval}
+                    type="button"
+                    onClick={() => setSelectedInterval(interval)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                      isActive
+                        ? "bg-blue-600 text-white"
+                        : "text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white"
+                    }`}
+                  >
+                    {formatIntervalLabel(interval)}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mb-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {/* Plan card */}
+          <div className="flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+              Your membership
+            </p>
+            <p className="mt-4 text-[1.75rem] font-black tracking-tight text-slate-900 dark:text-white">
+              {isActivating
+                ? "Activating trial"
+                : isSelectionRequired
+                ? "Choose a plan"
+                : !billingStatus?.isPremium
+                ? "7-day trial"
+                : PUBLIC_BILLING_PLANS.find((p) => p.id === currentPlanId)?.name ||
+                  "Premium"}
+            </p>
+            {isSelectionRequired ? (
+              <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
+                Select a subscription to start your 7-day trial and unlock the workspace.
+              </p>
+            ) : null}
+            {isActivating ? (
+              <div className="mt-3 space-y-3">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  We&apos;re waiting for billing to activate your workspace access.
+                </p>
+                {pendingPlan ? (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                    <CreditCard className="h-3.5 w-3.5" />
+                    {pendingPlan.name}
+                    {billingStatus?.pendingInterval
+                      ? ` · ${formatIntervalLabel(billingStatus.pendingInterval)}`
+                      : ""}
+                  </div>
+                ) : null}
+                {activationTimedOut ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                    Activation is taking longer than expected. Retry the status check or choose a plan again.
+                    <div className="mt-3">
+                      <button
+                        type="button"
+                        onClick={onRetryBillingStatus}
+                        className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-slate-900 dark:text-amber-300 dark:hover:bg-amber-950/40"
+                      >
+                        Refresh billing status
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            {currentPeriodEnd && (
+              <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">Renews {currentPeriodEnd}</p>
+            )}
+            <div className="mt-5 self-start">
+              <div
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${
+                  isPremium
+                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+                    : isActivating
+                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+                    : "bg-[#e0f2fe] text-[#0284c7] dark:bg-blue-900/30 dark:text-blue-400"
+                }`}
+              >
+                <Check className="h-3 w-3" />
+                {isSelectionRequired
+                  ? "Selection required"
+                  : isActivating
+                    ? isPollingActivation
+                      ? "Activating"
+                      : activationTimedOut
+                        ? "Retry available"
+                        : "Pending"
+                  : isPremium
+                  ? billingStatus?.subscriptionStatus?.replace(/_/g, " ") || "Active"
+                  : "Trial"}
+              </div>
+            </div>
+
+            <div className="flex-1" />
+
+            {(billingError || !billingConnected) && (
+              <div className="mt-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-900/50">
+                <Headphones className="h-5 w-5 shrink-0 text-blue-500" />
+                <p className="text-xs font-medium leading-relaxed text-slate-600 dark:text-slate-300">
+                  {isLoading
+                    ? "Refreshing billing…"
+                    : billingError || "Contact support to activate billing access."}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Usage bars */}
+          {accessState === "active" && billingStatus?.usage && billingStatus?.planLimits ? (
+            <div className="flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+              <p className="mb-6 text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Capacity usage
+              </p>
+              <div className="flex flex-1 flex-col justify-center space-y-7">
+                <UsageBar
+                  used={billingStatus.usage.trackedApps}
+                  total={billingStatus.planLimits.trackedApps}
+                  label="Tracked apps"
+                />
+                <UsageBar
+                  used={billingStatus.usage.competitorGroups}
+                  total={billingStatus.planLimits.competitorGroups}
+                  label="Competitor groups"
+                />
+                <UsageBar
+                  used={billingStatus.usage.activeTrackedKeywords}
+                  total={billingStatus.planLimits.trackedKeywords}
+                  label="Active tracked keywords"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2" />
+          )}
+        </div>
+
+        {/* ── Everything included ───────────────────────────────────────── */}
+        <div className="relative mb-12 overflow-hidden rounded-[24px] border border-slate-200/60 bg-slate-50/50 p-8 shadow-sm dark:border-slate-800 dark:bg-slate-900/50 sm:p-10 md:p-12">
+          {/* Subtle gradient background inside */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f0f7ff] to-transparent dark:from-blue-950/20" />
+          
+          <div className="relative z-10">
+            <div className="mb-10 flex flex-col items-center text-center">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-slate-900 dark:text-blue-400">
+                Every plan includes
+              </div>
+              <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-900 dark:text-white md:text-[2rem]">
+                All features. Every tier.
+              </h2>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                Features are never gated. Only tracked apps, competitor groups, and keyword slots scale.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+              {PRICING_INCLUDED_CAPABILITIES.map((cap) => {
+                const Icon = FEATURE_ICONS[cap.label] || CheckCircle2;
+                return (
+                  <div key={cap.label} className="flex items-start gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-slate-200/60 bg-white text-blue-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-blue-400">
+                      <Icon className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <div className="text-[13px] font-bold text-slate-900 dark:text-white">{cap.label}</div>
+                      <div className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">{cap.sub}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Pricing Cards ────────────────────────────────────────────────── */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
+          {PUBLIC_BILLING_PLANS.map((plan) => {
+            const isHighlight = plan.highlight;
+            const priceLabel = getPlanPriceLabel(billingStatus, plan, selectedInterval);
+            const featureLines = getPlanLimitFeatureLines(plan.id as BillingPlanId);
+            const PlanIcon = PLAN_ICONS[plan.id] || CheckCircle2;
+
+            return (
+              <div
+                key={plan.id}
+                className={`relative flex h-full flex-col rounded-[20px] bg-white shadow-sm transition-all dark:bg-slate-900/90 backdrop-blur-sm ${
+                  isHighlight
+                    ? "border-2 border-blue-600 px-6 pb-6 pt-10 shadow-xl shadow-blue-500/10 z-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
+                    : "border border-slate-200 p-6 dark:border-slate-800 hover:shadow-md"
+                }`}
+              >
+                {/* Popular banner */}
+                {isHighlight && (
+                  <div className="absolute inset-x-0 top-0 flex h-[26px] items-center justify-center rounded-t-[18px] bg-blue-600">
+                    <span className="text-[9px] font-bold uppercase tracking-widest text-white">Popular</span>
+                  </div>
+                )}
+
+                {/* Icon + Name */}
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl border ${
+                      isHighlight
+                        ? "border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-400"
+                        : "border-slate-100 bg-slate-50 text-blue-600 dark:border-slate-800/80 dark:bg-slate-800/50 dark:text-blue-400"
+                    }`}
+                  >
+                    <PlanIcon className="h-4 w-4" />
+                  </div>
+                  <div className={`text-base font-bold ${isHighlight ? "text-slate-900 dark:text-white" : "text-slate-900 dark:text-white"}`}>
+                    {plan.name}
+                  </div>
+                </div>
+
+                {/* Price */}
+                <div className="mt-5">
+                  <div className="text-[2.25rem] font-black leading-none tracking-tight text-slate-900 dark:text-white">
+                    {(priceLabel || "Custom").replace("/mo", "")}
+                  </div>
+                  <div className="mt-2 min-h-[1.25rem] text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    {!plan.contactOnly &&
+                      `/mo · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
+                    {plan.contactOnly && "custom terms"}
+                  </div>
+                </div>
+
+                {/* Description */}
+                <p className="mt-5 min-h-[3rem] text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  {plan.description}
+                </p>
+
+                {/* Divider */}
+                <div className="my-5 h-px w-full bg-slate-100 dark:bg-slate-800" />
+
+                {/* Features */}
+                <div className="flex-1 space-y-3.5">
+                  {featureLines.map((line) => (
+                    <div
+                      key={line}
+                      className="flex items-start gap-3 text-[12px] font-medium text-slate-700 dark:text-slate-300"
+                    >
+                      <Check
+                        className="mt-0.5 h-[14px] w-[14px] shrink-0 text-blue-600 dark:text-blue-400"
+                        strokeWidth={2.5}
+                      />
+                      <span className="leading-snug">{line}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* CTA */}
+                <div className="mt-8">{renderCta(plan)}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Footer ────────────────────────────────────────────────────── */}
+        <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-xs font-medium text-slate-500 dark:text-slate-400">
+          <span className="flex items-center gap-2">
+            <Headphones className="h-3.5 w-3.5 text-slate-400" />
+            <span>Questions? </span>
+            <a
+              href="mailto:vantalumstudio@gmail.com"
+              className="text-slate-700 underline-offset-2 transition-colors hover:text-slate-900 hover:underline dark:text-slate-300 dark:hover:text-white"
+            >
+              Contact support
+            </a>
+          </span>
+          <span className="hidden sm:inline">·</span>
+          <span className="flex items-center gap-2">
+            <CircleDollarSign className="h-3.5 w-3.5 text-slate-400" />
+            Prices in USD. Cancel anytime.
+          </span>
+          <span className="hidden sm:inline">·</span>
+          <span className="flex items-center gap-2">
+            <Lock className="h-3.5 w-3.5 text-slate-400" />
+            Secure checkout via Stripe.
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
