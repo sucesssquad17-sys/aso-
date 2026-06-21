@@ -30,6 +30,7 @@ import {
   type Messaging as FirebaseAdminMessaging,
 } from 'firebase-admin/messaging';
 import {
+  type CollectionReference,
   FieldValue,
   getFirestore as getAdminFirestore,
   type DocumentData,
@@ -47,6 +48,10 @@ import {
   refreshTrackedKeywordRecord as refreshSharedTrackedKeywordRecord,
   TRACKING_HISTORY_LIMIT as SHARED_TRACKING_HISTORY_LIMIT,
 } from './src/lib/backendTracking';
+import {
+  DEFAULT_GLOBAL_TRACKING_TIME,
+  GLOBAL_TRACKING_TIMEZONE,
+} from './src/lib/trackingTime';
 import {
   BILLING_PLAN_LIMITS,
   TRACKED_KEYWORD_LEGACY_CREATED_AT,
@@ -364,6 +369,8 @@ type UserTrackingDocument = {
   subscriptionTier?: string;
   subscriptionInterval?: BillingInterval;
   isPremium?: boolean;
+  paypalSubscriptionId?: string;
+  paypalPlanId?: string;
   subscriptionStatus?: BillingSubscriptionStatus;
   pendingPlanId?: BillingPlanId;
   pendingInterval?: BillingInterval;
@@ -463,16 +470,18 @@ const TRACKING_HISTORY_LIMIT = 5000;
 const EMBEDDED_TRACKING_HISTORY_LIMIT = 1200;
 const USER_RANK_HISTORY_ARCHIVE_COLLECTION = 'rank_history';
 const USER_COMPETITOR_RANK_HISTORY_ARCHIVE_COLLECTION = 'competitor_rank_history';
+const USER_ALERT_EVENTS_COLLECTION = 'alert_events';
+const USER_COMPETITOR_ASO_DIFFS_COLLECTION = 'competitor_aso_diffs';
+const USER_PUSH_TOKENS_COLLECTION = 'push_tokens';
 const TRACKING_REFRESH_CONCURRENCY = 1;
 const DEFAULT_RANKING_DEPTH = 100;
 const TRACKED_KEYWORD_RANKING_DEPTH = 100;
 const MAX_RANKING_DEPTH = 100;
-const GLOBAL_TRACKING_TIMEZONE = 'Asia/Kolkata';
 const GLOBAL_TRACKING_HOURS = [9] as const;
 const DEFAULT_TRACKING_SCHEDULE: TrackingSchedule = {
   enabled: false,
-  time: '09:00',
-  timezone: 'UTC',
+  time: DEFAULT_GLOBAL_TRACKING_TIME,
+  timezone: GLOBAL_TRACKING_TIMEZONE,
 };
 const GLOBAL_TRACKING_WATCHDOG_RETRY_INTERVAL_MINUTES = 60;
 const GLOBAL_TRACKING_WATCHDOG_RUNNING_GRACE_MINUTES = 120;
@@ -5363,6 +5372,55 @@ async function verifyFirebaseRequest(req: express.Request) {
   }
 }
 
+async function deleteCollectionDocuments(
+  collectionRef: CollectionReference<DocumentData>,
+  batchSize = 200,
+) {
+  while (true) {
+    const snapshot = await collectionRef.limit(batchSize).get();
+    if (snapshot.empty) {
+      return;
+    }
+
+    const batch = collectionRef.firestore.batch();
+    snapshot.docs.forEach((docSnapshot) => {
+      batch.delete(docSnapshot.ref);
+    });
+    await batch.commit();
+
+    if (snapshot.size < batchSize) {
+      return;
+    }
+  }
+}
+
+function hasRetainedAccountState(data: UserTrackingDocument | undefined) {
+  if (!data) {
+    return false;
+  }
+
+  return [
+    data.billingProvider,
+    data.billingEmail,
+    data.dodoCustomerId,
+    data.dodoSubscriptionId,
+    data.dodoProductId,
+    data.subscriptionTier,
+    data.subscriptionInterval,
+    data.isPremium,
+    data.paypalSubscriptionId,
+    data.paypalPlanId,
+    data.subscriptionStatus,
+    data.pendingPlanId,
+    data.pendingInterval,
+    data.subscriptionCurrentPeriodEnd,
+    data.subscriptionCancelAtPeriodEnd,
+    data.subscriptionUpdatedAt,
+    data.legalAcceptedAt,
+    data.legalVersion,
+  ].some((value) => value !== undefined && value !== null && value !== '');
+}
+
 async function mineCompetitorTerms(
   context: KeywordContext,
   mode: DiscoveryMode,
@@ -6218,6 +6276,66 @@ async function startServer() {
     }
   });
 
+  app.post('/api/account/delete', async (req, res) => {
+    try {
+      const decodedToken = await verifyFirebaseRequest(req);
+      const adminDb = getFirebaseAdminDb();
+      const adminAuth = getFirebaseAdminAuthClient();
+      if (!adminDb || !adminAuth) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
+      const snapshot = await userDocRef.get();
+      const userData = snapshot.data() as UserTrackingDocument | undefined;
+
+      await Promise.all([
+        deleteCollectionDocuments(userDocRef.collection(USER_ALERT_EVENTS_COLLECTION)),
+        deleteCollectionDocuments(
+          userDocRef.collection(USER_COMPETITOR_ASO_DIFFS_COLLECTION),
+        ),
+        deleteCollectionDocuments(
+          userDocRef.collection(USER_RANK_HISTORY_ARCHIVE_COLLECTION),
+        ),
+        deleteCollectionDocuments(
+          userDocRef.collection(USER_COMPETITOR_RANK_HISTORY_ARCHIVE_COLLECTION),
+        ),
+        deleteCollectionDocuments(userDocRef.collection(USER_PUSH_TOKENS_COLLECTION)),
+      ]);
+
+      if (hasRetainedAccountState(userData)) {
+        const deleteWorkspaceDataPayload: DocumentData = {
+          bookmarks: FieldValue.delete(),
+          trackedApps: FieldValue.delete(),
+          trackedKeywords: FieldValue.delete(),
+          rankHistory: FieldValue.delete(),
+          appAnalysisSnapshots: FieldValue.delete(),
+          competitorGroups: FieldValue.delete(),
+          competitorGroupSnapshots: FieldValue.delete(),
+          competitorTrackedKeywords: FieldValue.delete(),
+          competitorRankHistory: FieldValue.delete(),
+          competitorAsoLatestSnapshots: FieldValue.delete(),
+          trackingSchedule: FieldValue.delete(),
+          alertRules: FieldValue.delete(),
+          notificationSettings: FieldValue.delete(),
+          migratedFromLocalAt: FieldValue.delete(),
+          updatedAt: new Date().toISOString(),
+        };
+        await userDocRef.set(
+          deleteWorkspaceDataPayload,
+          { merge: true },
+        );
+      } else if (snapshot.exists) {
+        await userDocRef.delete();
+      }
+
+      await adminAuth.deleteUser(decodedToken.uid);
+      res.json({ success: true });
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to delete account.');
+    }
+  });
+
   app.put('/api/user-state', async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
@@ -6297,7 +6415,7 @@ async function startServer() {
       await adminDb
         .collection('users')
         .doc(decodedToken.uid)
-        .collection('push_tokens')
+        .collection(USER_PUSH_TOKENS_COLLECTION)
         .doc(tokenId)
         .set({
           token,

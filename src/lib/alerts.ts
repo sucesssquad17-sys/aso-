@@ -390,7 +390,7 @@ export function describeAlertCondition(condition: AlertCondition): string {
 
 export function buildAlertRuleSummary(rule: AlertRule): string {
   const scope =
-    rule.countries.length === 1
+    rule.countries.length === 1 && rule.countries[0]
       ? rule.countries[0].toUpperCase()
       : `${rule.countries.length} countries`;
   return `${rule.conditions.map(describeAlertCondition).join(", ")} in ${scope}`;

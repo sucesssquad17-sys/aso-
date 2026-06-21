@@ -132,7 +132,6 @@ import {
   SEARCH_CACHE_VERSION,
   TRACKED_KEYWORD_RANKING_DEPTH,
   TRACKED_KEYWORD_REFRESH_CONCURRENCY,
-  TRACKING_CHART_TIMEZONE,
   TRACKING_HISTORY_LIMIT,
   type ApiErrorPayload,
   type AppAnalysisSnapshot,
@@ -190,12 +189,17 @@ import {
 } from "./workspacePrimitives";
 import ReportsWorkspace from "../reports/ReportsWorkspace";
 import BrandMark from "../../components/BrandMark";
+import {
+  DEFAULT_GLOBAL_TRACKING_TIME,
+  GLOBAL_TRACKING_TIMEZONE,
+  TRACKING_CHART_TIMEZONE,
+} from "../../lib/trackingTime";
 
 function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
     enabled: false,
-    time: "09:00",
-    timezone: "Asia/Kolkata",
+    time: DEFAULT_GLOBAL_TRACKING_TIME,
+    timezone: GLOBAL_TRACKING_TIMEZONE,
   };
 }
 
@@ -1227,8 +1231,8 @@ function buildDemoWorkspaceState() {
     ],
     trackingSchedule: {
       enabled: true,
-      time: "09:00",
-      timezone: "Asia/Kolkata",
+      time: DEFAULT_GLOBAL_TRACKING_TIME,
+      timezone: GLOBAL_TRACKING_TIMEZONE,
       lastRunAt: hoursAgo(2),
       lastRunKey: hoursAgo(2).slice(0, 10),
     },
@@ -2494,11 +2498,11 @@ function normalizeTrackingScheduleState(
     time:
       typeof schedule?.time === "string" && /^\d{2}:\d{2}$/.test(schedule.time.trim())
         ? schedule.time.trim()
-        : "09:00",
+        : DEFAULT_GLOBAL_TRACKING_TIME,
     timezone:
       typeof schedule?.timezone === "string" && schedule.timezone.trim()
         ? schedule.timezone.trim()
-        : "Asia/Kolkata",
+        : GLOBAL_TRACKING_TIMEZONE,
     lastRunAt: schedule?.lastRunAt,
     lastRunKey: schedule?.lastRunKey,
   };

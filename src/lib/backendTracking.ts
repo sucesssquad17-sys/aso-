@@ -6,6 +6,10 @@ import {
   type App as FirebaseAdminApp,
 } from 'firebase-admin/app';
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
+import {
+  DEFAULT_GLOBAL_TRACKING_TIME,
+  GLOBAL_TRACKING_TIMEZONE,
+} from './trackingTime';
 
 export type StoreType = 'android' | 'ios';
 export type TrackedKeywordStatus = 'pending' | 'ok' | 'not_ranked' | 'error';
@@ -91,8 +95,6 @@ export type TrackingStateBase = {
   schedule: TrackingSchedule;
 };
 
-export const GLOBAL_TRACKING_TIMEZONE = 'Asia/Kolkata';
-export const DEFAULT_GLOBAL_TRACKING_TIME = '09:00';
 export const TRACKING_REFRESH_CONCURRENCY = 1;
 export const TRACKED_KEYWORD_RANKING_DEPTH = 100;
 export const TRACKING_HISTORY_LIMIT = 5000;
@@ -340,7 +342,12 @@ async function mapWithConcurrency<T, R>(
         return;
       }
 
-      results[currentIndex] = await worker(items[currentIndex], currentIndex);
+      const currentItem = items[currentIndex];
+      if (currentItem === undefined) {
+        return;
+      }
+
+      results[currentIndex] = await worker(currentItem, currentIndex);
     }
   };
 

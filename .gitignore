@@ -2,6 +2,7 @@ node_modules/
 build/
 dist/
 coverage/
+.firebase/
 .DS_Store
 *.log
 .env*
@@ -11,9 +12,5 @@ google-cloud-sdk/
 *.tar.gz
 *.js
 *.mjs
-*.json
-!package.json
-!package-lock.json
-!tsconfig.json
-!firebase.json
-!firestore.indexes.json
+firebase-applet-config.json
+service-account*.json

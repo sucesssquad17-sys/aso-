@@ -21,6 +21,10 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getMessaging } from 'firebase-admin/messaging';
 import { normalizeCountryCode } from '../src/lib/countries';
 import {
+  DEFAULT_GLOBAL_TRACKING_TIME,
+  GLOBAL_TRACKING_TIMEZONE,
+} from '../src/lib/trackingTime';
+import {
   ALERT_CONDITION_LABELS,
   type AlertCondition,
   type AlertConditionType,
@@ -31,8 +35,6 @@ import {
   normalizeNotificationSettings,
 } from '../src/lib/alerts';
 import {
-  DEFAULT_GLOBAL_TRACKING_TIME,
-  GLOBAL_TRACKING_TIMEZONE,
   getGlobalTrackingRunKey as getSharedGlobalTrackingRunKey,
   getZonedDateParts as getSharedZonedDateParts,
   initializeFirebaseAdminFirestoreFromEnv,

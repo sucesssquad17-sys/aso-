@@ -52,7 +52,6 @@ import {
 import { toast } from "sonner";
 import {
   createUserWithEmailAndPassword,
-  deleteUser,
   getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -61,12 +60,17 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
-import { deleteDoc, doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { getToken, onMessage } from "firebase/messaging";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LandingPage from "./components/LandingPage";
 import ThemeToggle from "./components/ThemeToggle";
 import { AuthenticatedApp as WorkspaceAuthenticatedApp } from "./features/app/AuthenticatedWorkspace";
+import {
+  DEFAULT_GLOBAL_TRACKING_TIME,
+  GLOBAL_TRACKING_TIMEZONE,
+  TRACKING_CHART_TIMEZONE,
+} from "./lib/trackingTime";
 import {
   clearPendingGoogleRedirectAttempt,
   createAuthAttemptId,
@@ -265,7 +269,6 @@ const DISCOVERY_CACHE_TTL = 1000 * 60 * 60 * 12;
 const DISCOVERY_CACHE_VERSION = "v11";
 const SEARCH_CACHE_VERSION = "v2";
 const TRACKING_HISTORY_LIMIT = 2000;
-const TRACKING_CHART_TIMEZONE = "Asia/Kolkata";
 const API_REQUEST_TIMEOUT_MS = 45000;
 const DISCOVERY_FAST_TIMEOUT_MS = 240000;
 const DISCOVERY_DEEP_TIMEOUT_MS = 420000;
@@ -274,8 +277,8 @@ const LEGAL_VERSION = "2026-05-26";
 function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
     enabled: false,
-    time: "09:00",
-    timezone: getBrowserTimeZone(),
+    time: DEFAULT_GLOBAL_TRACKING_TIME,
+    timezone: GLOBAL_TRACKING_TIMEZONE,
   };
 }
 
@@ -7576,43 +7579,34 @@ export default function App() {
       toast.error("No authenticated account found.");
       return;
     }
-    const userDocRef = doc(db, "users", user.uid);
-    let backupState: UserAppStateDocument | null = null;
     try {
-      const snapshot = await getDoc(userDocRef);
-      backupState = snapshot.exists()
-        ? (snapshot.data() as UserAppStateDocument)
-        : null;
-      await deleteDoc(userDocRef);
+      const token = await user.getIdToken();
+      await fetchJson<{ success: boolean }>(
+        "/api/account/delete",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+        { timeoutMs: 60000 },
+      );
       try {
-        await deleteUser(user);
-        setEmail("");
-        setPassword("");
-        setAuthError(null);
-        setPreAuthLegalAccepted(false);
-        setAuthView("login");
-        safeStorage.removeItem("aso-bookmarks");
-        safeStorage.removeItem("aso-tracked-keywords");
-        safeStorage.removeItem("aso-rank-history");
-        toast.success("Account deleted.");
-      } catch (error) {
-        if (backupState) {
-          await setDoc(userDocRef, backupState, { merge: true });
-        }
-        throw error;
+        await signOut(auth);
+      } catch (signOutError) {
+        console.warn("Failed to sign out after account deletion", signOutError);
       }
+      setEmail("");
+      setPassword("");
+      setAuthError(null);
+      setPreAuthLegalAccepted(false);
+      setAuthView("login");
+      safeStorage.removeItem("aso-bookmarks");
+      safeStorage.removeItem("aso-tracked-keywords");
+      safeStorage.removeItem("aso-rank-history");
+      toast.success("Account deleted.");
     } catch (error) {
       logError(error, { context: "handleDeleteAccount", uid: user.uid });
-      const code =
-        typeof error === "object" && error && "code" in error
-          ? String((error as { code?: unknown }).code)
-          : "";
-      if (code === "auth/requires-recent-login") {
-        toast.error(
-          "Re-authenticate by signing in again, then retry account deletion.",
-        );
-        return;
-      }
       toast.error("Failed to delete account.");
     }
   };

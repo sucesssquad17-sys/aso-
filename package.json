@@ -14,6 +14,8 @@
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
     "lint": "tsc --noEmit",
+    "lint:strict": "tsc -p tsconfig.strict.json --noEmit",
+    "check:tracking-timezone": "tsx scripts/check-tracking-timezone.ts",
     "deploy:hosting": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {

@@ -1,0 +1,25 @@
+{
+  "entities": {
+    "RankHistory": {
+      "title": "RankHistory",
+      "description": "Historical ranking data for an app and keyword",
+      "type": "object",
+      "properties": {
+        "appId": { "type": "string", "description": "The unique ID of the app" },
+        "keyword": { "type": "string", "description": "The search term" },
+        "store": { "type": "string", "enum": ["android", "ios"], "description": "The app store" },
+        "country": { "type": "string", "description": "The country code" },
+        "rank": { "type": "integer", "description": "The rank (1-100, or -1 for not found)" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "When the rank was checked" },
+        "uid": { "type": "string", "description": "The user who checked the rank" }
+      },
+      "required": ["appId", "keyword", "store", "country", "rank", "timestamp", "uid"]
+    }
+  },
+  "firestore": {
+    "/rank_history/{historyId}": {
+      "schema": "RankHistory",
+      "description": "Collection of ranking history entries"
+    }
+  }
+}

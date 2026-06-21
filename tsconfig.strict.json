@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": false,
+    "strict": true,
+    "noImplicitAny": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false
+  },
+  "include": [
+    "src/firebase.ts",
+    "src/vite-env.d.ts",
+    "src/lib/alerts.ts",
+    "src/lib/backendTracking.ts",
+    "src/lib/billing.ts",
+    "src/lib/countries.ts",
+    "src/lib/planLimits.ts",
+    "src/lib/trackingTime.ts",
+    "scripts/check-tracking-timezone.ts"
+  ]
+}

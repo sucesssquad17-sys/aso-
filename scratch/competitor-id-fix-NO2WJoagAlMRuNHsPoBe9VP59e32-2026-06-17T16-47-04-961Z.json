@@ -1,0 +1,412 @@
+{
+  "before": {
+    "competitorTrackedKeywords": [
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz:us",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 19,
+            "lastChecked": "2026-06-17T03:30:42.853Z",
+            "lastCheckStatus": "ok"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 13,
+            "lastChecked": "2026-06-17T03:30:42.853Z",
+            "lastCheckStatus": "ok"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:37.955Z",
+        "updatedAt": "2026-06-17T03:30:42.853Z",
+        "lastCheckedAt": "2026-06-17T03:30:42.853Z"
+      },
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz-assistant:us",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz assistant",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 14,
+            "lastChecked": "2026-06-17T03:30:42.501Z",
+            "lastCheckStatus": "ok"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 13,
+            "lastChecked": "2026-06-17T03:30:42.501Z",
+            "lastCheckStatus": "ok"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:38.374Z",
+        "updatedAt": "2026-06-17T03:30:42.501Z",
+        "lastCheckedAt": "2026-06-17T03:30:42.501Z"
+      },
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz-lin:us",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz lin",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 17,
+            "lastChecked": "2026-06-17T03:30:42.128Z",
+            "lastCheckStatus": "ok"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 22,
+            "lastChecked": "2026-06-17T03:30:42.128Z",
+            "lastCheckStatus": "ok"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:38.726Z",
+        "updatedAt": "2026-06-17T03:30:42.128Z",
+        "lastCheckedAt": "2026-06-17T03:30:42.128Z"
+      },
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz-reply:us",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz reply",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": -1,
+            "lastChecked": "2026-06-17T03:30:41.812Z",
+            "lastCheckStatus": "not_ranked"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": -1,
+            "lastChecked": "2026-06-17T03:30:41.812Z",
+            "lastCheckStatus": "not_ranked"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:39.237Z",
+        "updatedAt": "2026-06-17T03:30:41.812Z",
+        "lastCheckedAt": "2026-06-17T03:30:41.812Z"
+      }
+    ],
+    "competitorGroups": [
+      {
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "store": "android",
+        "country": "us",
+        "mode": "fast",
+        "ownApp": {
+          "appKey": "android:app.vercel.rizzmaster",
+          "appId": "app.vercel.rizzmaster",
+          "store": "android",
+          "role": "own",
+          "title": "Rizz Master: AI Dating Wingman",
+          "developer": "Vantalum",
+          "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+          "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+          "category": "Lifestyle"
+        },
+        "competitors": [
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle"
+          }
+        ],
+        "trackedKeywordIds": [
+          "comp-track:comp-group-1780321835465-722zmj4:rizz:us",
+          "comp-track:comp-group-1780321835465-722zmj4:rizz-assistant:us",
+          "comp-track:comp-group-1780321835465-722zmj4:rizz-lin:us",
+          "comp-track:comp-group-1780321835465-722zmj4:rizz-reply:us"
+        ],
+        "createdAt": "2026-06-01T13:50:37.955Z",
+        "updatedAt": "2026-06-17T03:30:42.853Z",
+        "lastAnalyzedAt": "2026-06-17T03:30:42.853Z"
+      }
+    ]
+  },
+  "after": {
+    "competitorTrackedKeywords": [
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 19,
+            "lastChecked": "2026-06-17T03:30:42.853Z",
+            "lastCheckStatus": "ok"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 13,
+            "lastChecked": "2026-06-17T03:30:42.853Z",
+            "lastCheckStatus": "ok"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:37.955Z",
+        "updatedAt": "2026-06-17T03:30:42.853Z",
+        "lastCheckedAt": "2026-06-17T03:30:42.853Z"
+      },
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz-assistant",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz assistant",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 14,
+            "lastChecked": "2026-06-17T03:30:42.501Z",
+            "lastCheckStatus": "ok"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 13,
+            "lastChecked": "2026-06-17T03:30:42.501Z",
+            "lastCheckStatus": "ok"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:38.374Z",
+        "updatedAt": "2026-06-17T03:30:42.501Z",
+        "lastCheckedAt": "2026-06-17T03:30:42.501Z"
+      },
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz-lin",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz lin",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 17,
+            "lastChecked": "2026-06-17T03:30:42.128Z",
+            "lastCheckStatus": "ok"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": 22,
+            "lastChecked": "2026-06-17T03:30:42.128Z",
+            "lastCheckStatus": "ok"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:38.726Z",
+        "updatedAt": "2026-06-17T03:30:42.128Z",
+        "lastCheckedAt": "2026-06-17T03:30:42.128Z"
+      },
+      {
+        "trackedKeywordId": "comp-track:comp-group-1780321835465-722zmj4:rizz-reply",
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "keyword": "rizz reply",
+        "store": "android",
+        "country": "us",
+        "apps": [
+          {
+            "appKey": "android:app.vercel.rizzmaster",
+            "appId": "app.vercel.rizzmaster",
+            "store": "android",
+            "role": "own",
+            "title": "Rizz Master: AI Dating Wingman",
+            "developer": "Vantalum",
+            "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+            "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": -1,
+            "lastChecked": "2026-06-17T03:30:41.812Z",
+            "lastCheckStatus": "not_ranked"
+          },
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle",
+            "lastRank": -1,
+            "lastChecked": "2026-06-17T03:30:41.812Z",
+            "lastCheckStatus": "not_ranked"
+          }
+        ],
+        "createdAt": "2026-06-01T13:50:39.237Z",
+        "updatedAt": "2026-06-17T03:30:41.812Z",
+        "lastCheckedAt": "2026-06-17T03:30:41.812Z"
+      }
+    ],
+    "competitorGroups": [
+      {
+        "groupId": "comp-group-1780321835465-722zmj4",
+        "store": "android",
+        "country": "us",
+        "mode": "fast",
+        "ownApp": {
+          "appKey": "android:app.vercel.rizzmaster",
+          "appId": "app.vercel.rizzmaster",
+          "store": "android",
+          "role": "own",
+          "title": "Rizz Master: AI Dating Wingman",
+          "developer": "Vantalum",
+          "icon": "https://play-lh.googleusercontent.com/ahQOTRSiWE2OdnezbcRGcOAn6W5RlHBrmNl35E6yDwZbvT6uX0EcnPnbTQ-o4HJEq2HbWujr8VuN2PYe3tStPw",
+          "url": "https://play.google.com/store/apps/details?id=app.vercel.rizzmaster&hl=en&gl=us",
+          "category": "Lifestyle"
+        },
+        "competitors": [
+          {
+            "appKey": "android:com.wenas.matchine",
+            "appId": "com.wenas.matchine",
+            "store": "android",
+            "role": "competitor",
+            "title": "Rizz Dating Wingman - Matchine",
+            "developer": "wenas",
+            "icon": "https://play-lh.googleusercontent.com/7c-0cueur1bYoEmavo2Dl2UlZZQoMjdIfpYNoz1QzeitpZGH_DX05ico6GmAKvz8vQZDpqw33RCvW_bzF4uydQ",
+            "url": "https://play.google.com/store/apps/details?id=com.wenas.matchine&hl=en&gl=us",
+            "category": "Lifestyle"
+          }
+        ],
+        "trackedKeywordIds": [
+          "comp-track:comp-group-1780321835465-722zmj4:rizz",
+          "comp-track:comp-group-1780321835465-722zmj4:rizz-assistant",
+          "comp-track:comp-group-1780321835465-722zmj4:rizz-lin",
+          "comp-track:comp-group-1780321835465-722zmj4:rizz-reply"
+        ],
+        "createdAt": "2026-06-01T13:50:37.955Z",
+        "updatedAt": "2026-06-17T03:30:42.853Z",
+        "lastAnalyzedAt": "2026-06-17T03:30:42.853Z"
+      }
+    ]
+  }
+}

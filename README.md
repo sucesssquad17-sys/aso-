@@ -1,57 +1,98 @@
- app<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Rank Analyzer Pro
 
-# Run and deploy your AI Studio app
+Rank Analyzer Pro is a TypeScript SaaS for ASO teams that track keyword rankings, compare competitors, monitor ASO changes, and review reports across Google Play and the App Store.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/f9ec8423-e0fb-4f1c-b0e1-1005d626a2d6
+- Multi-country keyword tracking for Android and iOS
+- Competitor groups with ASO comparison snapshots and change alerts
+- Daily scheduled tracking with deduplicated rank history
+- In-app, push, and email alert rules
+- PDF and reporting exports
+- Dodo Payments subscription gating with trial activation
 
-## Run Locally
+## Tech Stack
 
-**Prerequisites:**  Node.js
+- React 19 + Vite + TypeScript
+- Express + Node.js
+- Firebase Auth + Firestore + Firebase Admin
+- Dodo Payments
+- Resend for alert emails
+- Google GenAI for keyword discovery and analysis support
 
+## Local Setup
 
-1. Install dependencies:
-   `npm install`
-2. Run the app:
-   `npm run dev`
+1. Run `npm install`.
+2. Copy `.env.example` to `.env` and fill in the required values.
+3. Start development with `npm run dev`.
 
-## Daily Tracking Cron
+The Vite frontend and Express server run from the same repo entrypoint in development.
 
-Production daily tracking is intended to run through the Cloud Run Job defined by `scripts/run-daily-tracking.ts` and deployed with `setup-gcp-job.sh`.
+## Required Environment Variables
 
-- The supported Cloud Scheduler target is the Cloud Run Jobs API at `https://run.googleapis.com/v2/projects/<project>/locations/<region>/jobs/<job>:run`.
-- The Scheduler job should use OAuth service account auth, not OIDC.
-- The expected daily run key is fixed to `YYYY-MM-DDT09:00` in `Asia/Kolkata`.
-- Verify successful executions in Firestore at `system/dailyTracking` and in each tracked user's `trackingSchedule.lastRunKey`.
+Frontend Firebase client:
 
-The `/api/cron/run` endpoint remains available as a manual or emergency fallback, but it is not the primary production scheduler path.
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
 
-## Dodo Billing
-
-The app now exposes an authenticated Dodo billing flow inside the workspace:
-
-- `GET /api/billing/status` returns the current subscription snapshot for the signed-in user.
-- `POST /api/billing/checkout` creates a hosted Dodo checkout session for the configured product.
-- `POST /api/billing/portal` opens the hosted Dodo customer portal for linked customers.
-- `POST /api/dodo/webhook` verifies Dodo webhook signatures and syncs subscription state into Firestore.
-
-Minimum environment setup:
+Server/runtime essentials:
 
 - `APP_URL`
+- `GEMINI_API_KEY`
+- `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS`
+- `CRON_SECRET`
+
+Billing:
+
 - `DODO_API_KEY` or `DODO_PAYMENTS_API_KEY`
 - `DODO_WEBHOOK_SECRET` or `DODO_PAYMENTS_WEBHOOK_KEY`
-- `DODO_PRODUCT_ID`
-- `DODO_ENVIRONMENT` set to `test` / `live` or `test_mode` / `live_mode`
+- `DODO_ENVIRONMENT`
+- plan product IDs such as `DODO_PRODUCT_ID_STARTER`, `DODO_PRODUCT_ID_PRO`, and yearly variants
 
-Optional per-plan product IDs for the authenticated paywall:
+Optional:
 
-- `DODO_PRODUCT_ID_INDIE`
-- `DODO_PRODUCT_ID_STARTER`
-- `DODO_PRODUCT_ID_PRO`
+- `VITE_FIREBASE_VAPID_KEY` for browser push
+- `RESEND_API_KEY` and `RESEND_FROM_EMAIL` for email alerts
+- `PROXY_HOST`, `PROXY_PORT`, `PROXY_USERNAME`, `PROXY_PASSWORD` for proxy fallback
+- `VITE_SENTRY_DSN`
 
-If only `DODO_PRODUCT_ID` is set, the paywall uses that as the Starter checkout product.
+## Commands
 
-In the Dodo dashboard, register `https://<your-domain>/api/dodo/webhook` and enable the subscription lifecycle events.
+- `npm run dev`
+- `npm run lint`
+- `npm run lint:strict`
+- `npm run check:tracking-timezone`
+- `npm run build`
+- `npm run build:job`
+
+## Daily Tracking Job
+
+The production daily tracker lives in `scripts/run-daily-tracking.ts` and is intended to run as a Cloud Run Job triggered by Cloud Scheduler.
+
+- Global tracking defaults are fixed to `09:00` in `Asia/Kolkata`
+- Firestore run status is written to `system/dailyTracking`
+- User schedule state is written to `users/{uid}.trackingSchedule.lastRunKey`
+- `/api/cron/run` is the manual fallback
+- `/api/cron/watchdog` is the retry watchdog endpoint
+
+## Billing Notes
+
+The authenticated billing flow is server-owned:
+
+- `GET /api/billing/status`
+- `POST /api/billing/checkout`
+- `POST /api/billing/portal`
+- `POST /api/dodo/webhook`
+
+Webhook events are signature-verified and duplicate webhook IDs are ignored. Plan selection stays gated until the server confirms active billing.
+
+## Deployment Notes
+
+- Configure Firebase Auth, Firestore, and Firebase Admin credentials for both the web service and the tracking job
+- Register the Dodo webhook at `https://<your-domain>/api/dodo/webhook`
+- If you use alert emails, configure a verified Resend sender
+- Do not commit secrets, service-account files, or `.firebase` deploy cache artifacts

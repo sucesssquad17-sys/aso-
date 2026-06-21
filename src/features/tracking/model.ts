@@ -2,6 +2,11 @@ import type { AlertRule, NotificationSettings } from "../../lib/alerts";
 import { normalizeCountryCode } from "../../lib/countries";
 import { TRACKED_KEYWORD_LEGACY_CREATED_AT } from "../../lib/planLimits";
 import { safeStorage } from "../../lib/storage";
+import {
+  DEFAULT_GLOBAL_TRACKING_TIME,
+  GLOBAL_TRACKING_TIMEZONE,
+  TRACKING_CHART_TIMEZONE,
+} from "../../lib/trackingTime";
 
 export type StoreType = "android" | "ios";
 export type DiscoveryMode = "fast" | "deep";
@@ -482,7 +487,6 @@ export const DISCOVERY_CACHE_TTL = 1000 * 60 * 60 * 12;
 export const DISCOVERY_CACHE_VERSION = "v11";
 export const SEARCH_CACHE_VERSION = "v2";
 export const TRACKING_HISTORY_LIMIT = 2000;
-export const TRACKING_CHART_TIMEZONE = "Asia/Kolkata";
 export const API_REQUEST_TIMEOUT_MS = 45000;
 export const DISCOVERY_FAST_TIMEOUT_MS = 240000;
 export const DISCOVERY_DEEP_TIMEOUT_MS = 420000;
@@ -501,8 +505,8 @@ export function getBrowserTimeZone() {
 export function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
     enabled: false,
-    time: "09:00",
-    timezone: "Asia/Kolkata",
+    time: DEFAULT_GLOBAL_TRACKING_TIME,
+    timezone: GLOBAL_TRACKING_TIMEZONE,
   };
 }
 
@@ -2108,8 +2112,8 @@ export function normalizeTrackingScheduleState(
 ): TrackingSchedule {
   return {
     enabled: Boolean(schedule?.enabled),
-    time: "09:00",
-    timezone: "Asia/Kolkata",
+    time: DEFAULT_GLOBAL_TRACKING_TIME,
+    timezone: GLOBAL_TRACKING_TIMEZONE,
     lastRunAt: schedule?.lastRunAt,
     lastRunKey: schedule?.lastRunKey,
   };
@@ -2213,8 +2217,8 @@ export function serializeEditableUserStateForApi(
       trackingSchedule: state.trackingSchedule
         ? {
             enabled: state.trackingSchedule.enabled,
-            time: "09:00",
-            timezone: "Asia/Kolkata",
+            time: DEFAULT_GLOBAL_TRACKING_TIME,
+            timezone: GLOBAL_TRACKING_TIMEZONE,
           }
         : undefined,
       alertRules: state.alertRules?.map((rule) => ({
