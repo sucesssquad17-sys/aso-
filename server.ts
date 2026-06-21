@@ -53,6 +53,13 @@ import {
   GLOBAL_TRACKING_TIMEZONE,
 } from './src/lib/trackingTime';
 import {
+  DAILY_TRACKING_LEASE_TTL_MINUTES,
+  getDailyTrackingFinalStatus,
+  getEmptyDailyTrackingSummary,
+  shouldRetryPartialDailyTracking,
+  type DailyTrackingSummary,
+} from './src/lib/dailyTracking';
+import {
   BILLING_PLAN_LIMITS,
   TRACKED_KEYWORD_LEGACY_CREATED_AT,
   countPlanUsage,
@@ -128,6 +135,7 @@ const RANKING_FETCH_TIMEOUT_MS = 20000;
 const DISCOVERY_CACHE_VERSION = 'v16';
 const GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES = 60;
 const GLOBAL_TRACKING_UTC_OFFSET_MINUTES = 330;
+const DAILY_TRACKING_LEASE_OWNER = `service:${process.pid}:${crypto.randomUUID()}`;
 
 type StoreType = 'android' | 'ios';
 type DiscoveryMode = 'fast' | 'deep';
@@ -402,6 +410,20 @@ type NormalizedUserTrackingDocument = TrackingState & {
   legalVersion?: string;
   migratedFromLocalAt?: string;
 };
+type DailyTrackingStatusRecord = Partial<DailyTrackingSummary> & {
+  runKey?: string;
+  lastStatus?: 'running' | 'success' | 'partial' | 'error';
+  lastStartedAt?: string;
+  lastFinishedAt?: string;
+  lastRetryAt?: string;
+  retryCount?: number;
+  durationMs?: number;
+  error?: string;
+  watchdogRetryEligible?: boolean;
+  leaseOwner?: string;
+  leaseExpiresAt?: string;
+  lastTrigger?: 'automatic' | 'manual' | 'watchdog';
+};
 type DodoEnvironment = 'test_mode' | 'live_mode';
 type DodoSubscriptionEventType =
   | 'subscription.active'
@@ -509,16 +531,7 @@ const GLOBAL_TRACKING_WATCHDOG_RUNNING_GRACE_MINUTES = 120;
 let trackingStateCache: TrackingState | null = null;
 let trackingStateWriteQueue = Promise.resolve();
 let scheduledTrackingRunPromise: Promise<{ checked: number; changed: number; failed?: number }> | null = null;
-let userTrackingSchedulerPromise: Promise<{
-  scanned: number;
-  ran: number;
-  checked: number;
-  changed: number;
-  failed: number;
-  asoChecked: number;
-  asoChanged: number;
-  asoFailed: number;
-}> | null = null;
+let userTrackingSchedulerPromise: Promise<DailyTrackingSummary> | null = null;
 let firebaseAdminApp: FirebaseAdminApp | null = null;
 let firebaseAdminDb: Firestore | null = null;
 let firebaseAdminAuth: FirebaseAdminAuth | null = null;
@@ -4072,6 +4085,120 @@ function addMinutesToIsoTimestamp(timestamp: string | undefined, minutes: number
   return new Date(parsed + minutes * 60000).toISOString();
 }
 
+function readDailyTrackingSummaryFromStatus(
+  statusData: DailyTrackingStatusRecord | undefined,
+): DailyTrackingSummary {
+  const empty = getEmptyDailyTrackingSummary();
+  return {
+    scanned: statusData?.scanned ?? empty.scanned,
+    ran: statusData?.ran ?? empty.ran,
+    checked: statusData?.checked ?? empty.checked,
+    changed: statusData?.changed ?? empty.changed,
+    failed: statusData?.failed ?? empty.failed,
+    asoChecked: statusData?.asoChecked ?? empty.asoChecked,
+    asoChanged: statusData?.asoChanged ?? empty.asoChanged,
+    asoFailed: statusData?.asoFailed ?? empty.asoFailed,
+  };
+}
+
+function hasActiveDailyTrackingLease(
+  statusData: DailyTrackingStatusRecord | undefined,
+  now: Date,
+  ownerId?: string,
+) {
+  if (!statusData?.leaseOwner || !statusData.leaseExpiresAt) {
+    return false;
+  }
+  if (ownerId && statusData.leaseOwner === ownerId) {
+    return false;
+  }
+
+  const leaseExpiresAt = Date.parse(statusData.leaseExpiresAt);
+  if (Number.isNaN(leaseExpiresAt)) {
+    return false;
+  }
+
+  return leaseExpiresAt > now.getTime();
+}
+
+async function acquireDailyTrackingLease(
+  statusRef: DocumentReference<DocumentData>,
+  options: {
+    runKey: string;
+    ownerId: string;
+    force?: boolean;
+    trigger?: 'automatic' | 'manual' | 'watchdog';
+  },
+) {
+  const now = new Date();
+  const nextLeaseExpiresAt = new Date(
+    now.getTime() + DAILY_TRACKING_LEASE_TTL_MINUTES * 60 * 1000,
+  ).toISOString();
+
+  return statusRef.firestore.runTransaction(async (transaction) => {
+    const statusSnapshot = await transaction.get(statusRef);
+    const statusData = statusSnapshot.data() as DailyTrackingStatusRecord | undefined;
+
+    if (
+      !options.force &&
+      statusData?.runKey === options.runKey &&
+      statusData?.lastStatus === 'success'
+    ) {
+      return {
+        acquired: false as const,
+        reason: 'already-succeeded' as const,
+        statusData,
+      };
+    }
+
+    if (hasActiveDailyTrackingLease(statusData, now, options.ownerId)) {
+      return {
+        acquired: false as const,
+        reason: 'lease-active' as const,
+        statusData,
+      };
+    }
+
+    transaction.set(
+      statusRef,
+      {
+        runKey: options.runKey,
+        lastStartedAt: now.toISOString(),
+        lastStatus: 'running',
+        lastTrigger: options.trigger || 'manual',
+        lastRetryAt: options.force ? now.toISOString() : FieldValue.delete(),
+        retryCount: options.force ? FieldValue.increment(1) : 0,
+        error: FieldValue.delete(),
+        watchdogRetryEligible: false,
+        leaseOwner: options.ownerId,
+        leaseExpiresAt: nextLeaseExpiresAt,
+      },
+      { merge: true },
+    );
+
+    return {
+      acquired: true as const,
+      reason: 'acquired' as const,
+      statusData,
+    };
+  });
+}
+
+async function refreshDailyTrackingLease(
+  statusRef: DocumentReference<DocumentData>,
+  ownerId: string,
+) {
+  await statusRef.set(
+    {
+      leaseOwner: ownerId,
+      leaseExpiresAt: new Date(
+        Date.now() + DAILY_TRACKING_LEASE_TTL_MINUTES * 60 * 1000,
+      ).toISOString(),
+    },
+    { merge: true },
+  );
+}
+
 async function fetchPlayStoreHtml(path: string, country: string, retries = 2, timeoutMs = PLAY_STORE_FETCH_TIMEOUT_MS) {
   const gl = country.toUpperCase();
   const url = new URL(`https://play.google.com${path}`);
@@ -5440,7 +5567,7 @@ async function runAllUserTrackingSchedules(
   options?: {
     force?: boolean;
   },
-) {
+): Promise<DailyTrackingSummary> {
   if (userTrackingSchedulerPromise) {
     return userTrackingSchedulerPromise;
   }
@@ -5448,18 +5575,10 @@ async function runAllUserTrackingSchedules(
   userTrackingSchedulerPromise = (async () => {
     const adminDb = getFirebaseAdminDb();
     if (!adminDb) {
-      return {
-        scanned: 0,
-        ran: 0,
-        checked: 0,
-        changed: 0,
-        failed: 0,
-        asoChecked: 0,
-        asoChanged: 0,
-        asoFailed: 0,
-      };
+      return getEmptyDailyTrackingSummary();
     }
 
+    const statusRef = adminDb.doc('system/dailyTracking');
     const snapshot = await adminDb.collection('users').get();
     const now = new Date();
     let ran = 0;
@@ -5471,6 +5590,7 @@ async function runAllUserTrackingSchedules(
     let asoFailed = 0;
 
     await mapWithConcurrency(snapshot.docs, 1, async (userDoc) => {
+      await refreshDailyTrackingLease(statusRef, DAILY_TRACKING_LEASE_OWNER);
       const userData = userDoc.data() as UserTrackingDocument | undefined;
       const state = normalizeUserTrackingDocument(userData);
       if (
@@ -5583,33 +5703,37 @@ async function runAndPersistAllUserTrackingSchedules(
   }
 
   const statusRef = adminDb.doc('system/dailyTracking');
-  const startedAt = new Date().toISOString();
-  await statusRef.set(
+  const lease = await acquireDailyTrackingLease(
+    statusRef,
     {
       runKey,
-      lastStartedAt: startedAt,
-      lastStatus: 'running',
-      lastTrigger: options?.trigger || 'manual',
-      lastRetryAt: options?.force ? startedAt : FieldValue.delete(),
-      retryCount: options?.force ? FieldValue.increment(1) : 0,
-      error: FieldValue.delete(),
+      ownerId: DAILY_TRACKING_LEASE_OWNER,
+      force: options?.force,
+      trigger: options?.trigger,
     },
-    { merge: true },
   );
+  if (!lease.acquired) {
+    console.log(
+      `[tracking] Skipping run ${runKey}; ${lease.reason}.`,
+    );
+    return readDailyTrackingSummaryFromStatus(lease.statusData);
+  }
+
+  const startedAt = new Date().toISOString();
 
   const startMs = Date.now();
   try {
     const summary = await runAllUserTrackingSchedules(runKey, {
       force: options?.force,
     });
+    const finalStatus = getDailyTrackingFinalStatus(summary);
     const finishedAt = new Date().toISOString();
     await statusRef.set(
       {
         runKey,
         lastStartedAt: startedAt,
         lastFinishedAt: finishedAt,
-        lastStatus:
-          summary.failed > 0 || summary.asoFailed > 0 ? 'partial' : 'success',
+        lastStatus: finalStatus,
         lastTrigger: options?.trigger || 'manual',
         scanned: summary.scanned,
         ran: summary.ran,
@@ -5621,6 +5745,12 @@ async function runAndPersistAllUserTrackingSchedules(
         asoFailed: summary.asoFailed,
         durationMs: Date.now() - startMs,
         error: FieldValue.delete(),
+        watchdogRetryEligible:
+          finalStatus === 'partial'
+            ? shouldRetryPartialDailyTracking(summary)
+            : false,
+        leaseOwner: FieldValue.delete(),
+        leaseExpiresAt: FieldValue.delete(),
       },
       { merge: true },
     );
@@ -5639,6 +5769,9 @@ async function runAndPersistAllUserTrackingSchedules(
           lastTrigger: options?.trigger || 'manual',
           durationMs,
           error: errorMessage,
+          watchdogRetryEligible: true,
+          leaseOwner: FieldValue.delete(),
+          leaseExpiresAt: FieldValue.delete(),
         },
         { merge: true },
       )
@@ -6469,13 +6602,20 @@ async function startServer() {
   const PORT = Number(process.env.PORT || 3000);
   const isBundledServer = (process.argv[1] || '').includes(`${path.sep}dist${path.sep}server.cjs`);
   const isDevelopment = process.env.NODE_ENV !== 'production' && !isBundledServer;
+  const enableInProcessUserTrackingScheduler =
+    process.env.ENABLE_IN_PROCESS_USER_TRACKING_SCHEDULER === 'true' ||
+    (process.env.ENABLE_IN_PROCESS_USER_TRACKING_SCHEDULER !== 'false' && isDevelopment);
 
   await loadTrackingState();
   void maybeRunScheduledTrackingCheck();
-  void maybeRunAllUserTrackingSchedules();
+  if (enableInProcessUserTrackingScheduler) {
+    void maybeRunAllUserTrackingSchedules();
+  }
   setInterval(() => {
     void maybeRunScheduledTrackingCheck();
-    void maybeRunAllUserTrackingSchedules();
+    if (enableInProcessUserTrackingScheduler) {
+      void maybeRunAllUserTrackingSchedules();
+    }
   }, 60 * 1000);
 
   app.post('/api/dodo/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
@@ -7370,16 +7510,7 @@ async function startServer() {
 
       const statusRef = adminDb.doc('system/dailyTracking');
       const statusSnapshot = await statusRef.get();
-      const statusData = statusSnapshot.data() as
-        | {
-            runKey?: string;
-            lastStatus?: string;
-            lastStartedAt?: string;
-            lastFinishedAt?: string;
-            lastRetryAt?: string;
-            retryCount?: number;
-          }
-        | undefined;
+      const statusData = statusSnapshot.data() as DailyTrackingStatusRecord | undefined;
       const isCurrentRun = statusData?.runKey === expectedRunKey;
       const startedAgoMinutes = getMinutesSinceIsoTimestamp(statusData?.lastStartedAt, now);
       const lastRetryAgoMinutes = getMinutesSinceIsoTimestamp(statusData?.lastRetryAt, now);
@@ -7395,6 +7526,23 @@ async function startServer() {
           dueAt,
           action: 'none',
           reason: 'run-already-succeeded',
+        });
+      }
+
+      if (
+        isCurrentRun &&
+        hasActiveDailyTrackingLease(statusData, now)
+      ) {
+        return res.json({
+          status: 'running',
+          timestamp: now.toISOString(),
+          expectedRunKey,
+          dueAt,
+          action: 'none',
+          reason: 'run-still-in-flight',
+          startedAt: statusData.lastStartedAt,
+          retryCount: statusData.retryCount || 0,
+          nextRetryAt: statusData.leaseExpiresAt,
         });
       }
 
@@ -7417,6 +7565,22 @@ async function startServer() {
             statusData.lastStartedAt,
             GLOBAL_TRACKING_WATCHDOG_RUNNING_GRACE_MINUTES,
           ),
+        });
+      }
+
+      if (
+        isCurrentRun &&
+        statusData?.lastStatus === 'partial' &&
+        !statusData.watchdogRetryEligible
+      ) {
+        return res.json({
+          status: 'partial',
+          timestamp: now.toISOString(),
+          expectedRunKey,
+          dueAt,
+          action: 'none',
+          reason: 'partial-not-retryable',
+          retryCount: statusData.retryCount || 0,
         });
       }
 

@@ -25,6 +25,13 @@ import {
   GLOBAL_TRACKING_TIMEZONE,
 } from '../src/lib/trackingTime';
 import {
+  DAILY_TRACKING_LEASE_TTL_MINUTES,
+  getDailyTrackingFinalStatus,
+  getEmptyDailyTrackingSummary,
+  shouldRetryPartialDailyTracking,
+  type DailyTrackingSummary,
+} from '../src/lib/dailyTracking';
+import {
   ALERT_CONDITION_LABELS,
   type AlertCondition,
   type AlertConditionType,
@@ -225,6 +232,20 @@ type UserTrackingDocument = {
   trackingSchedule?: TrackingSchedule;
   updatedAt?: string;
 };
+type DailyTrackingStatusRecord = Partial<DailyTrackingSummary> & {
+  runKey?: string;
+  lastStatus?: 'running' | 'success' | 'partial' | 'error';
+  lastStartedAt?: string;
+  lastFinishedAt?: string;
+  lastRetryAt?: string;
+  retryCount?: number;
+  durationMs?: number;
+  error?: string;
+  watchdogRetryEligible?: boolean;
+  leaseOwner?: string;
+  leaseExpiresAt?: string;
+  lastTrigger?: 'automatic' | 'manual' | 'watchdog';
+};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -235,10 +256,15 @@ const RANKING_FETCH_TIMEOUT_MS = 20000;
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'updates@rankanalyzerpro.com';
+const CRON_FAILURE_EMAIL_RECIPIENTS = (process.env.CRON_FAILURE_EMAIL || '')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
 const ALERT_EMAIL_APP_URL = process.env.APP_URL?.trim() || 'https://rankanalyzerpro.com';
 const EMBEDDED_TRACKING_HISTORY_LIMIT = 1200;
 const USER_RANK_HISTORY_ARCHIVE_COLLECTION = 'rank_history';
 const USER_COMPETITOR_RANK_HISTORY_ARCHIVE_COLLECTION = 'competitor_rank_history';
+const DAILY_TRACKING_LEASE_OWNER = `job:${process.pid}:${crypto.randomUUID()}`;
 
 
 // ─── Caches ──────────────────────────────────────────────────────────────────
@@ -1155,6 +1181,176 @@ async function sendEmailAlertEvents(
   }
 }
 
+function buildCronFailureEmailHtml(input: {
+  runKey: string;
+  trigger: 'automatic' | 'manual' | 'watchdog';
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  errorMessage: string;
+}) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
+      <h2 style="margin: 0 0 12px; font-size: 22px;">Cron job failed</h2>
+      <p style="margin: 0 0 18px; color: #334155;">The daily tracking cron job failed before completing.</p>
+      <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; padding: 18px;">
+        <p style="margin: 0 0 8px;"><strong>Run key:</strong> ${escapeAlertEmailHtml(input.runKey)}</p>
+        <p style="margin: 0 0 8px;"><strong>Trigger:</strong> ${escapeAlertEmailHtml(input.trigger)}</p>
+        <p style="margin: 0 0 8px;"><strong>Started:</strong> ${escapeAlertEmailHtml(formatAlertEmailTimestamp(input.startedAt))}</p>
+        <p style="margin: 0 0 8px;"><strong>Finished:</strong> ${escapeAlertEmailHtml(formatAlertEmailTimestamp(input.finishedAt))}</p>
+        <p style="margin: 0 0 8px;"><strong>Duration:</strong> ${escapeAlertEmailHtml(`${Math.max(0, Math.round(input.durationMs / 1000))}s`)}</p>
+        <p style="margin: 0;"><strong>Error:</strong> ${escapeAlertEmailHtml(input.errorMessage)}</p>
+      </div>
+      <a href="${escapeAlertEmailHtml(ALERT_EMAIL_APP_URL)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
+        Open Workspace
+      </a>
+    </div>
+  `;
+}
+
+async function sendCronFailureEmail(input: {
+  runKey: string;
+  trigger: 'automatic' | 'manual' | 'watchdog';
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  errorMessage: string;
+}) {
+  if (!resend) {
+    log('[email] Skipping cron failure email because Resend is not configured.');
+    return;
+  }
+  if (!CRON_FAILURE_EMAIL_RECIPIENTS.length) {
+    log('[email] Skipping cron failure email because CRON_FAILURE_EMAIL is not configured.');
+    return;
+  }
+
+  try {
+    await resend.emails.send({
+      from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+      to: CRON_FAILURE_EMAIL_RECIPIENTS,
+      subject: `Cron job failed: ${input.runKey}`,
+      html: buildCronFailureEmailHtml(input),
+    });
+  } catch (error) {
+    log(`[email] Failed to deliver cron failure email: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function readDailyTrackingSummaryFromStatus(
+  statusData: DailyTrackingStatusRecord | undefined,
+): DailyTrackingSummary {
+  const empty = getEmptyDailyTrackingSummary();
+  return {
+    scanned: statusData?.scanned ?? empty.scanned,
+    ran: statusData?.ran ?? empty.ran,
+    checked: statusData?.checked ?? empty.checked,
+    changed: statusData?.changed ?? empty.changed,
+    failed: statusData?.failed ?? empty.failed,
+    asoChecked: statusData?.asoChecked ?? empty.asoChecked,
+    asoChanged: statusData?.asoChanged ?? empty.asoChanged,
+    asoFailed: statusData?.asoFailed ?? empty.asoFailed,
+  };
+}
+
+function hasActiveDailyTrackingLease(
+  statusData: DailyTrackingStatusRecord | undefined,
+  now: Date,
+  ownerId?: string,
+) {
+  if (!statusData?.leaseOwner || !statusData.leaseExpiresAt) {
+    return false;
+  }
+  if (ownerId && statusData.leaseOwner === ownerId) {
+    return false;
+  }
+
+  const leaseExpiresAt = Date.parse(statusData.leaseExpiresAt);
+  if (Number.isNaN(leaseExpiresAt)) {
+    return false;
+  }
+
+  return leaseExpiresAt > now.getTime();
+}
+
+async function acquireDailyTrackingLease(
+  statusRef: DocumentReference<DocumentData>,
+  options: {
+    runKey: string;
+    ownerId: string;
+    force?: boolean;
+    trigger?: 'automatic' | 'manual' | 'watchdog';
+  },
+) {
+  const now = new Date();
+  const nextLeaseExpiresAt = new Date(
+    now.getTime() + DAILY_TRACKING_LEASE_TTL_MINUTES * 60 * 1000,
+  ).toISOString();
+
+  return statusRef.firestore.runTransaction(async (transaction) => {
+    const statusSnapshot = await transaction.get(statusRef);
+    const statusData = statusSnapshot.data() as DailyTrackingStatusRecord | undefined;
+
+    if (
+      !options.force &&
+      statusData?.runKey === options.runKey &&
+      statusData?.lastStatus === 'success'
+    ) {
+      return {
+        acquired: false as const,
+        reason: 'already-succeeded' as const,
+        statusData,
+      };
+    }
+
+    if (hasActiveDailyTrackingLease(statusData, now, options.ownerId)) {
+      return {
+        acquired: false as const,
+        reason: 'lease-active' as const,
+        statusData,
+      };
+    }
+
+    transaction.set(
+      statusRef,
+      {
+        runKey: options.runKey,
+        lastStartedAt: now.toISOString(),
+        lastStatus: 'running',
+        lastTrigger: options.trigger || 'automatic',
+        lastRetryAt: options.force ? now.toISOString() : FieldValue.delete(),
+        retryCount: options.force ? FieldValue.increment(1) : 0,
+        error: FieldValue.delete(),
+        watchdogRetryEligible: false,
+        leaseOwner: options.ownerId,
+        leaseExpiresAt: nextLeaseExpiresAt,
+      },
+      { merge: true },
+    );
+
+    return {
+      acquired: true as const,
+      reason: 'acquired' as const,
+      statusData,
+    };
+  });
+}
+
+async function refreshDailyTrackingLease(
+  statusRef: DocumentReference<DocumentData>,
+  ownerId: string,
+) {
+  await statusRef.set(
+    {
+      leaseOwner: ownerId,
+      leaseExpiresAt: new Date(
+        Date.now() + DAILY_TRACKING_LEASE_TTL_MINUTES * 60 * 1000,
+      ).toISOString(),
+    },
+    { merge: true },
+  );
+}
+
 async function evaluateAndDispatchAlertRules(
   userDocRef: DocumentReference<DocumentData>,
   previousTrackedKeywords: TrackedKeywordRecord[],
@@ -1893,19 +2089,32 @@ async function main() {
     db = initFirebaseAdmin();
     log('✓ Firebase Admin initialized');
   } catch (err) {
-    console.error('✗ Firebase Admin init failed:', err);
+    console.error('Firebase Admin init failed:', err);
+    await sendCronFailureEmail({
+      runKey,
+      trigger: 'automatic',
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      durationMs: Date.now() - startMs,
+      errorMessage: err instanceof Error ? err.message : String(err),
+    });
     process.exit(1);
   }
 
-  // Write job start status
   const statusRef = db.doc('system/dailyTracking');
-  await statusRef.set({
-    lastStartedAt: startedAt,
-    lastStatus: 'running',
-    runKey,
-    retryCount: 0,
-    lastRetryAt: FieldValue.delete(),
-  }, { merge: true });
+  const lease = await acquireDailyTrackingLease(
+    statusRef,
+    {
+      runKey,
+      ownerId: DAILY_TRACKING_LEASE_OWNER,
+      trigger: 'automatic',
+    },
+  );
+  if (!lease.acquired) {
+    const summary = readDailyTrackingSummaryFromStatus(lease.statusData);
+    log(`=== Daily tracking job skipped: ${lease.reason} for ${runKey}. scanned=${summary.scanned}, ran=${summary.ran}, checked=${summary.checked}, failed=${summary.failed}, asoFailed=${summary.asoFailed} ===`);
+    process.exit(0);
+  }
 
   let totalScanned = 0;
   let totalRan = 0;
@@ -1922,6 +2131,7 @@ async function main() {
     log(`Found ${totalScanned} user(s) in Firestore`);
 
     for (const userDoc of snapshot.docs) {
+      await refreshDailyTrackingLease(statusRef, DAILY_TRACKING_LEASE_OWNER);
       const data = userDoc.data();
       const trackedKeywords = sanitizeTrackedKeywords(data?.trackedKeywords);
       const competitorTrackedKeywords = sanitizeCompetitorTrackedKeywords(data?.competitorTrackedKeywords);
@@ -2047,11 +2257,22 @@ async function main() {
 
     const durationMs = Date.now() - startMs;
     const finishedAt = new Date().toISOString();
+    const summary: DailyTrackingSummary = {
+      scanned: totalScanned,
+      ran: totalRan,
+      checked: totalChecked,
+      changed: totalChanged,
+      failed: totalFailed,
+      asoChecked: totalAsoChecked,
+      asoChanged: totalAsoChanged,
+      asoFailed: totalAsoFailed,
+    };
+    const finalStatus = getDailyTrackingFinalStatus(summary);
 
     await statusRef.set({
       lastStartedAt: startedAt,
       lastFinishedAt: finishedAt,
-      lastStatus: totalFailed > 0 || totalAsoFailed > 0 ? 'partial' : 'success',
+      lastStatus: finalStatus,
       runKey,
       scanned: totalScanned,
       ran: totalRan,
@@ -2062,6 +2283,11 @@ async function main() {
       asoChanged: totalAsoChanged,
       asoFailed: totalAsoFailed,
       durationMs,
+      watchdogRetryEligible: finalStatus === 'partial'
+        ? shouldRetryPartialDailyTracking(summary)
+        : false,
+      leaseOwner: FieldValue.delete(),
+      leaseExpiresAt: FieldValue.delete(),
     }, { merge: true });
 
     log(`=== Job complete in ${(durationMs / 1000).toFixed(1)}s: scanned=${totalScanned}, ran=${totalRan}, checked=${totalChecked}, changed=${totalChanged}, failed=${totalFailed}, asoChecked=${totalAsoChecked}, asoChanged=${totalAsoChanged}, asoFailed=${totalAsoFailed} ===`);
@@ -2069,7 +2295,25 @@ async function main() {
   } catch (err) {
     const durationMs = Date.now() - startMs;
     console.error('✗ Job failed:', err);
-    await statusRef.set({ lastFinishedAt: new Date().toISOString(), lastStatus: 'error', durationMs, error: err instanceof Error ? err.message : String(err) }, { merge: true }).catch(() => {});
+    const finishedAt = new Date().toISOString();
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    await statusRef.set({
+      lastFinishedAt: finishedAt,
+      lastStatus: 'error',
+      durationMs,
+      error: errorMessage,
+      watchdogRetryEligible: true,
+      leaseOwner: FieldValue.delete(),
+      leaseExpiresAt: FieldValue.delete(),
+    }, { merge: true }).catch(() => {});
+    await sendCronFailureEmail({
+      runKey,
+      trigger: 'automatic',
+      startedAt,
+      finishedAt,
+      durationMs,
+      errorMessage,
+    });
     process.exit(1);
   }
 }
