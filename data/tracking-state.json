@@ -7,6 +7,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "us",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 5,
       "lastChecked": "2026-06-13T09:00:52.996Z",
       "lastCheckStatus": "ok"
@@ -18,6 +19,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "gb",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 5,
       "lastChecked": "2026-06-13T09:00:53.785Z",
       "lastCheckStatus": "ok"
@@ -29,6 +31,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "ca",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 8,
       "lastChecked": "2026-06-13T09:00:54.169Z",
       "lastCheckStatus": "ok"
@@ -40,6 +43,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "au",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 6,
       "lastChecked": "2026-06-13T09:00:54.677Z",
       "lastCheckStatus": "ok"
@@ -51,6 +55,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "in",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 5,
       "lastChecked": "2026-06-13T09:00:54.988Z",
       "lastCheckStatus": "ok"
@@ -62,6 +67,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "de",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 5,
       "lastChecked": "2026-06-13T09:00:55.396Z",
       "lastCheckStatus": "ok"
@@ -73,6 +79,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "fr",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 5,
       "lastChecked": "2026-06-13T09:00:55.796Z",
       "lastCheckStatus": "ok"
@@ -84,6 +91,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "jp",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 6,
       "lastChecked": "2026-06-13T09:00:56.196Z",
       "lastCheckStatus": "ok"
@@ -95,6 +103,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "kr",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 6,
       "lastChecked": "2026-06-13T09:00:56.497Z",
       "lastCheckStatus": "ok"
@@ -106,6 +115,7 @@
       "appTitle": "Rizz Master: AI Dating Wingman",
       "store": "android",
       "country": "br",
+      "createdAt": "1970-01-01T00:00:00.000Z",
       "lastRank": 5,
       "lastChecked": "2026-06-13T09:00:56.817Z",
       "lastCheckStatus": "ok"
@@ -1218,11 +1228,12 @@
   "competitorRankHistory": [],
   "competitorGroups": [],
   "competitorGroupSnapshots": [],
+  "competitorAsoLatestSnapshots": [],
   "schedule": {
     "enabled": true,
     "time": "09:00",
     "timezone": "UTC",
-    "lastRunAt": "2026-06-16T09:00:34.585Z",
-    "lastRunKey": "2026-06-16T09:00"
+    "lastRunAt": "2026-06-21T09:00:43.695Z",
+    "lastRunKey": "2026-06-21T09:00"
   }
 }

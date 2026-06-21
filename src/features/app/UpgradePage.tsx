@@ -38,7 +38,11 @@ import {
   type BillingPlanId,
   type BillingStatus,
 } from "../../lib/billing";
-import { getBillingPlanRank, getPlanLimitFeatureLines } from "../../lib/planLimits";
+import {
+  getBillingPlanRank,
+  getPlanLimitFeatureLines,
+  getPlanLimits,
+} from "../../lib/planLimits";
 
 interface UpgradePageProps {
   billingStatus: BillingStatus | null;
@@ -149,6 +153,14 @@ function UsageBar({
   );
 }
 
+function formatCapacityLimit(value: number | null, label: string) {
+  if (value === null) {
+    return `Custom ${label}`;
+  }
+
+  return value.toLocaleString();
+}
+
 export function UpgradePage({
   billingStatus,
   accessState,
@@ -196,6 +208,44 @@ export function UpgradePage({
   const disablePlanSelection = isPollingActivation;
   const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
   const signedInAccount = currentUserEmail || currentUserLabel;
+  const capacityPreviewPlans = React.useMemo(() => {
+    const visiblePlans = PUBLIC_BILLING_PLANS.filter(
+      (plan) => availablePlans.has(plan.id) || plan.contactOnly,
+    );
+
+    return visiblePlans.length > 0 ? visiblePlans : PUBLIC_BILLING_PLANS;
+  }, [availablePlans]);
+  const [selectedCapacityPlanId, setSelectedCapacityPlanId] =
+    React.useState<BillingPlanId>(() => {
+      const defaultPlan =
+        capacityPreviewPlans.find((plan) => plan.id === "starter") ||
+        capacityPreviewPlans[0] ||
+        PUBLIC_BILLING_PLANS[0];
+
+      return defaultPlan?.id || "starter";
+    });
+
+  React.useEffect(() => {
+    if (!capacityPreviewPlans.some((plan) => plan.id === selectedCapacityPlanId)) {
+      const fallbackPlan =
+        capacityPreviewPlans.find((plan) => plan.id === "starter") ||
+        capacityPreviewPlans[0];
+      if (fallbackPlan) {
+        setSelectedCapacityPlanId(fallbackPlan.id);
+      }
+    }
+  }, [capacityPreviewPlans, selectedCapacityPlanId]);
+
+  const selectedCapacityPlan =
+    capacityPreviewPlans.find((plan) => plan.id === selectedCapacityPlanId) ||
+    capacityPreviewPlans[0] ||
+    null;
+  const selectedCapacityLimits = selectedCapacityPlan
+    ? getPlanLimits(selectedCapacityPlan.id)
+    : null;
+  const selectedCapacityPriceLabel = selectedCapacityPlan
+    ? getPlanPriceLabel(billingStatus, selectedCapacityPlan, selectedInterval)
+    : null;
 
   const renderCta = (plan: BillingPlanDefinition) => {
     const isCurrentPlan = currentPlanId === plan.id;
@@ -518,7 +568,148 @@ export function UpgradePage({
               </div>
             </div>
           ) : (
-            <div className="rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2" />
+            <div className="rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-slate-800 dark:bg-slate-900/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                    Premium capacities
+                  </p>
+                  <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                    Compare plan limits before you start
+                  </h3>
+                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                    Switch between plans to see how tracked app, competitor group, and keyword capacity scales.
+                  </p>
+                </div>
+                {selectedCapacityPlan ? (
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-left shadow-sm dark:border-blue-900/50 dark:bg-blue-950/30">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">
+                      Selected plan
+                    </p>
+                    <p className="mt-1 text-sm font-bold text-slate-900 dark:text-white">
+                      {selectedCapacityPlan.name}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {selectedCapacityPlan.contactOnly
+                        ? "Custom terms"
+                        : `${selectedCapacityPriceLabel || selectedCapacityPlan.priceLabel} · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-6">
+                <div className="mb-3 flex items-center gap-2">
+                  <div className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300">
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </div>
+                  <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                    Preview limits for
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {capacityPreviewPlans.map((plan) => {
+                    const isActive = plan.id === selectedCapacityPlanId;
+                    const planPriceLabel = getPlanPriceLabel(
+                      billingStatus,
+                      plan,
+                      selectedInterval,
+                    );
+                    return (
+                      <button
+                        key={plan.id}
+                        type="button"
+                        onClick={() => setSelectedCapacityPlanId(plan.id)}
+                        className={`rounded-2xl border px-4 py-3 text-left transition-all ${
+                          isActive
+                            ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/15"
+                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-700 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-bold">{plan.name}</p>
+                            <p
+                              className={`mt-1 text-xs ${
+                                isActive
+                                  ? "text-blue-100"
+                                  : "text-slate-500 dark:text-slate-400"
+                              }`}
+                            >
+                              {plan.contactOnly
+                                ? "Custom terms"
+                                : `${planPriceLabel || plan.priceLabel} · ${formatIntervalLabel(selectedInterval).toLowerCase()}`}
+                            </p>
+                          </div>
+                          <div
+                            className={`mt-0.5 h-4 w-4 rounded-full border ${
+                              isActive
+                                ? "border-white bg-white"
+                                : "border-slate-300 dark:border-slate-600"
+                            }`}
+                          >
+                            {isActive ? (
+                              <div className="mx-auto mt-[3px] h-2 w-2 rounded-full bg-blue-600" />
+                            ) : null}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {selectedCapacityPlan && selectedCapacityLimits ? (
+                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-slate-800 dark:bg-slate-950/50">
+                  {selectedCapacityPlan.contactOnly ? (
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                          Tracked apps
+                        </p>
+                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                          {formatCapacityLimit(selectedCapacityLimits.trackedApps, "tracked apps")}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                          Competitor groups
+                        </p>
+                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                          {formatCapacityLimit(selectedCapacityLimits.competitorGroups, "competitor groups")}
+                        </p>
+                      </div>
+                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/70">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                          Tracked keywords
+                        </p>
+                        <p className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                          {formatCapacityLimit(selectedCapacityLimits.trackedKeywords, "tracked keywords")}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col space-y-7">
+                      <UsageBar
+                        used={selectedCapacityLimits.trackedApps ?? 0}
+                        total={selectedCapacityLimits.trackedApps}
+                        label="Tracked apps"
+                      />
+                      <UsageBar
+                        used={selectedCapacityLimits.competitorGroups ?? 0}
+                        total={selectedCapacityLimits.competitorGroups}
+                        label="Competitor groups"
+                      />
+                      <UsageBar
+                        used={selectedCapacityLimits.trackedKeywords ?? 0}
+                        total={selectedCapacityLimits.trackedKeywords}
+                        label="Tracked keywords"
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
           )}
         </div>
 

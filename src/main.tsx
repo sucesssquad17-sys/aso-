@@ -37,8 +37,8 @@ function MissingFirebaseConfigScreen() {
           Firebase client env vars are missing
         </h1>
         <p className="mt-3 text-sm leading-6 text-slate-300">
-          The app no longer reads a committed Firebase JSON file. Add the missing Vite
-          vars to your local <code>.env</code> and reload localhost.
+          Add the missing Firebase client config in local <code>.env</code> or in
+          <code> firebase-applet-config.json</code>, then reload localhost.
         </p>
         <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
           <p className="text-sm text-amber-200">{firebaseConfigError}</p>
@@ -51,7 +51,8 @@ function MissingFirebaseConfigScreen() {
           </ul>
         </div>
         <p className="mt-6 text-xs text-slate-500">
-          Reference: <code>.env.example</code> includes the full list of required keys.
+          Reference: <code>.env.example</code> includes the env keys, and
+          <code> firebase-applet-config.json</code> can provide the same client config.
         </p>
       </div>
     </div>

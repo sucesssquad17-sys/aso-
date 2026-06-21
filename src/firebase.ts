@@ -2,10 +2,16 @@ import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getMessaging, type Messaging } from 'firebase/messaging';
+import firebaseAppletConfig from '../firebase-applet-config.json';
 
 type FirebaseAppConfig = FirebaseOptions & {
   firestoreDatabaseId?: string;
 };
+
+type FirebaseJsonFallbackConfig = Pick<
+  FirebaseAppConfig,
+  'apiKey' | 'appId' | 'authDomain' | 'messagingSenderId' | 'projectId' | 'storageBucket'
+>;
 
 const REQUIRED_FIREBASE_ENV_KEYS = [
   'VITE_FIREBASE_API_KEY',
@@ -17,7 +23,7 @@ const REQUIRED_FIREBASE_ENV_KEYS = [
 ] as const;
 
 export const firebaseConfigErrorDetails = (() => {
-  const config: FirebaseAppConfig = {
+  const envConfig: FirebaseAppConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY?.trim(),
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN?.trim(),
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID?.trim(),
@@ -28,6 +34,40 @@ export const firebaseConfigErrorDetails = (() => {
     firestoreDatabaseId:
       import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID?.trim() || undefined,
   };
+
+  const jsonConfig = firebaseAppletConfig as FirebaseJsonFallbackConfig;
+  const fallbackConfig: FirebaseAppConfig = {
+    apiKey: jsonConfig.apiKey?.trim(),
+    authDomain: jsonConfig.authDomain?.trim(),
+    projectId: jsonConfig.projectId?.trim(),
+    storageBucket: jsonConfig.storageBucket?.trim(),
+    messagingSenderId: jsonConfig.messagingSenderId?.trim(),
+    appId: jsonConfig.appId?.trim(),
+  };
+  const config = REQUIRED_FIREBASE_ENV_KEYS.every((key) => {
+    switch (key) {
+      case 'VITE_FIREBASE_API_KEY':
+        return Boolean(envConfig.apiKey);
+      case 'VITE_FIREBASE_AUTH_DOMAIN':
+        return Boolean(envConfig.authDomain);
+      case 'VITE_FIREBASE_PROJECT_ID':
+        return Boolean(envConfig.projectId);
+      case 'VITE_FIREBASE_STORAGE_BUCKET':
+        return Boolean(envConfig.storageBucket);
+      case 'VITE_FIREBASE_MESSAGING_SENDER_ID':
+        return Boolean(envConfig.messagingSenderId);
+      case 'VITE_FIREBASE_APP_ID':
+        return Boolean(envConfig.appId);
+      default:
+        return true;
+    }
+  })
+    ? envConfig
+    : {
+        ...fallbackConfig,
+        measurementId: envConfig.measurementId,
+        firestoreDatabaseId: envConfig.firestoreDatabaseId,
+      };
 
   const missingKeys = REQUIRED_FIREBASE_ENV_KEYS.filter((key) => {
     switch (key) {
@@ -50,13 +90,18 @@ export const firebaseConfigErrorDetails = (() => {
 
   return {
     config,
+    usingJsonFallback:
+      missingKeys.length === 0 &&
+      config.apiKey === fallbackConfig.apiKey &&
+      config.appId === fallbackConfig.appId &&
+      config.projectId === fallbackConfig.projectId,
     missingKeys,
   };
 })();
 
 export const firebaseConfigError =
   firebaseConfigErrorDetails.missingKeys.length > 0
-    ? `Missing required Firebase client config: ${firebaseConfigErrorDetails.missingKeys.join(
+    ? `Missing required Firebase client config from Vite env or firebase-applet-config.json: ${firebaseConfigErrorDetails.missingKeys.join(
         ', ',
       )}.`
     : null;
