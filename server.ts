@@ -5995,13 +5995,12 @@ async function refineKeywordsWithGemini(
   rawKeywords: string[],
   mode: DiscoveryMode
 ): Promise<string[]> {
-  if (!genai || rawKeywords.length === 0) {
-    return rawKeywords;
-  }
+  let finalKeywords = rawKeywords;
 
-  const limit = DISCOVERY_PROFILES[mode].keywordLimit;
-  
-  const prompt = `You are a strict App Store Optimization (ASO) keyword expert.
+  if (genai && rawKeywords.length > 0) {
+    const limit = DISCOVERY_PROFILES[mode].keywordLimit;
+    
+    const prompt = `You are a strict App Store Optimization (ASO) keyword expert.
 I am optimizing an app with the following metadata:
 Title: "${context.title}"
 Description: "${context.description ? context.description.slice(0, 800) : 'N/A'}"
@@ -6017,50 +6016,66 @@ Your task is to refine this list based on strict ASO principles:
 4. NEVER output filler/helper-word combinations or "brand + random word" phrases.
 5. Return EXACTLY a JSON array of up to ${limit} strings. NEVER use markdown formatting.`;
 
-  try {
-    const response = await genai.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: prompt,
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
+    try {
+      const response = await genai.models.generateContent({
+        model: 'gemini-2.5-flash-lite',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
         },
-      },
-    });
+      });
 
-    const text = response.text;
-    if (text) {
-      const parsed = JSON.parse(text);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        const isValidASOKeyword = (k: any): k is string => {
-          if (typeof k !== 'string') return false;
-          const trimmed = k.trim().toLowerCase();
-          if (trimmed.length < 2 || trimmed.length > 40) return false;
-          
-          const words = trimmed.split(/\s+/);
-          if (words.length > 4) return false;
-          
-          const badStems = ['featur', 'manag', 'improv', 'updat', 'experienc', 'perform'];
-          if (words.some(w => badStems.includes(w))) return false;
-          
-          const fillers = new Set(['and', 'the', 'for', 'with', 'to', 'in', 'of', 'a', 'an', 'is', 'by', 'on']);
-          if (words.every(w => fillers.has(w))) return false;
-          
-          return true;
-        };
-        
-        const validKeywords = parsed.filter(isValidASOKeyword);
-        if (validKeywords.length > 0) {
-          return validKeywords;
+      const text = response.text;
+      if (text) {
+        const parsed = JSON.parse(text);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          finalKeywords = parsed;
         }
       }
+    } catch (err) {
+      console.error('Gemini keyword refinement failed:', err);
     }
-  } catch (err) {
-    console.error('Gemini keyword refinement failed:', err);
   }
-  return rawKeywords;
+
+  // Deterministic ASO keyword quality filter (applied to both Gemini output and fallback)
+  const isValidASOKeyword = (k: any): k is string => {
+    if (typeof k !== 'string') return false;
+    const trimmed = k.trim().toLowerCase();
+    
+    if (trimmed.length < 2 || trimmed.length > 40) return false;
+    
+    // Basic allowed chars: letters, numbers, spaces, hyphen, ampersand, dot
+    if (/[^a-z0-9\s\-\.&]/i.test(trimmed)) return false;
+    
+    const words = trimmed.split(/\s+/);
+    if (words.length > 4) return false;
+    
+    // Reject stemmed or broken tokens
+    const badStems = new Set(['featur', 'manag', 'improv', 'updat', 'experienc', 'perform', 'enhanc', 'optim', 'resolv', 'bugfix', 'introduc', 'provid']);
+    if (words.some(w => badStems.has(w))) return false;
+    
+    // Reject pure trash words with no search intent
+    const pureTrashWords = new Set(['version', 'release', 'notes', 'bug', 'bugs', 'fix', 'fixes', 'fixed', 'improvement', 'improvements', 'performance', 'experience']);
+    if (words.some(w => pureTrashWords.has(w))) return false;
+    
+    const lowIntentWords = new Set(['download', 'install', 'update', 'updates', 'support', 'user', 'users', 'app', 'apps', 'free', 'premium', 'pro']);
+    const fillers = new Set(['and', 'the', 'for', 'with', 'to', 'in', 'of', 'a', 'an', 'is', 'by', 'on', 'at', 'it', 'my', 'your', 'this', 'that', 'how', 'what', 'why', 'get', 'let']);
+    
+    // Reject if the ENTIRE phrase is just low-intent words and fillers (e.g., "free app for you")
+    if (words.every(w => fillers.has(w) || lowIntentWords.has(w))) return false;
+    
+    // Reject trailing fillers like "fitness for"
+    if (words.length > 1 && fillers.has(words[words.length - 1])) return false;
+    
+    return true;
+  };
+
+  const validKeywords = finalKeywords.filter(isValidASOKeyword);
+  return validKeywords.length > 0 ? validKeywords : rawKeywords.filter(isValidASOKeyword);
 }
 
 async function discoverRankedKeywords(input: {
