@@ -66,6 +66,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import LandingPage from "./components/LandingPage";
 import ThemeToggle from "./components/ThemeToggle";
 import { AuthenticatedApp as WorkspaceAuthenticatedApp } from "./features/app/AuthenticatedWorkspace";
+import { WorkspaceEmptyBlock, WorkspacePanel } from "./features/app/workspacePrimitives";
 import {
   DEFAULT_GLOBAL_TRACKING_TIME,
   GLOBAL_TRACKING_TIMEZONE,
@@ -4412,15 +4413,8 @@ function AuthenticatedApp({
               </button>{" "}
             </div>
           )}{" "}
-          {/* Navigation Tabs */}{" "}
-          <div
-            className="flex gap-1 mb-6 sm:mb-8 p-1 rounded-2xl w-full sm:w-fit overflow-x-auto scrollbar-hide"
-            style={{
-              background: "rgba(10,15,35,0.7)",
-              border: "1px solid rgba(51,65,85,0.4)",
-            }}
-          >
-            {" "}
+          {/* Navigation Tabs */}
+          <div className="flex gap-1 mb-6 sm:mb-8 p-1 rounded-2xl w-full sm:w-fit overflow-x-auto scrollbar-hide bg-app-surface/70 border border-app-border/50 backdrop-blur-sm">
             {(
               [
                 { id: "single", label: "Analyze", icon: Search },
@@ -4450,72 +4444,48 @@ function AuthenticatedApp({
               <button
                 key={id}
                 onClick={() => setViewMode(id)}
-                className="relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200"
-                style={{
-                  background:
-                    viewMode === id
-                      ? "linear-gradient(135deg, rgba(34,211,238,0.15), rgba(129,140,248,0.15))"
-                      : "transparent",
-                  color: viewMode === id ? "#22d3ee" : "#64748b",
-                  border:
-                    viewMode === id
-                      ? "1px solid rgba(34,211,238,0.2)"
-                      : "1px solid transparent",
-                  boxShadow:
-                    viewMode === id
-                      ? "0 2px 12px rgba(34,211,238,0.1)"
-                      : "none",
-                }}
+                className={`relative flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                  viewMode === id
+                    ? "bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 shadow-sm"
+                    : "text-app-text-muted border border-transparent hover:text-app-text"
+                }`}
               >
-                {" "}
-                <Icon className="w-3.5 h-3.5 flex-shrink-0" />{" "}
-                <span className="whitespace-nowrap">{label}</span>{" "}
+                <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+                <span>{label}</span>
                 {badge !== undefined && (
-                  <span
-                    className="ml-0.5 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center"
-                    style={{
-                      background:
-                        viewMode === id
-                          ? "rgba(34,211,238,0.2)"
-                          : "rgba(100,116,139,0.3)",
-                      color: viewMode === id ? "#22d3ee" : "#94a3b8",
-                    }}
-                  >
+                  <span className={`ml-0.5 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    viewMode === id
+                      ? "bg-cyan-500/20 text-cyan-300"
+                      : "bg-app-surface-strong text-app-text-muted"
+                  }`}>
                     {badge}
                   </span>
-                )}{" "}
+                )}
               </button>
-            ))}{" "}
-          </div>{" "}
-          {/* Search Section */}{" "}
+            ))}
+          </div>
+
+          {/* Search Section */}
           {viewMode !== "bookmarks" && viewMode !== "tracked" && (
-            <div className="card-glow p-7 mb-8">
-              {" "}
-              <h2
-                className="font-display font-bold text-lg text-app-text mb-5 flex items-center gap-2.5"
-                style={{ letterSpacing: "-0.02em" }}
-              >
-                {" "}
-                <span
-                  className="section-header-icon"
-                  style={{
-                    background: "rgba(34,211,238,0.1)",
-                    border: "1px solid rgba(34,211,238,0.2)",
-                  }}
-                >
-                  {" "}
-                  <Search
-                    className="w-4 h-4"
-                    style={{ color: "#22d3ee" }}
-                  />{" "}
-                </span>{" "}
-                {viewMode === "single"
-                  ? "Find an App to Analyze"
-                  : "Search & Add Apps to Compare"}{" "}
-                {viewMode === "compare" && (
-                  <span className="badge badge-cyan ml-1">Max 5</span>
-                )}{" "}
-              </h2>{" "}
+            <WorkspacePanel tone="strong" className="mb-8">
+              <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between mb-5">
+                <div>
+                  <div className="workspace-chip-label">
+                    {viewMode === "single" ? "Analyze" : "Compare"}
+                  </div>
+                  <h2 className="mt-1 text-lg lg:text-xl font-semibold text-app-text flex items-center gap-2">
+                    {viewMode === "single" ? "Find an App to Analyze" : "Search & Add Apps to Compare"}
+                    {viewMode === "compare" && (
+                      <span className="badge badge-cyan">Max 5</span>
+                    )}
+                  </h2>
+                  <p className="mt-1 text-xs lg:text-sm text-app-text-muted lg:mt-2">
+                    {viewMode === "single" 
+                      ? "Search the store to discover keywords, estimate volume, and analyze visibility."
+                      : "Add up to 5 apps to compare their rankings and keyword overlaps side-by-side."}
+                  </p>
+                </div>
+              </div>
               <form
                 onSubmit={handleSearch}
                 className="flex flex-col sm:flex-row gap-3"
@@ -4823,49 +4793,30 @@ function AuthenticatedApp({
                   </div>{" "}
                 </div>
               )}{" "}
-            </div>
+            </WorkspacePanel>
           )}{" "}
-          {/* Bookmarks Dashboard */}{" "}
+          {/* Bookmarks Dashboard */}
           {viewMode === "bookmarks" && (
             <div className="space-y-6">
-              {" "}
-              <h2
-                className="font-display font-bold text-app-text flex items-center gap-3"
-                style={{ fontSize: "1.375rem", letterSpacing: "-0.02em" }}
-              >
-                {" "}
-                <span
-                  className="section-header-icon"
-                  style={{
-                    background: "rgba(34,211,238,0.1)",
-                    border: "1px solid rgba(34,211,238,0.2)",
-                  }}
-                >
-                  {" "}
-                  <Bookmark
-                    className="w-4 h-4"
-                    style={{ color: "#22d3ee" }}
-                  />{" "}
-                </span>{" "}
-                Bookmarked Apps{" "}
-              </h2>{" "}
-              {bookmarks.length === 0 ? (
-                <div className="empty-state">
-                  {" "}
-                  <div className="empty-state-icon">
-                    {" "}
-                    <Bookmark
-                      className="w-7 h-7"
-                      style={{ color: "#475569" }}
-                    />{" "}
-                  </div>{" "}
-                  <h3 className="text-base font-semibold text-app-text-muted mb-1">
-                    No bookmarks yet
-                  </h3>{" "}
-                  <p className="text-sm text-app-text-muted">
-                    Analyze an app and click the bookmark icon to save it here.
-                  </p>{" "}
+              <WorkspacePanel tone="strong">
+                <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
+                  <div>
+                    <div className="workspace-chip-label">Bookmarks</div>
+                    <h2 className="mt-1 text-lg lg:text-xl font-semibold text-app-text">
+                      Bookmarked Apps
+                    </h2>
+                    <p className="mt-1 text-xs lg:text-sm text-app-text-muted lg:mt-2">
+                      Quickly access apps you've saved for later analysis.
+                    </p>
+                  </div>
                 </div>
+              </WorkspacePanel>
+              {bookmarks.length === 0 ? (
+                <WorkspaceEmptyBlock
+                  icon={Bookmark}
+                  title="No bookmarks yet"
+                  description="Analyze an app and click the bookmark icon to save it here."
+                />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {" "}
@@ -4898,8 +4849,7 @@ function AuthenticatedApp({
                       <img
                         src={b.icon}
                         alt={b.title}
-                        className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-                        style={{ border: "1px solid rgba(51,65,85,0.5)" }}
+                        className="w-14 h-14 rounded-xl object-cover flex-shrink-0 border border-app-border/60"
                       />{" "}
                       <div className="flex-1 min-w-0">
                         {" "}
@@ -4955,35 +4905,27 @@ function AuthenticatedApp({
             <div className="space-y-6">
               {" "}
               <div className="space-y-3">
-                <div className="card p-5 md:p-6">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <WorkspacePanel tone="strong">
+                  <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
                     <div>
-                      <h2 className="section-header">
-                        <span
-                          className="section-header-icon"
-                          style={{
-                            background: "rgba(34,211,238,0.1)",
-                            border: "1px solid rgba(34,211,238,0.2)",
-                          }}
-                        >
-                          <BellRing className="w-4 h-4 text-cyan-400" />
-                        </span>
+                      <div className="workspace-chip-label">Tracking</div>
+                      <h2 className="mt-1 text-lg lg:text-xl font-semibold text-app-text">
                         Tracked Keywords
                       </h2>
-                      <p className="mt-2 text-sm text-app-text-muted">
+                      <p className="mt-1 text-xs lg:text-sm text-app-text-muted lg:mt-2">
                         Focus on the latest rank, region coverage, and what needs attention.
                       </p>
                     </div>
                     {trackedKeywordGroupCount > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-app-text-muted">
+                      <div className="flex flex-wrap items-center gap-1.5 lg:gap-2 text-[10px] lg:text-xs">
+                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-app-text-muted">
                           {trackedDashboardStats.totalGroups} groups
                         </span>
-                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-emerald-300">
+                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-emerald-300">
                           {trackedDashboardStats.rankedCount} ranking
                         </span>
                         {(trackedDashboardStats.pendingCount > 0 || trackedDashboardStats.needsAttentionCount > 0) && (
-                          <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-amber-300">
+                          <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-amber-300">
                             {trackedDashboardStats.pendingCount} pending / {trackedDashboardStats.needsAttentionCount} errors
                           </span>
                         )}
@@ -4993,36 +4935,38 @@ function AuthenticatedApp({
 
                   {trackedKeywordGroupCount > 0 && (
                     <>
-                      <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_220px]">
-                        <div className="relative">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-text-muted" />
+                      <div className="mt-3 grid grid-cols-2 gap-2 lg:mt-4 lg:gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_220px]">
+                        <div className="col-span-2 lg:col-span-1 relative">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 -translate-y-1/2 text-app-text-muted" />
                           <input
                             type="text"
                             value={trackSearchTerm}
                             onChange={(event) => setTrackSearchTerm(event.target.value)}
                             placeholder="Search app, keyword, or country..."
-                            className="input-field w-full py-2.5 pl-10 pr-4"
+                            className="input-field w-full py-2 pl-9 pr-3 text-xs lg:py-2.5 lg:pl-10 lg:pr-4 lg:text-sm"
                           />
                         </div>
-                        <CountrySearchSelect
-                          value={trackFilterCountry}
-                          onChange={setTrackFilterCountry}
-                          options={COUNTRIES}
-                          includeAllOption={{
-                            code: "all",
-                            name: "All Countries",
-                          }}
-                          ariaLabel="Filter tracked keywords by country"
-                          className="w-full"
-                        />
+                        <div className="col-span-2 sm:col-span-1 lg:col-span-1">
+                          <CountrySearchSelect
+                            value={trackFilterCountry}
+                            onChange={setTrackFilterCountry}
+                            options={COUNTRIES}
+                            includeAllOption={{
+                              code: "all",
+                              name: "All Countries",
+                            }}
+                            ariaLabel="Filter tracked keywords by country"
+                            className="w-full text-xs lg:text-sm"
+                          />
+                        </div>
                         <select
                           id="tracked-app-filter"
                           name="trackedAppFilter"
                           aria-label="Filter tracked keywords by app"
                           value={trackFilterApp}
                           onChange={(e) => setTrackFilterApp(e.target.value)}
-                          className="input-field py-2.5 w-full"
-                          style={{ paddingRight: "2rem" }}
+                          className="input-field py-2 w-full col-span-1 lg:col-span-1 text-xs lg:py-2.5 lg:text-sm"
+                          style={{ paddingRight: "1.5rem" }}
                         >
                           <option value="all">All Apps</option>
                           {trackedAppTitles.map((title) => (
@@ -5037,8 +4981,8 @@ function AuthenticatedApp({
                           aria-label="Sort tracked keywords"
                           value={trackSortBy}
                           onChange={(e) => setTrackSortBy(e.target.value as any)}
-                          className="input-field py-2.5 w-full"
-                          style={{ paddingRight: "2rem" }}
+                          className="input-field py-2 w-full col-span-1 lg:col-span-1 text-xs lg:py-2.5 lg:text-sm"
+                          style={{ paddingRight: "1.5rem" }}
                         >
                           <option value="date_added">Newest first</option>
                           <option value="last_checked">Recently checked</option>
@@ -5047,11 +4991,11 @@ function AuthenticatedApp({
                         </select>
                       </div>
 
-                      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                      <div className="mt-2.5 flex flex-wrap items-center gap-1 lg:gap-2 lg:mt-3 text-[10px] lg:text-xs">
                         <button
                           type="button"
                           onClick={() => setExpandedTrackedGroupIds(visibleTrackedGroupIds)}
-                          className="btn-ghost rounded-xl px-3 py-2 text-xs"
+                          className="btn-ghost rounded-lg px-2 py-1.5 lg:rounded-xl lg:px-3 lg:py-2"
                           disabled={visibleTrackedGroupIds.length === 0}
                         >
                           Expand all
@@ -5059,7 +5003,7 @@ function AuthenticatedApp({
                         <button
                           type="button"
                           onClick={() => setExpandedTrackedGroupIds([])}
-                          className="btn-ghost rounded-xl px-3 py-2 text-xs"
+                          className="btn-ghost rounded-lg px-2 py-1.5 lg:rounded-xl lg:px-3 lg:py-2"
                           disabled={expandedTrackedGroupIds.length === 0}
                         >
                           Collapse all
@@ -5072,14 +5016,14 @@ function AuthenticatedApp({
                             setTrackFilterApp("all");
                             setTrackSortBy("date_added");
                           }}
-                          className="btn-ghost rounded-xl px-3 py-2 text-xs"
+                          className="btn-ghost rounded-lg px-2 py-1.5 lg:rounded-xl lg:px-3 lg:py-2"
                         >
                           Reset filters
                         </button>
                       </div>
                     </>
                   )}
-                </div>
+                </WorkspacePanel>
 
                 <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-xs text-app-text-muted">
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
@@ -5096,33 +5040,24 @@ function AuthenticatedApp({
               {(() => {
                 if (trackedKeywordGroupCount === 0) {
                   return (
-                    <div className="text-center py-16 bg-app-surface-muted/80 rounded-3xl shadow-xl shadow-slate-900/20 border border-app-border/60">
-                      {" "}
-                      <Bell className="w-12 h-12 text-app-text-muted mx-auto mb-4" />{" "}
-                      <p className="text-app-text-muted font-medium">
-                        No keywords tracked yet.
-                      </p>{" "}
-                      <p className="text-sm text-app-text-muted mt-2">
-                        Search for an app, check a keyword ranking, and click
-                        "Track Keyword" to monitor it here.
-                      </p>{" "}
-                    </div>
+                    <WorkspaceEmptyBlock
+                      icon={Bell}
+                      title="No keywords tracked yet"
+                      description='Search for an app, check a keyword ranking, and click "Track Keyword" to monitor it here.'
+                    />
                   );
                 }
                 if (processedTrackedKeywordGroups.length === 0) {
                   return (
-                    <div className="text-center py-12 bg-app-surface-muted/80 rounded-3xl shadow-xl border border-app-border/60">
-                      {" "}
-                      <p className="text-app-text-muted font-medium">
-                        {" "}
-                        No tracked keyword groups for{" "}
-                        {trackFilterCountry === "all"
+                    <WorkspaceEmptyBlock
+                      icon={Search}
+                      title="No results match your filter"
+                      description={`No tracked keyword groups for ${
+                        trackFilterCountry === "all"
                           ? "all countries"
-                          : findCountryName(trackFilterCountry) ||
-                            trackFilterCountry}{" "}
-                        match your filter.{" "}
-                      </p>{" "}
-                    </div>
+                          : findCountryName(trackFilterCountry) || trackFilterCountry
+                      } match your filter.`}
+                    />
                   );
                 }
                 return (
