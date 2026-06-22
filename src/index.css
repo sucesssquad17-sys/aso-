@@ -2633,6 +2633,79 @@ select {
     font-size: 0.48rem;
     letter-spacing: 0.14em;
   }
+
+  /* ---- Chip label: tighter on mobile ---- */
+  .workspace-chip-label {
+    letter-spacing: 0.14em;
+    font-size: 0.6rem;
+  }
+
+  /* ---- Metric hint / trend: hidden on mobile to reduce noise ---- */
+  .workspace-metric-hint,
+  .workspace-metric-trend {
+    display: none;
+  }
+
+  /* ---- Onboarding steps: compact ---- */
+  .workspace-onboarding-step {
+    padding: 0.65rem 0.75rem;
+    border-radius: 0.9rem;
+  }
+
+  .workspace-onboarding-step-index {
+    width: 1.5rem;
+    height: 1.5rem;
+    font-size: 0.68rem;
+  }
+
+  /* ---- Mini stat chips: compact ---- */
+  .workspace-mini-stat {
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.75rem;
+  }
+
+  /* ---- Empty state: compact (JSX already sets sm: breakpoints, this is a safety override) ---- */
+  .workspace-empty-block {
+    border-radius: 1rem;
+    padding: 1.25rem 1rem;
+  }
+
+  .workspace-empty-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.75rem;
+  }
+
+  .workspace-empty-title {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+  }
+
+  .workspace-empty-description {
+    margin-top: 0.3rem;
+    font-size: 0.78rem;
+  }
+
+  /* ---- Reports section description: clamp to 2 lines on mobile ---- */
+  .workspace-panel p.mt-1.text-xs {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* ---- Space between stacked panels: tighter ---- */
+  .space-y-6 > * + * {
+    margin-top: 0.75rem !important;
+  }
+
+  .space-y-4 > * + * {
+    margin-top: 0.5rem !important;
+  }
+
+  .space-y-3 > * + * {
+    margin-top: 0.4rem !important;
+  }
 }
 
 @media (max-width: 420px) {
@@ -2659,6 +2732,55 @@ select {
   .workspace-mobile-track-button {
     font-size: 0.6rem;
     padding: 0.46rem 0.34rem;
+  }
+}
+
+/* =========================================
+   MOBILE CONTENT DENSITY — tracked & reports cards
+   ========================================= */
+@media (max-width: 640px) {
+  /* Tracked keyword group cards: tighter internal rows */
+  .tracked-group-card-header {
+    padding: 0.65rem 0.75rem;
+  }
+
+  /* Reduce gap in flex rows inside panels on mobile */
+  .workspace-panel .flex.gap-4,
+  .workspace-panel .flex.gap-5,
+  .workspace-panel .flex.gap-6 {
+    gap: 0.75rem;
+  }
+
+  .workspace-panel .flex.flex-col.gap-4,
+  .workspace-panel .flex.flex-col.gap-5,
+  .workspace-panel .flex.flex-col.gap-6 {
+    gap: 0.65rem;
+  }
+
+  /* Compact grid inside panels: reduce gap */
+  .workspace-panel .grid.gap-4,
+  .workspace-panel .grid.gap-5,
+  .workspace-panel .grid.gap-6 {
+    gap: 0.5rem;
+  }
+
+  /* Reports section: clamp description text */
+  .workspace-panel .mt-1.text-xs.lg\:text-sm.text-app-text-muted {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Competitor group / ASO cards: reduce stacked space */
+  .workspace-panel .space-y-3 > * + * {
+    margin-top: 0.35rem;
+  }
+
+  /* Summary stat grid in reports: force 2-col on mobile */
+  .workspace-metric-grid.md\:grid-cols-4,
+  .workspace-metric-grid.lg\:grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

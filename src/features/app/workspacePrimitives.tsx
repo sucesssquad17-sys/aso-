@@ -161,13 +161,13 @@ export function WorkspaceEmptyBlock({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="workspace-empty-block px-6 py-10 md:p-12">
-      <div className="workspace-empty-icon mb-4">
-        <Icon className="h-6 w-6" />
+    <div className="workspace-empty-block px-4 py-5 sm:px-6 sm:py-10 md:p-12">
+      <div className="workspace-empty-icon mb-2 sm:mb-4 !w-10 !h-10 sm:!w-16 sm:!h-16">
+        <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
       </div>
-      <h3 className="workspace-empty-title mb-2 text-lg">{title}</h3>
-      <p className="workspace-empty-description mb-6 max-w-sm mx-auto">{description}</p>
-      {action && <div className="mt-2">{action}</div>}
+      <h3 className="workspace-empty-title mb-1 sm:mb-2 !text-sm sm:!text-lg">{title}</h3>
+      <p className="workspace-empty-description mb-3 sm:mb-6 max-w-sm mx-auto !text-xs sm:!text-[0.9rem]">{description}</p>
+      {action && <div className="mt-1 sm:mt-2">{action}</div>}
     </div>
   );
 }
@@ -232,13 +232,13 @@ export function MobileDataCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-app-border/60 dark:bg-app-surface-muted/40 md:hidden",
+        "flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-app-border/60 dark:bg-app-surface-muted/40 sm:gap-3 sm:p-4 md:hidden",
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-sm font-semibold text-slate-900 dark:text-app-text">
               {title}
             </span>
@@ -249,30 +249,30 @@ export function MobileDataCard({
             ))}
           </div>
           {subtitle && (
-            <div className="text-xs text-app-text-muted dark:text-app-text-muted">
+            <div className="text-[11px] leading-snug text-app-text-muted dark:text-app-text-muted">
               {subtitle}
             </div>
           )}
         </div>
       </div>
-      
+
       {metrics && metrics.length > 0 && (
-        <div className="grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 dark:bg-app-surface/50">
+        <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-slate-50 p-2 dark:bg-app-surface/50 sm:gap-3 sm:p-3">
           {metrics.map((metric, i) => (
-            <div key={i} className="flex flex-col gap-1">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-app-text-muted">
+            <div key={i} className="flex flex-col gap-0.5">
+              <span className="text-[9px] font-medium uppercase tracking-wider text-app-text-muted sm:text-[10px]">
                 {metric.label}
               </span>
-              <span className="text-sm font-semibold text-slate-900 dark:text-app-text">
+              <span className="text-xs font-semibold text-slate-900 dark:text-app-text sm:text-sm">
                 {metric.value}
               </span>
             </div>
           ))}
         </div>
       )}
-      
+
       {actions && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           {actions}
         </div>
       )}
