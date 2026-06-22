@@ -52,6 +52,7 @@ import {
   DEFAULT_GLOBAL_TRACKING_TIME,
   GLOBAL_TRACKING_TIMEZONE,
 } from './src/lib/trackingTime';
+import { DISCOVERY_CACHE_VERSION } from './src/lib/discoveryCache';
 import {
   DAILY_TRACKING_LEASE_TTL_MINUTES,
   getDailyTrackingFinalStatus,
@@ -132,10 +133,11 @@ const PLAY_STORE_FETCH_TIMEOUT_MS = 30000;
 const UPSTREAM_REQUEST_TIMEOUT_MS = 30000;
 const UPSTREAM_FAILURE_CACHE_TTL_SECONDS = 15;
 const RANKING_FETCH_TIMEOUT_MS = 20000;
-const DISCOVERY_CACHE_VERSION = 'v16';
 const GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES = 60;
 const GLOBAL_TRACKING_UTC_OFFSET_MINUTES = 330;
 const DAILY_TRACKING_LEASE_OWNER = `service:${process.pid}:${crypto.randomUUID()}`;
+const DODO_WEBHOOK_LEASE_TTL_MINUTES = 15;
+const DODO_WEBHOOK_PROCESS_OWNER = `dodo:${process.pid}:${crypto.randomUUID()}`;
 
 type StoreType = 'android' | 'ios';
 type DiscoveryMode = 'fast' | 'deep';
@@ -443,6 +445,16 @@ type DodoWebhookHeaders = {
   'webhook-id': string;
   'webhook-signature': string;
   'webhook-timestamp': string;
+};
+type DodoWebhookDeliveryRecord = {
+  status?: 'processing' | 'success' | 'error';
+  eventType?: string;
+  claimedAt?: string;
+  processedAt?: string;
+  updatedAt?: string;
+  error?: string;
+  leaseOwner?: string;
+  leaseExpiresAt?: string;
 };
 type PublicFirebaseClientConfig = {
   apiKey?: string;
@@ -1129,6 +1141,107 @@ function readDodoWebhookHeaders(req: express.Request): DodoWebhookHeaders {
     'webhook-signature': webhookSignature,
     'webhook-timestamp': webhookTimestamp,
   };
+}
+
+function getDodoWebhookEventRef(adminDb: Firestore, eventKey: string) {
+  return adminDb.collection('_dodoWebhookEvents').doc(eventKey);
+}
+
+function hasActiveDodoWebhookLease(
+  record: DodoWebhookDeliveryRecord | undefined,
+  now: Date,
+  ownerId?: string,
+) {
+  if (!record?.leaseOwner || !record.leaseExpiresAt) {
+    return false;
+  }
+  if (ownerId && record.leaseOwner === ownerId) {
+    return false;
+  }
+
+  const leaseExpiresAt = Date.parse(record.leaseExpiresAt);
+  if (Number.isNaN(leaseExpiresAt)) {
+    return false;
+  }
+
+  return leaseExpiresAt > now.getTime();
+}
+
+async function claimDodoWebhookEvent(adminDb: Firestore, eventKey: string) {
+  const eventRef = getDodoWebhookEventRef(adminDb, eventKey);
+  const now = new Date();
+  const leaseExpiresAt = new Date(
+    now.getTime() + DODO_WEBHOOK_LEASE_TTL_MINUTES * 60 * 1000,
+  ).toISOString();
+
+  return adminDb.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(eventRef);
+    const record = snapshot.data() as DodoWebhookDeliveryRecord | undefined;
+
+    if (record?.status === 'success') {
+      return {
+        status: 'duplicate' as const,
+      };
+    }
+
+    if (record?.status === 'processing' && hasActiveDodoWebhookLease(record, now, DODO_WEBHOOK_PROCESS_OWNER)) {
+      return {
+        status: 'processing' as const,
+      };
+    }
+
+    transaction.set(
+      eventRef,
+      {
+        status: 'processing',
+        claimedAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        error: FieldValue.delete(),
+        leaseOwner: DODO_WEBHOOK_PROCESS_OWNER,
+        leaseExpiresAt,
+      },
+      { merge: true },
+    );
+
+    return {
+      status: 'claimed' as const,
+      eventRef,
+    };
+  });
+}
+
+async function finalizeDodoWebhookEvent(
+  eventRef: DocumentReference<DocumentData>,
+  eventType: string,
+) {
+  await eventRef.set(
+    {
+      status: 'success',
+      eventType,
+      processedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      error: FieldValue.delete(),
+      leaseOwner: FieldValue.delete(),
+      leaseExpiresAt: FieldValue.delete(),
+    },
+    { merge: true },
+  );
+}
+
+async function markDodoWebhookEventError(
+  eventRef: DocumentReference<DocumentData>,
+  error: unknown,
+) {
+  await eventRef.set(
+    {
+      status: 'error',
+      updatedAt: new Date().toISOString(),
+      error: error instanceof Error ? error.message : String(error),
+      leaseOwner: FieldValue.delete(),
+      leaseExpiresAt: FieldValue.delete(),
+    },
+    { merge: true },
+  );
 }
 
 function isDodoSubscriptionWebhookEvent(event: unknown): event is DodoSubscriptionWebhookEvent {
@@ -3797,7 +3910,24 @@ async function refreshTrackedKeywordRecord(
     trackedKeyword,
     {
       rankingDepth,
-      getKeywordRank,
+      getKeywordRank: (
+        keyword,
+        appId,
+        storeType,
+        country,
+        refresh,
+        depth,
+      ) =>
+        getKeywordRank(
+          keyword,
+          appId,
+          storeType,
+          country,
+          refresh,
+          depth,
+          getUpstreamDeadline(),
+          { proxyFallbackOnNotRanked: true },
+        ),
       normalizeTrackedKeywordError: (error) =>
         normalizeApiError(error, 'Tracked keyword check failed.').message,
       normalizeCompetitorTrackedKeywordError: (error) =>
@@ -4412,9 +4542,32 @@ async function getGooglePlayRankWithFallback(
   deadlineAt: number,
   failureMessage: string,
   contextLabel: 'discovery' | 'ranking',
+  options?: {
+    proxyFallbackOnNotRanked?: boolean;
+  },
 ) {
   try {
-    return await getGooglePlayRankWeb(keyword, appId, country, depth);
+    const directRank = await getGooglePlayRankWeb(keyword, appId, country, depth);
+    if (
+      directRank !== -1 ||
+      options?.proxyFallbackOnNotRanked !== true ||
+      !googlePlayProxyRequestOptions.agent
+    ) {
+      return directRank;
+    }
+
+    console.warn(
+      `[${contextLabel}] Direct rank lookup returned not ranked for "${keyword}", verifying via proxy.`,
+    );
+    return await getGooglePlayRankViaSearch(
+      keyword,
+      appId,
+      country,
+      depth,
+      googlePlayProxyRequestOptions,
+      deadlineAt,
+      failureMessage,
+    );
   } catch (error) {
     if (!googlePlayProxyRequestOptions.agent) {
       throw error;
@@ -4940,15 +5093,19 @@ async function getKeywordRank(
   refresh = false,
   depth = DEFAULT_RANKING_DEPTH,
   deadlineAt = getUpstreamDeadline(),
+  options?: {
+    proxyFallbackOnNotRanked?: boolean;
+  },
 ) {
   const rankingDepth = normalizeRankingDepth(depth);
-  const cacheKey = `${storeType}-${country}-${appId}-${keyword}-${rankingDepth}`;
+  const proxyVerificationKey = options?.proxyFallbackOnNotRanked ? 'verify-proxy' : 'standard';
+  const cacheKey = `${storeType}-${country}-${appId}-${keyword}-${rankingDepth}-${proxyVerificationKey}`;
   const cachedRank = rankingCache.get<number>(cacheKey);
   if (cachedRank !== undefined && !refresh) {
     return cachedRank;
   }
 
-  const failureCacheKey = `ranking-failure:${storeType}:${country}:${appId}:${normalizeKeyword(keyword)}:${rankingDepth}`;
+  const failureCacheKey = `ranking-failure:${storeType}:${country}:${appId}:${normalizeKeyword(keyword)}:${rankingDepth}:${proxyVerificationKey}`;
   const useFailureCache = !refresh;
   const cachedFailure = useFailureCache ? getCachedFailure(failureCacheKey) : null;
   if (cachedFailure) {
@@ -4981,6 +5138,7 @@ async function getKeywordRank(
         deadlineAt,
         failureMessage,
         'ranking',
+        options,
       );
     }
   } catch (error) {
@@ -5229,7 +5387,24 @@ async function refreshAllTrackingState(
     state,
     {
       rankingDepth: TRACKED_KEYWORD_RANKING_DEPTH,
-      getKeywordRank,
+      getKeywordRank: (
+        keyword,
+        appId,
+        storeType,
+        country,
+        refresh,
+        depth,
+      ) =>
+        getKeywordRank(
+          keyword,
+          appId,
+          storeType,
+          country,
+          refresh,
+          depth,
+          getUpstreamDeadline(),
+          { proxyFallbackOnNotRanked: true },
+        ),
       normalizeTrackedKeywordError: (error) =>
         normalizeApiError(error, 'Tracked keyword check failed.').message,
       normalizeCompetitorTrackedKeywordError: (error) =>
@@ -6204,10 +6379,10 @@ function isValidASOKeyword(k: unknown): k is string {
   if (/[^a-z0-9\s\-\.&]/i.test(trimmed)) return false;
 
   const words = trimmed.split(/\s+/);
-  if (words.length > 4) return false;
+  if (words.length > 6) return false;
 
   // Reject stemmed or broken tokens
-  const badStems = new Set(['articl', 'featur', 'gam', 'improv', 'introduc', 'manag', 'optim', 'perform', 'provid', 'resolv', 'stat', 'updat', 'experienc', 'enhanc', 'bugfix']);
+  const badStems = new Set(['articl', 'featur', 'gam', 'improv', 'introduc', 'manag', 'messag', 'optim', 'perform', 'provid', 'resolv', 'stat', 'updat', 'experienc', 'enhanc', 'bugfix']);
   if (words.some((word) => badStems.has(word))) return false;
 
   // Reject pure trash words with no search intent
@@ -6251,7 +6426,7 @@ async function refineKeywordsWithGemini(
   let geminiKeywords: string[] = [];
 
   if (genai && rawKeywords.length > 0) {
-    const prompt = `You are a strict App Store Optimization (ASO) keyword expert.
+    const prompt = `You are a creative and broad App Store Optimization (ASO) keyword expert.
 I am optimizing an app with the following metadata:
 Title: "${context.title}"
 Description: "${context.description ? context.description.slice(0, 800) : 'N/A'}"
@@ -6260,11 +6435,11 @@ Category: "${context.category || 'N/A'}"
 I have scraped the following potential keywords from competitors:
 ${rawKeywords.join(', ')}
 
-Your task is to refine this list based on strict ASO principles:
-1. Return ONLY real, human-searchable App Store / Google Play keywords with clear search intent.
-2. DO NOT return random app-description fragments, broken phrases, or stemmed/partial tokens (e.g., "featur", "manag").
-3. Output ONLY clean 1-4 word ASO keywords.
-4. NEVER output filler/helper-word combinations or "brand + random word" phrases.
+Your task is to refine this list and discover as many relevant keywords as possible:
+1. Return real, human-searchable App Store / Google Play keywords with search intent.
+2. Filter out broken app-description fragments or stemmed tokens (e.g., "featur").
+3. You may include long-tail keywords (up to 5-6 words) if they are highly relevant.
+4. Keep the list broad but avoid generic filler-only phrases.
 5. Return EXACTLY a JSON array of up to ${limit} strings. NEVER use markdown formatting.`;
 
     try {
@@ -6641,21 +6816,42 @@ async function startServer() {
       }
 
       const eventKey = headers['webhook-id'];
-      if (dodoWebhookEventCache.has(eventKey)) {
-        return res.json({ received: true, duplicate: true });
-      }
-
       const event = client.webhooks.unwrap(rawBody, {
         headers,
         key: webhookKey,
       });
-
-      if (isDodoSubscriptionWebhookEvent(event)) {
-        await applyDodoSubscriptionEvent(event);
+      if (dodoWebhookEventCache.has(eventKey)) {
+        return res.json({ received: true, duplicate: true });
       }
 
-      dodoWebhookEventCache.set(eventKey, true);
-      return res.json({ received: true });
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+      const claim = await claimDodoWebhookEvent(adminDb, eventKey);
+      if (claim.status === 'duplicate') {
+        dodoWebhookEventCache.set(eventKey, true);
+        return res.json({ received: true, duplicate: true });
+      }
+      if (claim.status === 'processing') {
+        return res.json({ received: true, processing: true });
+      }
+
+      try {
+        if (isDodoSubscriptionWebhookEvent(event)) {
+          await applyDodoSubscriptionEvent(event);
+        }
+
+        await finalizeDodoWebhookEvent(
+          claim.eventRef,
+          typeof event?.type === 'string' ? event.type : 'unknown',
+        );
+        dodoWebhookEventCache.set(eventKey, true);
+        return res.json({ received: true });
+      } catch (error) {
+        await markDodoWebhookEventError(claim.eventRef, error).catch(() => undefined);
+        throw error;
+      }
     } catch (error) {
       console.error('[dodo] Webhook processing failed:', error);
       return sendApiError(res, error, 'Failed to process Dodo webhook.');
@@ -6999,6 +7195,7 @@ async function startServer() {
         appAnalysisSnapshots: mergedState.appAnalysisSnapshots,
         competitorGroups: mergedState.competitorGroups,
         competitorGroupSnapshots: mergedState.competitorGroupSnapshots,
+        competitorAsoLatestSnapshots: mergedState.competitorAsoLatestSnapshots,
         competitorTrackedKeywords: mergedState.competitorTrackedKeywords,
         competitorRankHistory: retainedCompetitorRankHistory,
         trackingSchedule: mergedState.schedule,
@@ -7033,26 +7230,44 @@ async function startServer() {
       if (!adminDb) {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
+      const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
       const token = readRequiredString(req.body?.token, 'token', 4096);
       const platform = readOptionalString(req.body?.platform, 'platform', 80) || 'web';
       const userAgent = readOptionalString(req.body?.userAgent, 'userAgent', 500) || 'unknown';
+      const registeredAt = new Date().toISOString();
       // Tokens are typically very long base64url strings.
       // Firebase document IDs can be up to 1500 bytes and allow most characters except forward slash.
       // We will hash the token to ensure a safe, fixed-length document ID.
       const tokenId = crypto.createHash('sha256').update(token).digest('hex');
 
-      await adminDb
-        .collection('users')
-        .doc(decodedToken.uid)
+      const currentUserSnapshot = await userDocRef.get();
+      const currentUserData = currentUserSnapshot.data() as UserTrackingDocument | undefined;
+      const currentNotificationSettings = normalizeNotificationSettings(
+        currentUserData?.notificationSettings,
+      );
+
+      await userDocRef
         .collection(USER_PUSH_TOKENS_COLLECTION)
         .doc(tokenId)
         .set({
           token,
           platform,
           userAgent,
-          lastSeenAt: new Date().toISOString(),
+          lastSeenAt: registeredAt,
         }, { merge: true });
-      res.json({ success: true });
+
+      await userDocRef.set({
+        notificationSettings: {
+          ...currentNotificationSettings,
+          lastToken: token,
+          tokenUpdatedAt: registeredAt,
+        },
+        updatedAt: registeredAt,
+      } satisfies Pick<UserTrackingDocument, 'notificationSettings' | 'updatedAt'>, {
+        merge: true,
+      });
+
+      res.json({ ok: true, success: true });
     } catch (error) {
       return sendApiError(res, error, 'Failed to register notification token.');
     }
@@ -7285,7 +7500,7 @@ async function startServer() {
       if (markAll) {
         const snapshot = await userEventsRef.where('readAt', '==', null).get();
         await Promise.all(snapshot.docs.map((doc) => doc.ref.set({ readAt: nowIso }, { merge: true })));
-        res.json({ success: true, updated: snapshot.size });
+        res.json({ ok: true, success: true, updated: snapshot.size });
         return;
       }
 
@@ -7304,7 +7519,7 @@ async function startServer() {
       await Promise.all(
         eventIds.map((eventId) => userEventsRef.doc(eventId).set({ readAt: nowIso }, { merge: true })),
       );
-      res.json({ success: true, updated: eventIds.length });
+      res.json({ ok: true, success: true, updated: eventIds.length });
     } catch (error) {
       return sendApiError(res, error, 'Failed to update alert history.');
     }

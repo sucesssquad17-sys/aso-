@@ -85,6 +85,10 @@ import {
 import { sendAuthEvent, type AuthEventPayload } from "./features/auth/telemetry";
 import { getAuthErrorMessage } from "./features/auth/utils";
 import { auth, db, messaging } from "./firebase";
+import {
+  DISCOVERY_CACHE_TTL,
+  DISCOVERY_CACHE_VERSION,
+} from "./lib/discoveryCache";
 import { loadArchivedHistoryCollections } from "./lib/firestoreHistoryArchive";
 import { logError, getFriendlyErrorMessage } from "./lib/errorHandler";
 import {
@@ -265,8 +269,6 @@ class ApiRequestError extends Error {
 }
 const TRACKED_KEYWORD_REFRESH_CONCURRENCY = 1;
 const TRACKED_KEYWORD_RANKING_DEPTH = 100;
-const DISCOVERY_CACHE_TTL = 1000 * 60 * 60 * 12;
-const DISCOVERY_CACHE_VERSION = "v11";
 const SEARCH_CACHE_VERSION = "v2";
 const TRACKING_HISTORY_LIMIT = 2000;
 const API_REQUEST_TIMEOUT_MS = 45000;

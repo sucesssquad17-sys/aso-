@@ -1,0 +1,93 @@
+﻿{
+  "apiVersion": "run.googleapis.com/v1",
+  "kind": "Job",
+  "metadata": {
+    "annotations": {
+      "run.googleapis.com/client-name": "cloud-console",
+      "run.googleapis.com/creator": "rv9411305430@gmail.com",
+      "run.googleapis.com/lastModifier": "rv9411305430@gmail.com",
+      "run.googleapis.com/operation-id": "4a574f01-d257-459b-9e4a-c71673f0724c"
+    },
+    "creationTimestamp": "2026-05-27T18:10:46.185230Z",
+    "generation": 19,
+    "labels": {
+      "cloud.googleapis.com/location": "asia-south1",
+      "run.googleapis.com/lastUpdatedTime": "2026-06-20T06:18:54.781716Z",
+      "run.googleapis.com/satisfiesPzs": "true"
+    },
+    "name": "daily-tracking-worker",
+    "namespace": "1018514426128",
+    "resourceVersion": "AAZUuycfxXs",
+    "selfLink": "/apis/run.googleapis.com/v1/namespaces/1018514426128/jobs/daily-tracking-worker",
+    "uid": "ee84c192-cf4e-439f-af82-3b3f29365966"
+  },
+  "spec": {
+    "template": {
+      "metadata": {
+        "annotations": {
+          "run.googleapis.com/client-name": "cloud-console",
+          "run.googleapis.com/execution-environment": "gen2"
+        },
+        "labels": {
+          "client.knative.dev/nonce": "mim_hek_dej"
+        }
+      },
+      "spec": {
+        "taskCount": 1,
+        "template": {
+          "spec": {
+            "containers": [
+              {
+                "env": [
+                  {
+                    "name": "PROXY_HOST",
+                    "value": "gw.dataimpulse.com"
+                  },
+                  {
+                    "name": "PROXY_PORT",
+                    "value": "823"
+                  },
+                  {
+                    "name": "PROXY_USERNAME",
+                    "value": "58bb66771551c24a299e"
+                  },
+                  {
+                    "name": "PROXY_PASSWORD",
+                    "value": "d124d64c9b0306ea"
+                  }
+                ],
+                "image": "gcr.io/aso-analyzer-pro-app/daily-tracking-worker",
+                "name": "daily-tracking-worker-1",
+                "resources": {
+                  "limits": {
+                    "cpu": "1000m",
+                    "memory": "512Mi"
+                  }
+                }
+              }
+            ],
+            "maxRetries": 0,
+            "serviceAccountName": "tracking-worker-sa@aso-analyzer-pro-app.iam.gserviceaccount.com",
+            "timeoutSeconds": "1800"
+          }
+        }
+      }
+    }
+  },
+  "status": {
+    "conditions": [
+      {
+        "status": "True",
+        "type": "Ready"
+      }
+    ],
+    "executionCount": 29,
+    "latestCreatedExecution": {
+      "completionStatus": "EXECUTION_SUCCEEDED",
+      "completionTimestamp": "2026-06-21T03:30:52.142731Z",
+      "creationTimestamp": "2026-06-21T03:30:01.744961Z",
+      "name": "daily-tracking-worker-mtk5q"
+    },
+    "observedGeneration": 19
+  }
+}
