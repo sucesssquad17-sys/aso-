@@ -161,13 +161,13 @@ export function WorkspaceEmptyBlock({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="workspace-empty-block px-4 py-5 sm:px-6 sm:py-10 md:p-12">
-      <div className="workspace-empty-icon mb-2 sm:mb-4 !w-10 !h-10 sm:!w-16 sm:!h-16">
-        <Icon className="h-4 w-4 sm:h-6 sm:w-6" />
+    <div className="workspace-empty-block">
+      <div className="workspace-empty-icon">
+        <Icon className="h-6 w-6" />
       </div>
-      <h3 className="workspace-empty-title mb-1 sm:mb-2 !text-sm sm:!text-lg">{title}</h3>
-      <p className="workspace-empty-description mb-3 sm:mb-6 max-w-sm mx-auto !text-xs sm:!text-[0.9rem]">{description}</p>
-      {action && <div className="mt-1 sm:mt-2">{action}</div>}
+      <h3 className="workspace-empty-title">{title}</h3>
+      <p className="workspace-empty-description">{description}</p>
+      {action && <div className="mt-2">{action}</div>}
     </div>
   );
 }
@@ -232,7 +232,7 @@ export function MobileDataCard({
   return (
     <div
       className={cn(
-        "flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-app-border/60 dark:bg-app-surface-muted/40 sm:gap-3 sm:p-4 md:hidden",
+        "workspace-panel !gap-2 !p-3 sm:!gap-3 sm:!p-4 md:hidden",
         className,
       )}
     >
