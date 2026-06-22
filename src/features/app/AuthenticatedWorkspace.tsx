@@ -199,7 +199,7 @@ import {
 
 function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
-    enabled: false,
+    enabled: true,
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
   };
@@ -2496,7 +2496,7 @@ function normalizeTrackingScheduleState(
   schedule?: Partial<TrackingSchedule>,
 ): TrackingSchedule {
   return {
-    enabled: Boolean(schedule?.enabled),
+    enabled: true,
     time:
       typeof schedule?.time === "string" && /^\d{2}:\d{2}$/.test(schedule.time.trim())
         ? schedule.time.trim()
@@ -2614,7 +2614,7 @@ function serializeUserStateForFirestore(state: UserAppStateDocument) {
       ),
       trackingSchedule: state.trackingSchedule
         ? {
-            enabled: state.trackingSchedule.enabled,
+            enabled: true,
             time: state.trackingSchedule.time,
             timezone: state.trackingSchedule.timezone,
           }
@@ -13597,7 +13597,6 @@ function AuthenticatedApp({
                   lastRefreshLabel: trackingSchedule.lastRunAt
                     ? formatTrackingChartDateTime(trackingSchedule.lastRunAt)
                     : "Not yet",
-                  scheduleEnabled: trackingSchedule.enabled,
                   keywordGroups: trackedKeywordGroupCount,
                   rankedKeywords: trackedDashboardStats.rankedCount,
                   top10Count: trackedOverviewStats.top10Count,

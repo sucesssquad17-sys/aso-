@@ -507,7 +507,7 @@ export function getBrowserTimeZone() {
 
 export function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
-    enabled: false,
+    enabled: true,
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
   };
@@ -2114,7 +2114,7 @@ export function normalizeTrackingScheduleState(
   schedule?: Partial<TrackingSchedule>,
 ): TrackingSchedule {
   return {
-    enabled: Boolean(schedule?.enabled),
+    enabled: true,
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
     lastRunAt: schedule?.lastRunAt,
@@ -2219,7 +2219,7 @@ export function serializeEditableUserStateForApi(
       competitorRankHistory: state.competitorRankHistory,
       trackingSchedule: state.trackingSchedule
         ? {
-            enabled: state.trackingSchedule.enabled,
+            enabled: true,
             time: DEFAULT_GLOBAL_TRACKING_TIME,
             timezone: GLOBAL_TRACKING_TIMEZONE,
           }

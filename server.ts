@@ -46,6 +46,7 @@ import {
   normalizeTrackingSchedule as normalizeSharedTrackingSchedule,
   refreshAllTrackingState as refreshSharedAllTrackingState,
   refreshTrackedKeywordRecord as refreshSharedTrackedKeywordRecord,
+  shouldRunTrackingRefresh,
   TRACKING_HISTORY_LIMIT as SHARED_TRACKING_HISTORY_LIMIT,
 } from './src/lib/backendTracking';
 import {
@@ -533,7 +534,7 @@ const TRACKED_KEYWORD_RANKING_DEPTH = 100;
 const MAX_RANKING_DEPTH = 100;
 const GLOBAL_TRACKING_HOURS = [9] as const;
 const DEFAULT_TRACKING_SCHEDULE: TrackingSchedule = {
-  enabled: false,
+  enabled: true,
   time: DEFAULT_GLOBAL_TRACKING_TIME,
   timezone: GLOBAL_TRACKING_TIMEZONE,
 };
@@ -5708,10 +5709,11 @@ async function runTrackedKeywordRefreshJob(options?: {
 async function maybeRunScheduledTrackingCheck() {
   const state = await loadTrackingState();
   const schedule = normalizeTrackingSchedule(state.schedule);
-  if (
-    !schedule.enabled ||
-    (!state.trackedKeywords.length && !state.competitorTrackedKeywords.length)
-  ) {
+  const hasTrackedData =
+    state.trackedKeywords.length > 0 ||
+    state.competitorTrackedKeywords.length > 0 ||
+    state.competitorGroups.length > 0;
+  if (!hasTrackedData) {
     return;
   }
 
@@ -5723,7 +5725,7 @@ async function maybeRunScheduledTrackingCheck() {
   }
 
   const runKey = getScheduleRunKey(now, schedule);
-  if (schedule.lastRunKey === runKey) {
+  if (!shouldRunTrackingRefresh(schedule, { hasTrackedData, runKey })) {
     return;
   }
 
@@ -5777,10 +5779,11 @@ async function runAllUserTrackingSchedules(
       }
 
       const schedule = normalizeTrackingSchedule(state.schedule);
-      if (!schedule.enabled) {
-        return;
-      }
-      if (!options?.force && schedule.lastRunKey === runKey) {
+      if (!shouldRunTrackingRefresh(schedule, {
+        hasTrackedData: true,
+        runKey,
+        force: options?.force,
+      })) {
         return;
       }
 
