@@ -1631,6 +1631,50 @@ function parsePlayStoreRankFromHtml(html: string, targetAppId: string, depth: nu
   return -1;
 }
 
+async function getGooglePlayRankViaProxySearch(
+  keyword: string,
+  appId: string,
+  country: string,
+  depth: number,
+) {
+  const results = await gplay.search({
+    term: keyword,
+    country,
+    num: depth,
+    requestOptions: googlePlayRequestOptions,
+  });
+  const index = results.findIndex((app: any) => String(app.appId) === String(appId));
+  return index !== -1 ? index + 1 : -1;
+}
+
+async function getGooglePlayRankWithFallback(
+  keyword: string,
+  appId: string,
+  country: string,
+  depth: number,
+) {
+  try {
+    const html = await fetchPlayStoreHtml(
+      `/store/search?c=apps&q=${encodeURIComponent(keyword)}`,
+      country,
+    );
+    const directRank = parsePlayStoreRankFromHtml(html, appId, depth);
+    if (directRank !== -1 || !googlePlayRequestOptions.agent) {
+      return directRank;
+    }
+
+    log(`[tracking] Direct Google Play rank lookup returned not ranked for "${keyword}", verifying via proxy.`);
+    return await getGooglePlayRankViaProxySearch(keyword, appId, country, depth);
+  } catch (err) {
+    if (!googlePlayRequestOptions.agent) {
+      throw err;
+    }
+
+    log(`[tracking] Direct Google Play rank lookup failed for "${keyword}", retrying via proxy.`);
+    return await getGooglePlayRankViaProxySearch(keyword, appId, country, depth);
+  }
+}
+
 function normalizeAsoTextValue(input: unknown) {
   return typeof input === 'string'
     ? input.replace(/\s+/g, ' ').trim()
@@ -1998,17 +2042,14 @@ async function getKeywordRank(keyword: string, appId: string, storeType: StoreTy
     }
   } else {
     try {
-      const html = await fetchPlayStoreHtml(`/store/search?c=apps&q=${encodeURIComponent(keyword)}`, country);
-      rank = parsePlayStoreRankFromHtml(html, appId, TRACKED_KEYWORD_RANKING_DEPTH);
+      rank = await getGooglePlayRankWithFallback(
+        keyword,
+        appId,
+        country,
+        TRACKED_KEYWORD_RANKING_DEPTH,
+      );
     } catch (err) {
-      // Try npm scraper as fallback
-      try {
-        const results = await gplay.search({ term: keyword, country, num: TRACKED_KEYWORD_RANKING_DEPTH, requestOptions: googlePlayRequestOptions });
-        const index = results.findIndex((app: any) => String(app.appId) === String(appId));
-        rank = index !== -1 ? index + 1 : -1;
-      } catch (fallbackErr) {
-        throw new Error(`Android rank fetch failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`);
-      }
+      throw new Error(`Android rank fetch failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -2283,6 +2324,7 @@ async function main() {
       asoChanged: totalAsoChanged,
       asoFailed: totalAsoFailed,
       durationMs,
+      error: FieldValue.delete(),
       watchdogRetryEligible: finalStatus === 'partial'
         ? shouldRetryPartialDailyTracking(summary)
         : false,

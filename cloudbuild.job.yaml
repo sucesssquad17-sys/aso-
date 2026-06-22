@@ -1,7 +1,5 @@
 steps:
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', 'gcr.io/aso-analyzer-pro-app/daily-tracking-worker', '-f', 'Dockerfile.job', '.']
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/aso-analyzer-pro-app/daily-tracking-worker']
+    args: ['build', '-t', '${_IMAGE_NAME}', '-f', 'Dockerfile.job', '.']
 images:
-  - 'gcr.io/aso-analyzer-pro-app/daily-tracking-worker'
+  - '${_IMAGE_NAME}'
