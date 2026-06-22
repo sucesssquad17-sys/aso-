@@ -1690,23 +1690,23 @@ export default function ReportsWorkspace({
   return (
     <div className="space-y-6">
       <WorkspacePanel tone="strong">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="workspace-chip-label">Reports</div>
-            <h2 className="mt-1 text-xl font-semibold text-app-text">
+            <h2 className="mt-1 text-lg lg:text-xl font-semibold text-app-text">
               Rank movement analysis
             </h2>
-            <p className="mt-2 text-sm text-app-text-muted">
+            <p className="mt-1 text-xs lg:text-sm text-app-text-muted lg:mt-2">
               Review movement trends, drill into keywords, and compare competitor groups from one workspace.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 lg:gap-2">
             {REPORT_MODE_OPTIONS.map((option) => (
               <button
                 key={option.key}
                 type="button"
                 onClick={() => setReportMode(option.key)}
-                className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`rounded-lg lg:rounded-xl px-3 py-1.5 lg:px-4 lg:py-2 text-xs lg:text-sm font-semibold transition-colors ${
                   reportMode === option.key
                     ? "bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
                     : "bg-app-surface/45 text-app-text-muted border border-app-border/70 hover:text-app-text"
@@ -1717,13 +1717,13 @@ export default function ReportsWorkspace({
             ))}
           </div>
         </div>
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-3 lg:mt-5 flex flex-wrap gap-1.5 lg:gap-2">
           {REPORT_PERIOD_OPTIONS.map((option) => (
             <button
               key={option.key}
               type="button"
               onClick={() => setPeriod(option.key)}
-              className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] transition-colors ${
+              className={`rounded-full px-2 py-1 lg:px-3 lg:py-1.5 text-[10px] lg:text-xs font-semibold uppercase tracking-[0.18em] transition-colors ${
                 period === option.key
                   ? "bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
                   : "bg-app-surface/45 text-app-text-muted border border-app-border/70 hover:text-app-text"
@@ -1738,30 +1738,32 @@ export default function ReportsWorkspace({
       {reportMode === "my" ? (
         <>
           <WorkspacePanel tone="muted">
-            <div className="grid gap-3 xl:grid-cols-[240px_220px_280px_minmax(0,1fr)]">
+            <div className="grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-[240px_220px_280px_minmax(0,1fr)]">
               <select
                 value={reportStoreFilter}
                 onChange={(event) =>
                   setReportStoreFilter(event.target.value as StoreType | "all")
                 }
-                className="input-field py-2.5"
+                className="input-field py-2 text-xs lg:py-2.5 lg:text-sm col-span-1"
               >
                 <option value="all">All Stores</option>
                 <option value="android">Google Play</option>
                 <option value="ios">iOS</option>
               </select>
-              <CountrySearchSelect
-                value={reportCountryFilter}
-                onChange={setReportCountryFilter}
-                options={COUNTRIES}
-                includeAllOption={{ code: "all", name: "All Countries" }}
-                ariaLabel="Filter report by country"
-                className="w-full"
-              />
+              <div className="col-span-1">
+                <CountrySearchSelect
+                  value={reportCountryFilter}
+                  onChange={setReportCountryFilter}
+                  options={COUNTRIES}
+                  includeAllOption={{ code: "all", name: "All Countries" }}
+                  ariaLabel="Filter report by country"
+                  className="w-full text-xs lg:text-sm"
+                />
+              </div>
               <select
                 value={reportAppFilter}
                 onChange={(event) => setReportAppFilter(event.target.value)}
-                className="input-field py-2.5"
+                className="input-field py-2 text-xs lg:py-2.5 lg:text-sm col-span-2 sm:col-span-1 xl:col-span-1"
               >
                 <option value="all">All Apps</option>
                 {trackedAppOptions.map((appTitle) => (
@@ -1773,7 +1775,7 @@ export default function ReportsWorkspace({
               <select
                 value={reportKeywordFilter}
                 onChange={(event) => setReportKeywordFilter(event.target.value)}
-                className="input-field py-2.5"
+                className="input-field py-2 text-xs lg:py-2.5 lg:text-sm col-span-2 sm:col-span-1 xl:col-span-1"
               >
                 <option value="all">All Keywords</option>
                 {myKeywordOptions.map((keyword) => (
@@ -1784,8 +1786,8 @@ export default function ReportsWorkspace({
               </select>
             </div>
             {hasKeywordDrilldown ? (
-              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
-                <span className="text-sm text-app-text-muted">
+              <div className="mt-3 lg:mt-4 flex flex-wrap items-center gap-2 lg:gap-3 rounded-xl lg:rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-3 py-2 lg:px-4 lg:py-3">
+                <span className="text-xs lg:text-sm text-app-text-muted">
                   Viewing keyword drilldown for{" "}
                   <span className="font-semibold text-cyan-200">
                     {reportKeywordFilter}
@@ -1794,9 +1796,9 @@ export default function ReportsWorkspace({
                 <button
                   type="button"
                   onClick={() => setReportKeywordFilter("all")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
+                  className="inline-flex items-center gap-1.5 lg:gap-2 rounded-lg lg:rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 py-1.5 lg:px-3 lg:py-2 text-[10px] lg:text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
                 >
-                  <ArrowLeft className="h-3.5 w-3.5" />
+                  <ArrowLeft className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
                   Back to all keywords
                 </button>
               </div>
@@ -1804,9 +1806,9 @@ export default function ReportsWorkspace({
           </WorkspacePanel>
 
           <WorkspacePanel tone="muted">
-            <div className="mb-4">
+            <div className="mb-3 lg:mb-4">
               <div className="workspace-chip-label">Quick Summary</div>
-              <h3 className="mt-1 text-lg font-semibold text-app-text">
+              <h3 className="mt-1 text-base lg:text-lg font-semibold text-app-text">
                 What changed in this period
               </h3>
             </div>

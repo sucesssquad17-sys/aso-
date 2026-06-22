@@ -1653,6 +1653,11 @@ async function getGooglePlayRankWithFallback(
   country: string,
   depth: number,
 ) {
+  if (googlePlayRequestOptions.agent) {
+    log(`[tracking] Using proxy-first Google Play rank lookup for "${keyword}".`);
+    return await getGooglePlayRankViaProxySearch(keyword, appId, country, depth);
+  }
+
   try {
     const html = await fetchPlayStoreHtml(
       `/store/search?c=apps&q=${encodeURIComponent(keyword)}`,
@@ -1748,12 +1753,16 @@ async function getStoreAppDetails(appId: string, storeType: StoreType, country: 
   if (storeType === 'ios') {
     details = await store.app({ id: appId, country, requestOptions: appStoreRequestOptions });
   } else {
-    try {
+    if (googlePlayRequestOptions.agent) {
       details = await gplay.app({ appId, country, requestOptions: googlePlayRequestOptions });
-    } catch (error) {
-      console.warn(`google-play-scraper app lookup failed for "${appId}", falling back to web parsing.`);
-      const html = await fetchPlayStoreHtml(`/store/apps/details?id=${encodeURIComponent(appId)}`, country);
-      details = parsePlayStoreAppDetails(html, appId);
+    } else {
+      try {
+        details = await gplay.app({ appId, country, requestOptions: googlePlayRequestOptions });
+      } catch (error) {
+        console.warn(`google-play-scraper app lookup failed for "${appId}", falling back to web parsing.`);
+        const html = await fetchPlayStoreHtml(`/store/apps/details?id=${encodeURIComponent(appId)}`, country);
+        details = parsePlayStoreAppDetails(html, appId);
+      }
     }
   }
 
