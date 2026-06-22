@@ -446,7 +446,7 @@ export function UpgradePage({
 
         <div className="mb-12 flex flex-col sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Plan card */}
-          <div className="order-2 sm:order-1 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-app-border dark:bg-app-surface-muted/80 backdrop-blur-sm">
+          <div className="workspace-panel order-2 sm:order-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
               Your membership
             </p>
@@ -539,7 +539,7 @@ export function UpgradePage({
 
           {/* Usage bars */}
           {accessState === "active" && billingStatus?.usage && billingStatus?.planLimits ? (
-            <div className="order-1 sm:order-2 flex flex-col rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-app-border dark:bg-app-surface-muted/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+            <div className="workspace-panel order-1 sm:order-2 sm:col-span-1 lg:col-span-2">
               <p className="mb-6 text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                 Capacity usage
               </p>
@@ -562,7 +562,7 @@ export function UpgradePage({
               </div>
             </div>
           ) : (
-            <div className="order-1 sm:order-2 rounded-[20px] border border-slate-200 bg-white p-7 shadow-sm dark:border-app-border dark:bg-app-surface-muted/80 backdrop-blur-sm sm:col-span-1 lg:col-span-2">
+            <div className="workspace-panel order-1 sm:order-2 sm:col-span-1 lg:col-span-2">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
@@ -708,7 +708,7 @@ export function UpgradePage({
         </div>
 
         {/* ── Everything included ───────────────────────────────────────── */}
-        <div className="relative mb-12 overflow-hidden rounded-[24px] border border-slate-200/60 bg-slate-50/50 p-8 shadow-sm dark:border-app-border dark:bg-app-surface-muted/50 sm:p-10 md:p-12">
+        <div className="workspace-panel relative mb-12 overflow-hidden !border-slate-200/60 bg-slate-50/50 dark:bg-app-surface-muted/50">
           {/* Subtle gradient background inside */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f0f7ff] to-transparent dark:from-blue-950/20" />
           
@@ -755,10 +755,10 @@ export function UpgradePage({
             return (
               <div
                 key={plan.id}
-                className={`relative flex h-full flex-col rounded-[20px] bg-white shadow-sm transition-all dark:bg-app-surface-muted/90 backdrop-blur-sm ${
+                className={`workspace-panel relative h-full transition-all ${
                   isHighlight
                     ? "border-2 border-blue-600 px-6 pb-6 pt-10 shadow-xl shadow-blue-500/10 z-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
-                    : "border border-slate-200 p-6 dark:border-app-border hover:shadow-md"
+                    : "!border !border-slate-200 dark:!border-app-border hover:shadow-md"
                 }`}
               >
                 {/* Popular banner */}

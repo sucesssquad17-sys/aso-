@@ -13139,7 +13139,7 @@ function AuthenticatedApp({
                                   : "No ASO changes match the current filters."}
                               </div>
                             ) : (
-                              <div className="mt-4 overflow-hidden rounded-2xl border border-app-border/60 bg-app-surface/40">
+                              <div className="workspace-panel overflow-hidden mt-4 !p-0">
                                 <div className="grid grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                   <div>Detected</div>
                                   <div>App</div>
@@ -14740,12 +14740,12 @@ function AuthenticatedApp({
                   ) : (
                     <div className="space-y-2">
                       {isLoadingCharts ? (
-                        <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
+                        <div className="flex items-center gap-2 workspace-metric-card text-sm text-app-text-muted">
                           <Loader2 className="h-4 w-4 animate-spin" />
                           Loading category chart snapshot...
                         </div>
                       ) : chartEntries.length === 0 ? (
-                        <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
+                        <div className="workspace-metric-card text-sm text-app-text-muted">
                           No chart data available for this combination right
                           now.
                         </div>
@@ -16133,7 +16133,7 @@ function AuthenticatedApp({
                   </button>{" "}
                 </div>{" "}
               </div>{" "}
-              <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-sm text-app-text-muted flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+              <div className="workspace-panel !px-4 !py-3 !flex-col md:!flex-row md:!items-center md:!justify-between gap-2 text-sm text-app-text-muted">
                 {" "}
                 <span>
                   {" "}
@@ -16235,12 +16235,12 @@ function AuthenticatedApp({
                 ) : (
                   <div className="space-y-2">
                     {isLoadingCharts ? (
-                      <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
+                      <div className="flex items-center gap-2 workspace-metric-card text-sm text-app-text-muted">
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Loading category chart snapshot...
                       </div>
                     ) : chartEntries.length === 0 ? (
-                      <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
+                      <div className="workspace-metric-card text-sm text-app-text-muted">
                         No chart data available for this combination right now.
                       </div>
                     ) : (
@@ -16285,7 +16285,7 @@ function AuthenticatedApp({
                 {compareAppInsights.map((insight) => (
                   <div
                     key={insight.compareKey}
-                    className="bg-app-surface-muted/60 p-5 rounded-2xl shadow-lg border border-app-border/50 relative transition-all hover:shadow-cyan-500/10 hover:border-app-border backdrop-blur-sm"
+                    className="workspace-panel relative transition-all hover:shadow-cyan-500/10 hover:border-app-border"
                   >
                     <button
                       onClick={() => removeCompareApp(insight.appDetails)}
@@ -16471,7 +16471,7 @@ function AuthenticatedApp({
                         term.{" "}
                       </p>{" "}
                       <div className="mt-5 grid gap-3 md:grid-cols-3">
-                        <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                        <div className="workspace-panel !px-4 !py-3">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Coverage leader
                           </p>
@@ -16484,7 +16484,7 @@ function AuthenticatedApp({
                               : "Refresh compare analysis to load coverage data."}
                           </p>
                         </div>
-                        <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                        <div className="workspace-panel !px-4 !py-3">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Contested keywords
                           </p>
@@ -16495,7 +16495,7 @@ function AuthenticatedApp({
                             Terms where multiple compared apps already rank.
                           </p>
                         </div>
-                        <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                        <div className="workspace-panel !px-4 !py-3">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Opportunity gaps
                           </p>
@@ -16507,7 +16507,7 @@ function AuthenticatedApp({
                           </p>
                         </div>
                       </div>
-                      <div className="mt-5 rounded-2xl border border-app-border/60 bg-app-surface/45 p-4">
+                      <div className="workspace-panel mt-5">
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Coverage ladder
@@ -16520,7 +16520,7 @@ function AuthenticatedApp({
                           {compareCoverageLeaders.map((insight, index) => (
                             <div
                               key={`coverage-leader-${insight.compareKey}`}
-                              className="flex items-center gap-3 rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-2.5"
+                              className="workspace-metric-card !flex-row items-center gap-3 !px-3 !py-2.5"
                             >
                               <div className="w-8 text-center text-xs font-bold text-app-text-muted">
                                 #{index + 1}
@@ -16575,7 +16575,7 @@ function AuthenticatedApp({
                           compareGapRows.slice(0, 5).map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
+                              className="workspace-panel"
                             >
                               {" "}
                               <div className="flex items-start justify-between gap-3">
@@ -16646,7 +16646,7 @@ function AuthenticatedApp({
                           compareSharedBattles.map((battle) => (
                             <div
                               key={battle.keyword}
-                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
+                              className="workspace-panel"
                             >
                               {" "}
                               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -16722,7 +16722,7 @@ function AuthenticatedApp({
                           compareGapRows.map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="rounded-xl border border-app-border/60 bg-app-surface/50 p-4"
+                              className="workspace-panel"
                             >
                               {" "}
                               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -16829,7 +16829,7 @@ function AuthenticatedApp({
                         {compareRankings.map((result, index) => (
                           <div
                             key={`${result.appTitle}-${index}`}
-                            className="flex flex-col gap-3 rounded-xl border border-app-border/60 bg-app-surface-muted/40 p-4 md:flex-row md:items-center md:justify-between"
+                            className="workspace-panel !flex-col md:!flex-row md:!items-center md:!justify-between gap-3"
                           >
                             {" "}
                             <div>
@@ -16987,12 +16987,12 @@ function AuthenticatedApp({
                       {chartError}
                     </div>
                   ) : isLoadingCharts ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-4 text-sm text-app-text-muted">
+                    <div className="flex items-center gap-2 workspace-metric-card text-sm text-app-text-muted">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Loading chart leaderboard...
                     </div>
                   ) : chartEntries.length === 0 ? (
-                    <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-4 py-10 text-center text-sm text-app-text-muted">
+                    <div className="workspace-empty-block !py-10">
                       No chart data available for this store / country /
                       category combination right now.
                     </div>
@@ -17049,7 +17049,7 @@ function AuthenticatedApp({
                       Snapshot Stats
                     </p>
                     <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                      <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                      <div className="workspace-panel !px-4 !py-3">
                         <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                           Rows loaded
                         </p>
@@ -17057,7 +17057,7 @@ function AuthenticatedApp({
                           {chartEntries.length}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                      <div className="workspace-panel !px-4 !py-3">
                         <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                           Store
                         </p>
@@ -17065,7 +17065,7 @@ function AuthenticatedApp({
                           {storeType === "ios" ? "iOS" : "Android"}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3">
+                      <div className="workspace-panel !px-4 !py-3">
                         <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                           Selected app
                         </p>
@@ -17084,7 +17084,7 @@ function AuthenticatedApp({
                       App Spotlight
                     </p>
                     {selectedApp ? (
-                      <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/45 p-4">
+                      <div className="workspace-panel mt-4">
                         <div className="flex items-center gap-3">
                           <img
                             src={selectedApp.icon}
@@ -17101,7 +17101,7 @@ function AuthenticatedApp({
                           </div>
                         </div>
                         <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-3">
+                          <div className="workspace-metric-card !p-3">
                             <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                               Chart rank
                             </p>
@@ -17111,7 +17111,7 @@ function AuthenticatedApp({
                                 : "-"}
                             </p>
                           </div>
-                          <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-3">
+                          <div className="workspace-metric-card !p-3">
                             <p className="text-xs uppercase tracking-[0.16em] text-app-text-muted">
                               Chart type
                             </p>
@@ -17127,7 +17127,7 @@ function AuthenticatedApp({
                         </p>
                       </div>
                     ) : (
-                      <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-6 text-sm text-app-text-muted">
+                      <div className="workspace-panel mt-4 !py-6 text-sm text-app-text-muted">
                         Analyze an app first if you want its chart rank pinned
                         against this leaderboard.
                       </div>
@@ -17230,7 +17230,7 @@ function AuthenticatedApp({
                       </div>
                       {viewMode === "single" && selectedApp ? (
                         <>
-                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/50 p-4">
+                          <div className="workspace-panel">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               {selectedApp.title}
                             </p>
@@ -17252,7 +17252,7 @@ function AuthenticatedApp({
                                 </p>
                               </div>
                             </div>
-                            <div className="mt-4 rounded-xl border border-app-border/50 bg-app-surface/60 px-3 py-3 text-sm text-app-text-muted">
+                            <div className="workspace-metric-card mt-4 !p-3 text-sm text-app-text-muted">
                               {isLoadingCharts ? (
                                 <div className="flex items-center gap-2 text-app-text-muted">
                                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -17284,7 +17284,7 @@ function AuthenticatedApp({
                               )}
                             </div>
                           </div>
-                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/50 p-4">
+                          <div className="workspace-panel">
                             <div className="mb-3 flex items-center justify-between gap-3">
                               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                 Current leaders
@@ -17331,7 +17331,7 @@ function AuthenticatedApp({
                               {!isLoadingCharts &&
                                 !chartError &&
                                 chartEntries.length === 0 && (
-                                  <div className="rounded-xl border border-app-border/50 bg-app-surface/50 px-3 py-6 text-center text-sm text-app-text-muted">
+                                  <div className="workspace-empty-block !p-6">
                                     No chart data available for this store /
                                     country / category combination right now.
                                   </div>
@@ -17344,7 +17344,7 @@ function AuthenticatedApp({
                           {chartError}
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/50 p-4">
+                        <div className="workspace-panel">
                           <div className="mb-3 flex items-center justify-between gap-3">
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               Category leaders
@@ -17357,12 +17357,12 @@ function AuthenticatedApp({
                           </div>
                           <div className="space-y-2">
                             {isLoadingCharts ? (
-                              <div className="flex items-center gap-2 rounded-xl border border-app-border/50 bg-app-surface/50 px-4 py-4 text-sm text-app-text-muted">
+                              <div className="workspace-metric-card !flex-row items-center gap-2 text-sm text-app-text-muted">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 Loading category chart snapshot...
                               </div>
                             ) : chartEntries.length === 0 ? (
-                              <div className="rounded-xl border border-app-border/50 bg-app-surface/50 px-4 py-4 text-sm text-app-text-muted">
+                              <div className="workspace-metric-card text-sm text-app-text-muted">
                                 No chart data available for this combination
                                 right now.
                               </div>
