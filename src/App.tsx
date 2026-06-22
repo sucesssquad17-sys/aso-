@@ -279,7 +279,7 @@ const LEGAL_VERSION = "2026-05-26";
 
 function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
-    enabled: false,
+    enabled: true,
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
   };
@@ -645,7 +645,7 @@ function normalizeTrackingScheduleState(
 ): TrackingSchedule {
   const defaults = getDefaultTrackingSchedule();
   return {
-    enabled: Boolean(schedule?.enabled),
+    enabled: true,
     time: schedule?.time || defaults.time,
     timezone: schedule?.timezone || defaults.timezone,
     lastRunAt: schedule?.lastRunAt,

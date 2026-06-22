@@ -156,7 +156,6 @@ type ReportTrackedCountryRow = {
 
 type TrackedReportOverview = {
   lastRefreshLabel: string;
-  scheduleEnabled: boolean;
   keywordGroups: number;
   rankedKeywords: number;
   top10Count: number;
@@ -1323,9 +1322,9 @@ export default function ReportsWorkspace({
         hint: "Most recent tracked refresh across the workspace",
       },
       {
-        label: "Schedule",
-        value: trackedOverview.scheduleEnabled ? "Daily enabled" : "Daily disabled",
-        hint: "Background monitoring schedule",
+        label: "Tracking",
+        value: "Daily active",
+        hint: "Automatic background monitoring",
       },
       {
         label: "Keyword Groups",
@@ -1900,9 +1899,7 @@ export default function ReportsWorkspace({
                         Last refresh {trackedOverview.lastRefreshLabel}
                       </span>
                       <span className="workspace-status-chip">
-                        {trackedOverview.scheduleEnabled
-                          ? "Daily enabled"
-                          : "Daily disabled"}
+                        Daily active
                       </span>
                     </div>
                   </div>

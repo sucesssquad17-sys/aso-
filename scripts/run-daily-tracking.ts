@@ -49,6 +49,7 @@ import {
   normalizeTrackingSchedule as normalizeSharedTrackingSchedule,
   refreshAllTrackingState as refreshSharedAllTrackingState,
   resolveTrackingGroupId as resolveSharedTrackingGroupId,
+  shouldRunTrackingRefresh,
   TRACKED_KEYWORD_RANKING_DEPTH,
   TRACKING_HISTORY_LIMIT as SHARED_TRACKING_HISTORY_LIMIT,
   TRACKING_REFRESH_CONCURRENCY,
@@ -2208,13 +2209,7 @@ async function main() {
           timezone: GLOBAL_TRACKING_TIMEZONE,
         }),
       };
-      if (!state.schedule.enabled) {
-        log(`  → User ${userDoc.id}: schedule disabled, skipping`);
-        continue;
-      }
-
-      // Skip if already ran for this runKey
-      if (state.schedule.lastRunKey === runKey) {
+      if (!shouldRunTrackingRefresh(state.schedule, { hasTrackedData: true, runKey })) {
         log(`  → User ${userDoc.id}: already ran for ${runKey}, skipping`);
         continue;
       }

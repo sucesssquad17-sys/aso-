@@ -164,8 +164,7 @@ export function normalizeTrackingSchedule(
   fallback: TrackingSchedule,
 ): TrackingSchedule {
   return {
-    enabled:
-      typeof input?.enabled === 'boolean' ? input.enabled : fallback.enabled,
+    enabled: true,
     time:
       typeof input?.time === 'string' && /^\d{2}:\d{2}$/.test(input.time.trim())
         ? input.time.trim()
@@ -177,6 +176,25 @@ export function normalizeTrackingSchedule(
     lastRunAt: typeof input?.lastRunAt === 'string' ? input.lastRunAt : undefined,
     lastRunKey: typeof input?.lastRunKey === 'string' ? input.lastRunKey : undefined,
   };
+}
+
+export function shouldRunTrackingRefresh(
+  schedule: Pick<TrackingSchedule, 'lastRunKey'>,
+  options: {
+    hasTrackedData: boolean;
+    runKey?: string;
+    force?: boolean;
+  },
+) {
+  if (!options.hasTrackedData) {
+    return false;
+  }
+
+  if (options.runKey && !options.force && schedule.lastRunKey === options.runKey) {
+    return false;
+  }
+
+  return true;
 }
 
 export function getScheduleRunKey(date: Date, schedule: TrackingSchedule) {
