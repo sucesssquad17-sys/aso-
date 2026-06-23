@@ -116,7 +116,7 @@ import type { ThemeMode } from "../../lib/theme";
 import {
   countPlanUsage,
   getCompetitorTrackedKeywordIdentityKey,
-  getTrackedAppIdentityKey,
+  getTrackedAppIdentityKeysFromTrackedKeywords,
   getTrackedKeywordActivity,
   getTrackedKeywordIdentityKey as getPlanTrackedKeywordIdentityKey,
   type PlanLimits,
@@ -142,6 +142,7 @@ import {
   type CompetitorAnalysisInsight,
   type CompetitorAsoDiffRecord,
   type CompetitorAsoFieldName,
+  type CompetitorAsoSnapshotRecord,
   type CompetitorAsoSummary,
   type CompetitorDraftKeywordCandidate,
   type CompetitorDraftKeywordCandidateApp,
@@ -176,6 +177,9 @@ import {
   type TrackedKeywordStatus,
   type TrackingSchedule,
   type UserAppStateDocument,
+  normalizeTrackingScheduleState as normalizeSharedTrackingScheduleState,
+  reconcileCompetitorTrackedKeywordCountryEdit,
+  serializeEditableUserStateForApi,
 } from "../tracking/model";
 import {
   WorkspaceEmptyBlock,
@@ -353,6 +357,138 @@ type CompetitorTrackedKeywordGroupView = {
   countryViews: CompetitorTrackedKeywordCountryView[];
   lastCheckedAt?: string;
 };
+
+export function getCompetitorTrackedKeywordCardState({
+  keywordGroup,
+  workspaceCountry,
+  selectedCountriesByGroup,
+}: {
+  keywordGroup: Pick<
+    CompetitorTrackedKeywordGroupView,
+    "groupKey" | "groupId" | "keyword" | "countries" | "countryViews"
+  >;
+  workspaceCountry: string;
+  selectedCountriesByGroup?: Record<string, string | undefined>;
+}) {
+  const defaultSummaryCountryCode =
+    keywordGroup.countryViews.find(
+      (countryView) =>
+        countryView.trackedKeyword.country === workspaceCountry,
+    )?.trackedKeyword.country ||
+    [...keywordGroup.countryViews].sort(
+      (a, b) =>
+        new Date(b.trackedKeyword.lastCheckedAt || 0).getTime() -
+        new Date(a.trackedKeyword.lastCheckedAt || 0).getTime(),
+    )[0]?.trackedKeyword.country ||
+    keywordGroup.countryViews[0]?.trackedKeyword.country;
+  const selectedCountryView =
+    keywordGroup.countryViews.find(
+      (countryView) =>
+        countryView.trackedKeyword.country ===
+        selectedCountriesByGroup?.[keywordGroup.groupKey],
+    ) ||
+    keywordGroup.countryViews.find(
+      (countryView) =>
+        countryView.trackedKeyword.country === defaultSummaryCountryCode,
+    ) ||
+    keywordGroup.countryViews[0] ||
+    null;
+
+  return {
+    selectedCountryView,
+    showCountrySwitcher: keywordGroup.countries.length > 1,
+    showEditCountries: selectedCountryView !== null,
+    editCountriesInput: selectedCountryView
+      ? {
+          groupId: keywordGroup.groupId,
+          keyword: keywordGroup.keyword,
+        }
+      : null,
+  };
+}
+
+export function getTrackedAppUsageCountForOverview(
+  trackedKeywords: Array<Pick<TrackedKeyword, "appId" | "store">>,
+) {
+  return getTrackedAppIdentityKeysFromTrackedKeywords(trackedKeywords).size;
+}
+
+export function getTrackedViewAppCountForOverview(
+  trackedAppGroups: Array<Pick<TrackedAppGroupView, "appKey">>,
+) {
+  return new Set(trackedAppGroups.map((group) => group.appKey)).size;
+}
+
+export function isTrackedKeywordKeyWithinActiveLimit(
+  activity:
+    | {
+        activeKeys: Set<string>;
+        pausedTrackedKeywords: number;
+      }
+    | null
+    | undefined,
+  trackedKeywordKey: string,
+) {
+  if (!activity || activity.pausedTrackedKeywords === 0) {
+    return true;
+  }
+
+  return activity.activeKeys.has(trackedKeywordKey);
+}
+
+function syncOwnTrackedAppsWithTrackedKeywords(
+  trackedApps: TrackedAppRecord[],
+  trackedKeywords: TrackedKeyword[],
+) {
+  const existingTrackedAppsByKey = new Map(
+    trackedApps
+      .filter((trackedApp) => trackedApp.kind === "own")
+      .map((trackedApp) => [trackedApp.appKey, trackedApp]),
+  );
+  const nextTrackedAppsByKey = new Map<string, TrackedAppRecord>();
+
+  trackedKeywords.forEach((trackedKeyword) => {
+    const appKey = getTrackedAppKeyFromValues(
+      trackedKeyword.appId,
+      trackedKeyword.store,
+    );
+    const existingTrackedApp = nextTrackedAppsByKey.get(appKey);
+    if (existingTrackedApp) {
+      const country = normalizeCountryCode(trackedKeyword.country, "us");
+      if (!existingTrackedApp.countries.includes(country)) {
+        existingTrackedApp.countries.push(country);
+        existingTrackedApp.countries.sort((left, right) => left.localeCompare(right));
+      }
+      return;
+    }
+
+    const matchedTrackedApp = existingTrackedAppsByKey.get(appKey);
+    nextTrackedAppsByKey.set(appKey, {
+      appKey,
+      appId: trackedKeyword.appId,
+      store: trackedKeyword.store,
+      title:
+        matchedTrackedApp?.title ||
+        trackedKeyword.appTitle ||
+        trackedKeyword.appId,
+      developer: matchedTrackedApp?.developer || "",
+      icon: matchedTrackedApp?.icon || "",
+      url: matchedTrackedApp?.url,
+      category: matchedTrackedApp?.category,
+      kind: "own",
+      source: matchedTrackedApp?.source || "manual",
+      countries: [normalizeCountryCode(trackedKeyword.country, "us")],
+      createdAt:
+        matchedTrackedApp?.createdAt ||
+        trackedKeyword.createdAt ||
+        new Date().toISOString(),
+      updatedAt: matchedTrackedApp?.updatedAt || new Date().toISOString(),
+      lastAnalyzedAt: matchedTrackedApp?.lastAnalyzedAt,
+    });
+  });
+
+  return normalizeTrackedApps(Array.from(nextTrackedAppsByKey.values()));
+}
 
 function getBookmarkKey(bookmark: Pick<AppBookmark, "appId" | "id" | "store">) {
   return bookmark.store === "ios"
@@ -1801,6 +1937,74 @@ function normalizeCompetitorTrackedKeywordAppRecord(
   };
 }
 
+function normalizeCompetitorAsoLatestSnapshots(
+  input: unknown,
+): CompetitorAsoSnapshotRecord[] {
+  if (!Array.isArray(input)) return [];
+
+  return input.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const candidate = entry as Partial<CompetitorAsoSnapshotRecord>;
+    const payloadCandidate =
+      candidate.payload && typeof candidate.payload === "object"
+        ? candidate.payload
+        : null;
+    if (
+      typeof candidate.snapshotId !== "string" ||
+      !candidate.snapshotId.trim() ||
+      typeof candidate.groupId !== "string" ||
+      !candidate.groupId.trim() ||
+      typeof candidate.appId !== "string" ||
+      !candidate.appId.trim() ||
+      typeof candidate.appKey !== "string" ||
+      !candidate.appKey.trim() ||
+      typeof candidate.appTitle !== "string" ||
+      !candidate.appTitle.trim()
+    ) {
+      return [];
+    }
+    return [
+      {
+        snapshotId: candidate.snapshotId,
+        groupId: candidate.groupId,
+        appId: candidate.appId,
+        appKey: candidate.appKey,
+        appTitle: candidate.appTitle.trim(),
+        store: candidate.store === "ios" ? "ios" : "android",
+        country: normalizeCountryCode(candidate.country, "us"),
+        capturedAt:
+          typeof candidate.capturedAt === "string" && candidate.capturedAt
+            ? candidate.capturedAt
+            : new Date(0).toISOString(),
+        payload: {
+          title:
+            typeof payloadCandidate?.title === "string"
+              ? payloadCandidate.title
+              : "",
+          description:
+            typeof payloadCandidate?.description === "string"
+              ? payloadCandidate.description
+              : "",
+          icon:
+            typeof payloadCandidate?.icon === "string"
+              ? payloadCandidate.icon
+              : "",
+          category:
+            typeof payloadCandidate?.category === "string"
+              ? payloadCandidate.category
+              : "",
+          screenshots: Array.isArray(payloadCandidate?.screenshots)
+            ? payloadCandidate.screenshots.filter(
+                (item): item is string =>
+                  typeof item === "string" && item.trim().length > 0,
+              )
+            : [],
+        },
+      },
+    ];
+  });
+}
+
 function normalizeCompetitorTrackedKeywords(
   input: unknown,
 ): CompetitorTrackedKeywordRecord[] {
@@ -2495,19 +2699,7 @@ function getTrackedRankDisplay(trackedKeyword: TrackedKeyword) {
 function normalizeTrackingScheduleState(
   schedule?: Partial<TrackingSchedule>,
 ): TrackingSchedule {
-  return {
-    enabled: true,
-    time:
-      typeof schedule?.time === "string" && /^\d{2}:\d{2}$/.test(schedule.time.trim())
-        ? schedule.time.trim()
-        : DEFAULT_GLOBAL_TRACKING_TIME,
-    timezone:
-      typeof schedule?.timezone === "string" && schedule.timezone.trim()
-        ? schedule.timezone.trim()
-        : GLOBAL_TRACKING_TIMEZONE,
-    lastRunAt: schedule?.lastRunAt,
-    lastRunKey: schedule?.lastRunKey,
-  };
+  return normalizeSharedTrackingScheduleState(schedule);
 }
 
 function readLegacyLocalUserState() {
@@ -2563,6 +2755,7 @@ function hasPersistedUserState(
       Array.isArray(state.appAnalysisSnapshots) ||
       Array.isArray(state.competitorGroups) ||
       Array.isArray(state.competitorGroupSnapshots) ||
+      Array.isArray(state.competitorAsoLatestSnapshots) ||
       Array.isArray(state.competitorTrackedKeywords) ||
       Array.isArray(state.competitorRankHistory) ||
       Array.isArray(state.alertRules) ||
@@ -2574,79 +2767,7 @@ function hasPersistedUserState(
 }
 
 function serializeUserStateForFirestore(state: UserAppStateDocument) {
-  return JSON.parse(
-    JSON.stringify({
-      bookmarks: state.bookmarks,
-      trackedApps: state.trackedApps,
-      trackedKeywords: state.trackedKeywords?.map((trackedKeyword) => ({
-        groupId: trackedKeyword.groupId,
-        keyword: trackedKeyword.keyword,
-        appId: trackedKeyword.appId,
-        appTitle: trackedKeyword.appTitle,
-        store: trackedKeyword.store,
-        country: trackedKeyword.country,
-        createdAt: trackedKeyword.createdAt,
-      })),
-      appAnalysisSnapshots: state.appAnalysisSnapshots,
-      competitorGroups: state.competitorGroups,
-      competitorGroupSnapshots: state.competitorGroupSnapshots,
-      competitorTrackedKeywords: state.competitorTrackedKeywords?.map(
-        (trackedKeyword) => ({
-          trackedKeywordId: trackedKeyword.trackedKeywordId,
-          groupId: trackedKeyword.groupId,
-          keyword: trackedKeyword.keyword,
-          store: trackedKeyword.store,
-          country: trackedKeyword.country,
-          createdAt: trackedKeyword.createdAt,
-          apps: trackedKeyword.apps.map((app) => ({
-            appKey: app.appKey,
-            appId: app.appId,
-            store: app.store,
-            title: app.title,
-            description: app.description,
-            developer: app.developer,
-            icon: app.icon,
-            url: app.url,
-            category: app.category,
-            role: app.role,
-          })),
-        }),
-      ),
-      trackingSchedule: state.trackingSchedule
-        ? {
-            enabled: true,
-            time: state.trackingSchedule.time,
-            timezone: state.trackingSchedule.timezone,
-          }
-        : undefined,
-      alertRules: state.alertRules?.map((rule) => ({
-        id: rule.id,
-        enabled: rule.enabled,
-        groupId: rule.groupId,
-        appId: rule.appId,
-        keyword: rule.keyword,
-        store: rule.store,
-        scope: rule.scope,
-        countries: rule.countries,
-        channels: rule.channels,
-        conditions: rule.conditions,
-        targetAppIds: rule.targetAppIds,
-        createdAt: rule.createdAt,
-        updatedAt: rule.updatedAt,
-      })),
-      notificationSettings: state.notificationSettings
-        ? {
-            inAppEnabled: state.notificationSettings.inAppEnabled,
-            pushEnabled: state.notificationSettings.pushEnabled,
-            permission: state.notificationSettings.permission,
-          }
-        : undefined,
-      legalAcceptedAt: state.legalAcceptedAt,
-      legalVersion: state.legalVersion,
-      migratedFromLocalAt: state.migratedFromLocalAt,
-      updatedAt: state.updatedAt,
-    }),
-  ) as UserAppStateDocument;
+  return serializeEditableUserStateForApi(state);
 }
 
 function createAlertRuleId() {
@@ -4412,6 +4533,8 @@ function AuthenticatedApp({
   const [competitorGroupSnapshots, setCompetitorGroupSnapshots] = useState<
     CompetitorGroupSnapshotRecord[]
   >([]);
+  const [competitorAsoLatestSnapshots, setCompetitorAsoLatestSnapshots] =
+    useState<CompetitorAsoSnapshotRecord[]>([]);
   const [competitorTrackedKeywords, setCompetitorTrackedKeywords] = useState<
     CompetitorTrackedKeywordRecord[]
   >([]);
@@ -4560,10 +4683,28 @@ function AuthenticatedApp({
     currentRankKnown: boolean;
     existingTrackedCountries: string[];
     selectedCountries: string[];
-    selectionKind?: "tracked_add" | "tracked_edit" | "competitor_draft";
+    competitorGroupId?: string;
+    selectionKind?:
+      | "tracked_add"
+      | "tracked_edit"
+      | "competitor_draft"
+      | "competitor_tracked_edit";
   } | null>(null);
   const [isSubmittingTrackCountries, setIsSubmittingTrackCountries] =
     useState(false);
+  const refreshCompetitorTrackedKeywordBatchRef = React.useRef<
+    | ((
+        records: CompetitorTrackedKeywordRecord[],
+        errorContext: string,
+      ) => Promise<
+        {
+          updatedRecord: CompetitorTrackedKeywordRecord;
+          historyEntries: CompetitorRankHistoryEntry[];
+          failedApps: string[];
+        }[]
+      >)
+    | null
+  >(null);
   const isApplyingUserState = React.useRef(false);
   const pushSetupErrorRef = React.useRef<string | null>(null);
   const userStatePersistQueueRef = React.useRef<Promise<void>>(Promise.resolve());
@@ -4590,6 +4731,7 @@ function AuthenticatedApp({
     setAllRankHistory(demoState.rankHistory);
     setCompetitorGroups(demoState.competitorGroups);
     setCompetitorGroupSnapshots(demoState.competitorGroupSnapshots);
+    setCompetitorAsoLatestSnapshots([]);
     setCompetitorTrackedKeywords(demoState.competitorTrackedKeywords);
     setCompetitorRankHistory(demoState.competitorRankHistory);
     setCompetitorDraftOwnApp(demoState.competitorDraftOwnApp);
@@ -5173,6 +5315,7 @@ function AuthenticatedApp({
       setAppAnalysisSnapshots([]);
       setCompetitorGroups([]);
       setCompetitorGroupSnapshots([]);
+      setCompetitorAsoLatestSnapshots([]);
       setCompetitorTrackedKeywords([]);
       setCompetitorRankHistory([]);
       setCompetitorDraftOwnApp(null);
@@ -5229,9 +5372,6 @@ function AuthenticatedApp({
             .filter((trackedApp) => trackedApp.kind === "competitor")
             .map((trackedApp) => trackedApp.appKey),
         );
-        let nextTrackedApps = normalizedTrackedApps.filter(
-          (trackedApp) => trackedApp.kind === "own",
-        );
         const nextTrackedKeywords = normalizeTrackedKeywordGroupIds(
           hasRemoteState
             ? Array.isArray(remoteState?.trackedKeywords)
@@ -5247,53 +5387,10 @@ function AuthenticatedApp({
               ),
             ),
         );
-        if (nextTrackedApps.length === 0) {
-          const derivedApps = new Map<string, TrackedAppRecord>();
-          nextBookmarks.forEach((bm) => {
-            const appId = String(bm.id || bm.appId);
-            const store = bm.store;
-            const appKey = getTrackedAppKeyFromValues(appId, store);
-            derivedApps.set(appKey, {
-              appKey,
-              appId,
-              store,
-              title: bm.title || appId,
-              developer: "",
-              icon: bm.icon || "",
-              kind: "own",
-              source: "manual",
-              countries: ["us"],
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            });
-          });
-          nextTrackedKeywords.forEach((tk) => {
-            const appKey = getTrackedAppKeyFromValues(tk.appId, tk.store);
-            if (!derivedApps.has(appKey)) {
-              derivedApps.set(appKey, {
-                appKey,
-                appId: tk.appId,
-                store: tk.store,
-                title: tk.appTitle || tk.appId,
-                developer: "",
-                icon: "",
-                kind: "own",
-                source: "manual",
-                countries: [normalizeCountryCode(tk.country, "us")],
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-              });
-            } else {
-              const existing = derivedApps.get(appKey)!;
-              const country = normalizeCountryCode(tk.country, "us");
-              if (!existing.countries.includes(country)) {
-                existing.countries.push(country);
-                existing.countries.sort();
-              }
-            }
-          });
-          nextTrackedApps = Array.from(derivedApps.values());
-        }
+        const nextTrackedApps = syncOwnTrackedAppsWithTrackedKeywords(
+          normalizedTrackedApps,
+          nextTrackedKeywords,
+        );
         const nextRankHistory = normalizeTrackedRankHistoryGroupIds(
           hasRemoteState
             ? [
@@ -5321,6 +5418,12 @@ function AuthenticatedApp({
         const nextCompetitorGroupSnapshots = normalizeCompetitorGroupSnapshots(
           hasRemoteState ? remoteState?.competitorGroupSnapshots : [],
         );
+        const nextCompetitorAsoLatestSnapshots =
+          normalizeCompetitorAsoLatestSnapshots(
+            hasRemoteState ? remoteState?.competitorAsoLatestSnapshots : [],
+          ).filter((snapshot) =>
+            nextCompetitorGroups.some((group) => group.groupId === snapshot.groupId),
+          );
         const nextCompetitorTrackedKeywords = normalizeCompetitorTrackedKeywords(
           hasRemoteState ? remoteState?.competitorTrackedKeywords : [],
         ).filter((record) => nextCompetitorGroups.some((group) => group.groupId === record.groupId));
@@ -5374,6 +5477,7 @@ function AuthenticatedApp({
             appAnalysisSnapshots: nextAppAnalysisSnapshots,
             competitorGroups: normalizedCompetitorGroupsWithKeywords,
             competitorGroupSnapshots: nextCompetitorGroupSnapshots,
+            competitorAsoLatestSnapshots: nextCompetitorAsoLatestSnapshots,
             competitorTrackedKeywords: nextCompetitorTrackedKeywords,
             competitorRankHistory: nextCompetitorRankHistory,
             trackingSchedule: nextTrackingSchedule,
@@ -5407,6 +5511,7 @@ function AuthenticatedApp({
         setAppAnalysisSnapshots(nextAppAnalysisSnapshots);
         setCompetitorGroups(normalizedCompetitorGroupsWithKeywords);
         setCompetitorGroupSnapshots(nextCompetitorGroupSnapshots);
+        setCompetitorAsoLatestSnapshots(nextCompetitorAsoLatestSnapshots);
         setCompetitorTrackedKeywords(nextCompetitorTrackedKeywords);
         setCompetitorRankHistory(nextCompetitorRankHistory);
         setTrackingSchedule(nextTrackingSchedule);
@@ -5490,6 +5595,7 @@ function AuthenticatedApp({
           appAnalysisSnapshots,
           competitorGroups,
           competitorGroupSnapshots,
+          competitorAsoLatestSnapshots,
           competitorTrackedKeywords,
           competitorRankHistory,
           trackingSchedule,
@@ -5507,6 +5613,7 @@ function AuthenticatedApp({
     appAnalysisSnapshots,
     alertRules,
     bookmarks,
+    competitorAsoLatestSnapshots,
     competitorGroupSnapshots,
     competitorGroups,
     competitorRankHistory,
@@ -5979,6 +6086,10 @@ function AuthenticatedApp({
       new Map(trackedApps.map((trackedApp) => [trackedApp.appKey, trackedApp])),
     [trackedApps],
   );
+  const trackedAppUsageCount = React.useMemo(
+    () => getTrackedAppUsageCountForOverview(trackedKeywords),
+    [trackedKeywords],
+  );
   const billingAccessState: BillingAccessState = isDemoMode
     ? "active"
     : billingStatus?.accessState || "selection_required";
@@ -5994,13 +6105,8 @@ function AuthenticatedApp({
     [billingStatus, hasActiveBillingAccess],
   );
   const currentTrackedAppLimitKeys = React.useMemo(
-    () =>
-      new Set(
-        trackedApps
-          .filter((trackedApp) => trackedApp.kind === "own")
-          .map((trackedApp) => getTrackedAppIdentityKey(trackedApp)),
-      ),
-    [trackedApps],
+    () => getTrackedAppIdentityKeysFromTrackedKeywords(trackedKeywords),
+    [trackedKeywords],
   );
   const currentCompetitorGroupLimitKeys = React.useMemo(
     () => new Set(competitorGroups.map((group) => group.groupId)),
@@ -6198,20 +6304,31 @@ function AuthenticatedApp({
   ]);
   const isTrackedKeywordWithinActiveLimit = React.useCallback(
     (trackedKeyword: TrackedKeyword) =>
-      trackedKeywordLimitActivity
-        ? trackedKeywordLimitActivity.activeTrackedKeywordKeys.has(
-            getPlanTrackedKeywordIdentityKey(trackedKeyword),
-          )
-        : true,
+      isTrackedKeywordKeyWithinActiveLimit(
+        trackedKeywordLimitActivity
+          ? {
+              activeKeys: trackedKeywordLimitActivity.activeTrackedKeywordKeys,
+              pausedTrackedKeywords:
+                trackedKeywordLimitActivity.pausedTrackedKeywords,
+            }
+          : null,
+        getPlanTrackedKeywordIdentityKey(trackedKeyword),
+      ),
     [trackedKeywordLimitActivity],
   );
   const isCompetitorTrackedKeywordWithinActiveLimit = React.useCallback(
     (trackedKeyword: CompetitorTrackedKeywordRecord) =>
-      trackedKeywordLimitActivity
-        ? trackedKeywordLimitActivity.activeCompetitorTrackedKeywordKeys.has(
-            getCompetitorTrackedKeywordIdentityKey(trackedKeyword),
-          )
-        : true,
+      isTrackedKeywordKeyWithinActiveLimit(
+        trackedKeywordLimitActivity
+          ? {
+              activeKeys:
+                trackedKeywordLimitActivity.activeCompetitorTrackedKeywordKeys,
+              pausedTrackedKeywords:
+                trackedKeywordLimitActivity.pausedTrackedKeywords,
+            }
+          : null,
+        getCompetitorTrackedKeywordIdentityKey(trackedKeyword),
+      ),
     [trackedKeywordLimitActivity],
   );
   const appAnalysisSnapshotsByKey = React.useMemo(
@@ -6294,6 +6411,24 @@ function AuthenticatedApp({
     });
     return byGroupId;
   }, [competitorAsoDiffs]);
+  const competitorAsoLatestSnapshotsByGroupId = React.useMemo(() => {
+    const byGroupId = new Map<string, CompetitorAsoSnapshotRecord[]>();
+    competitorAsoLatestSnapshots.forEach((snapshot) => {
+      const current = byGroupId.get(snapshot.groupId) || [];
+      current.push(snapshot);
+      byGroupId.set(snapshot.groupId, current);
+    });
+    byGroupId.forEach((entries, groupId) => {
+      byGroupId.set(
+        groupId,
+        [...entries].sort(
+          (a, b) =>
+            new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
+        ),
+      );
+    });
+    return byGroupId;
+  }, [competitorAsoLatestSnapshots]);
   const competitorRankHistoryByTrackedKeywordId = React.useMemo(() => {
     const byTrackedKeywordId = new Map<
       string,
@@ -6940,6 +7075,47 @@ function AuthenticatedApp({
     },
     [country, trackedKeywords],
   );
+  const openCompetitorTrackedKeywordCountryPicker = React.useCallback(
+    ({ groupId, keyword }: { groupId: string; keyword: string }) => {
+      const group = competitorGroups.find((entry) => entry.groupId === groupId);
+      if (!group) {
+        toast.error("This competitor group could not be found.");
+        return;
+      }
+      const existingTrackedCountries = Array.from(
+        new Set(
+          competitorTrackedKeywords
+            .filter(
+              (record) =>
+                record.groupId === groupId &&
+                record.keyword.trim().toLowerCase() === keyword.trim().toLowerCase(),
+            )
+            .map((record) => normalizeCountryCode(record.country, country)),
+        ),
+      ).sort((a, b) => a.localeCompare(b));
+      if (existingTrackedCountries.length === 0) {
+        toast.error("No tracked countries were found for this competitor keyword.");
+        return;
+      }
+      const initialCountry =
+        existingTrackedCountries[0] || normalizeCountryCode(country, "us");
+      setTrackCountryPickerState({
+        keyword: keyword.trim(),
+        app: toCompetitorGroupAppDetails(group.ownApp),
+        store: group.store,
+        appKind: "own",
+        appSource: "manual",
+        currentCountry: initialCountry,
+        currentRank: -1,
+        currentRankKnown: false,
+        existingTrackedCountries,
+        selectedCountries: existingTrackedCountries,
+        competitorGroupId: groupId,
+        selectionKind: "competitor_tracked_edit",
+      });
+    },
+    [competitorGroups, competitorTrackedKeywords, country],
+  );
   const closeTrackCountryPicker = React.useCallback(() => {
     if (isSubmittingTrackCountries) return;
     setTrackCountryPickerState(null);
@@ -6954,6 +7130,7 @@ function AuthenticatedApp({
         );
         if (
           prev.selectionKind !== "tracked_edit" &&
+          prev.selectionKind !== "competitor_tracked_edit" &&
           prev.existingTrackedCountries.includes(normalizedCode)
         ) {
           return prev;
@@ -6977,11 +7154,12 @@ function AuthenticatedApp({
   );
   const removeTrackedKeywordGroup = React.useCallback(
     (groupId: string, keyword: string) => {
-      setTrackedKeywords((prev) =>
-        prev.filter(
-          (trackedKeyword) =>
-            resolveTrackingGroupId(trackedKeyword) !== groupId,
-        ),
+      const nextTrackedKeywords = trackedKeywords.filter(
+        (trackedKeyword) => resolveTrackingGroupId(trackedKeyword) !== groupId,
+      );
+      setTrackedKeywords(nextTrackedKeywords);
+      setTrackedApps((prev) =>
+        syncOwnTrackedAppsWithTrackedKeywords(prev, nextTrackedKeywords),
       );
       setAllRankHistory((prev) =>
         prev.filter((entry) => resolveTrackingGroupId(entry) !== groupId),
@@ -7001,7 +7179,7 @@ function AuthenticatedApp({
       setActiveAlertGroupId((prev) => (prev === groupId ? null : prev));
       toast.success(`Stopped tracking "${keyword}" for this country group`);
     },
-    [],
+    [trackedKeywords],
   );
   const toggleTrackedGroupExpansion = React.useCallback((groupId: string) => {
     setExpandedTrackedGroupIds((prev) =>
@@ -7082,6 +7260,149 @@ function AuthenticatedApp({
       toast.success(
         `Added "${trackCountryPickerState.keyword}" to the draft for ${normalizedCountries.length} ${normalizedCountries.length === 1 ? "country" : "countries"}. Save the group to start tracking.`,
       );
+      return;
+    }
+    if (trackCountryPickerState.selectionKind === "competitor_tracked_edit") {
+      const competitorGroupId = trackCountryPickerState.competitorGroupId;
+      if (!competitorGroupId) {
+        toast.error("This competitor keyword is missing its group reference.");
+        return;
+      }
+      const group = competitorGroups.find(
+        (entry) => entry.groupId === competitorGroupId,
+      );
+      if (!group) {
+        toast.error("This competitor group could not be found.");
+        return;
+      }
+      const nowIso = new Date().toISOString();
+      const reconciliation = reconcileCompetitorTrackedKeywordCountryEdit({
+        existingRecords: competitorTrackedKeywords,
+        group,
+        keyword: trackCountryPickerState.keyword,
+        nowIso,
+        selectedCountries: normalizedCountries,
+      });
+      if (
+        reconciliation.addedRecords.length === 0 &&
+        reconciliation.removedRecords.length === 0
+      ) {
+        toast.error("No country changes to save.");
+        return;
+      }
+      const nextCompetitorTrackedKeywords = competitorTrackedKeywords
+        .filter(
+          (record) =>
+            !(
+              record.groupId === competitorGroupId &&
+              record.keyword.trim().toLowerCase() ===
+                reconciliation.normalizedKeyword.toLowerCase()
+            ),
+        )
+        .concat(reconciliation.nextRecords);
+      const nextTrackedKeywordLimitKeys = new Set(
+        trackedKeywords
+          .map((trackedKeyword) => getPlanTrackedKeywordIdentityKey(trackedKeyword))
+          .concat(
+            nextCompetitorTrackedKeywords.map((trackedKeyword) =>
+              getCompetitorTrackedKeywordIdentityKey(trackedKeyword),
+            ),
+          ),
+      );
+      if (
+        reconciliation.addedRecords.length > 0 &&
+        !guardGovernedAddition(
+          "trackedKeywords",
+          currentTrackedKeywordLimitKeys,
+          nextTrackedKeywordLimitKeys,
+        )
+      ) {
+        return;
+      }
+      setIsSubmittingTrackCountries(true);
+      setCompetitorTrackedKeywords(nextCompetitorTrackedKeywords);
+      if (reconciliation.removedTrackedKeywordIds.length > 0) {
+        setCompetitorRankHistory((prev) =>
+          prev.filter(
+            (entry) =>
+              !reconciliation.removedTrackedKeywordIds.includes(
+                entry.trackedKeywordId,
+              ),
+          ),
+        );
+      }
+      setCompetitorGroups((prev) =>
+        prev.map((entry) =>
+          entry.groupId === competitorGroupId
+            ? {
+                ...entry,
+                trackedKeywordIds: reconciliation.nextTrackedKeywordIds,
+                updatedAt: nowIso,
+              }
+            : entry,
+        ),
+      );
+      if (reconciliation.removedCountries.length > 0) {
+        const keywordGroupKey = getCompetitorTrackedKeywordGroupKey({
+          groupId: competitorGroupId,
+          keyword: reconciliation.normalizedKeyword,
+        });
+        setCompetitorSummaryCountryByKeywordGroup((prev) => {
+          const currentCountry = prev[keywordGroupKey];
+          if (
+            !currentCountry ||
+            !reconciliation.removedCountries.includes(currentCountry)
+          ) {
+            return prev;
+          }
+          const next = { ...prev };
+          if (reconciliation.normalizedSelectedCountries[0]) {
+            next[keywordGroupKey] = reconciliation.normalizedSelectedCountries[0];
+          } else {
+            delete next[keywordGroupKey];
+          }
+          return next;
+        });
+      }
+      toast.success(
+        `Updated "${reconciliation.normalizedKeyword}" to ${normalizedCountries.length} ${normalizedCountries.length === 1 ? "country" : "countries"} in this competitor group.`,
+      );
+      try {
+        if (reconciliation.addedRecords.length > 0) {
+          const refreshCompetitorBatch =
+            refreshCompetitorTrackedKeywordBatchRef.current;
+          if (!refreshCompetitorBatch) {
+            toast.error("Competitor tracking refresh is not ready yet.");
+            return;
+          }
+          const refreshResults = await refreshCompetitorBatch(
+            reconciliation.addedRecords,
+            "submitTrackCountrySelection_competitor_batch",
+          );
+          setCompetitorTrackedKeywords((prev) =>
+            mergeCompetitorTrackedKeywordCollections(
+              prev,
+              refreshResults.map((entry) => entry.updatedRecord),
+            ),
+          );
+          setCompetitorRankHistory((prev) =>
+            mergeCompetitorRankHistoryEntries(
+              prev,
+              refreshResults.flatMap((entry) => entry.historyEntries),
+            ),
+          );
+        }
+        setTrackCountryPickerState(null);
+      } catch (err) {
+        logError(err, {
+          context: "submitTrackCountrySelection_competitor_batch",
+          groupId: competitorGroupId,
+          keyword: reconciliation.normalizedKeyword,
+          store: group.store,
+        });
+      } finally {
+        setIsSubmittingTrackCountries(false);
+      }
       return;
     }
     if (trackCountryPickerState.appKind !== "own") {
@@ -7176,7 +7497,7 @@ function AuthenticatedApp({
           .map((trackedKeyword) => trackedKeyword.country),
       ),
     ).sort((a, b) => a.localeCompare(b));
-    const nextTrackedApps =
+    const candidateTrackedApps =
       trackedEntries.length > 0
         ? mergeTrackedAppsWithIncoming(
             trackedApps,
@@ -7197,11 +7518,12 @@ function AuthenticatedApp({
                 : trackedApp,
             ),
           );
-    const nextTrackedAppLimitKeys = new Set(
-      nextTrackedApps
-        .filter((trackedApp) => trackedApp.kind === "own")
-        .map((trackedApp) => getTrackedAppIdentityKey(trackedApp)),
+    const nextTrackedApps = syncOwnTrackedAppsWithTrackedKeywords(
+      candidateTrackedApps,
+      nextTrackedKeywords,
     );
+    const nextTrackedAppLimitKeys =
+      getTrackedAppIdentityKeysFromTrackedKeywords(nextTrackedKeywords);
     if (
       !guardGovernedAddition(
         "trackedApps",
@@ -7309,6 +7631,7 @@ function AuthenticatedApp({
       setIsSubmittingTrackCountries(false);
     }
   }, [
+    competitorGroups,
     competitorTrackedKeywords,
     currentTrackedAppLimitKeys,
     currentTrackedKeywordLimitKeys,
@@ -8229,6 +8552,8 @@ function AuthenticatedApp({
       ),
     [refreshCompetitorTrackedKeyword],
   );
+  refreshCompetitorTrackedKeywordBatchRef.current =
+    refreshCompetitorTrackedKeywordBatch;
   const analyzeCompetitorDraftGroup = React.useCallback(async () => {
     if (!competitorDraftOwnApp) {
       toast.error("Select your app first.");
@@ -9010,7 +9335,7 @@ function AuthenticatedApp({
           top3Count: trackedOverviewStats.top3Count,
           totalGroups: trackedDashboardStats.totalGroups,
           totalRegions: trackedDashboardStats.totalRegions,
-          trackedAppCount: trackedOverviewStats.trackedAppCount,
+          trackedAppCount: trackedAppUsageCount,
         },
       };
     }
@@ -9941,11 +10266,6 @@ function AuthenticatedApp({
       const rank = countryView.trackedKeyword.lastRank;
       return rank >= 11 && rank <= 50;
     }).length;
-    const trackedAppCount = new Set(
-      processedTrackedKeywordGroups.map(
-        (group) => `${group.store}:${String(group.appId)}`,
-      ),
-    ).size;
 
     return {
       averageRank,
@@ -9953,7 +10273,6 @@ function AuthenticatedApp({
       top10Count,
       range4To10Count,
       range11To50Count,
-      trackedAppCount,
     };
   }, [processedTrackedKeywordGroups]);
   const competitorGroupStats = React.useMemo(
@@ -9979,6 +10298,8 @@ function AuthenticatedApp({
           competitorLatestSnapshotByGroupId.get(group.groupId) || null;
         const history =
           competitorSnapshotHistoryByGroupId.get(group.groupId) || [];
+        const asoLatestSnapshots =
+          competitorAsoLatestSnapshotsByGroupId.get(group.groupId) || [];
         const trackedKeywords =
           competitorTrackedKeywordsByGroupId.get(group.groupId) || [];
         const trackedKeywordGroups =
@@ -10007,6 +10328,7 @@ function AuthenticatedApp({
           group,
           snapshot,
           history,
+          asoLatestSnapshots,
           trackedKeywords,
           trackedKeywordGroups,
           rankedPairCount,
@@ -10016,12 +10338,14 @@ function AuthenticatedApp({
       .sort((a, b) => {
         const aTime = new Date(
           a.lastKeywordRefreshAt ||
+            a.asoLatestSnapshots[0]?.capturedAt ||
             a.snapshot?.loadedAt ||
             a.group.updatedAt ||
             0,
         ).getTime();
         const bTime = new Date(
           b.lastKeywordRefreshAt ||
+            b.asoLatestSnapshots[0]?.capturedAt ||
             b.snapshot?.loadedAt ||
             b.group.updatedAt ||
             0,
@@ -10030,6 +10354,7 @@ function AuthenticatedApp({
       });
   }, [
     competitorGroups,
+    competitorAsoLatestSnapshotsByGroupId,
     competitorLatestSnapshotByGroupId,
     competitorSnapshotHistoryByGroupId,
     processedCompetitorTrackedKeywordGroupsByGroupId,
@@ -10298,6 +10623,10 @@ function AuthenticatedApp({
     trackedAppsByKey,
     trackSortBy,
   ]);
+  const trackedViewAppCount = React.useMemo(
+    () => getTrackedViewAppCountForOverview(processedTrackedAppGroups),
+    [processedTrackedAppGroups],
+  );
   const activeAlertGroup = React.useMemo(
     () =>
       activeAlertGroupId
@@ -10343,8 +10672,8 @@ function AuthenticatedApp({
     ],
   );
   const ownTrackedAppCount = React.useMemo(
-    () => trackedApps.filter((trackedApp) => trackedApp.kind === "own").length,
-    [trackedApps],
+    () => trackedAppUsageCount,
+    [trackedAppUsageCount],
   );
   const focusAppSearch = React.useCallback(() => {
     window.requestAnimationFrame(() => {
@@ -10633,7 +10962,7 @@ function AuthenticatedApp({
         description:
           "Monitor rank movement, region coverage, and refresh health across the apps you care about most.",
         badge:
-          trackedKeywordGroupCount > 0 ? trackedKeywordGroupCount : undefined,
+          trackedAppUsageCount > 0 ? trackedAppUsageCount : undefined,
       },
     ],
     [
@@ -10642,7 +10971,7 @@ function AuthenticatedApp({
       competitorGroupStats.groupCount,
       country,
       selectedApp,
-      trackedKeywordGroupCount,
+      trackedAppUsageCount,
     ],
   );
   const mobileWorkspacePageConfigs = React.useMemo(
@@ -10724,15 +11053,15 @@ function AuthenticatedApp({
     if (visibleWorkspaceMode === "tracked") {
       return [
         {
-          label: "Ranking Keywords",
+          label: "Regions Ranked",
           value: trackedDashboardStats.rankedCount,
-          hint: `${trackedKeywordGroupCount} keyword groups`,
+          hint: `${trackedDashboardStats.totalGroups} keyword group${trackedDashboardStats.totalGroups === 1 ? "" : "s"} in view`,
           accent: "cyan" as const,
         },
         {
           label: "Regions Monitored",
           value: trackedDashboardStats.totalRegions,
-          hint: `${trackedOverviewStats.trackedAppCount} apps active`,
+          hint: `${trackedViewAppCount} tracked app${trackedViewAppCount === 1 ? "" : "s"} in view`,
           accent: "cyan" as const,
         },
         {
@@ -10894,7 +11223,7 @@ function AuthenticatedApp({
     trackedDashboardStats.totalRegions,
     trackedKeywordGroupCount,
     trackedOverviewStats.averageRank,
-    trackedOverviewStats.trackedAppCount,
+    trackedViewAppCount,
     visibleWorkspaceMode,
   ]);
   const isLightTheme = themeMode === "light";
@@ -12009,9 +12338,9 @@ function AuthenticatedApp({
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-app-text-muted">Tracked groups</span>
+                  <span className="text-app-text-muted">Tracked apps</span>
                   <span className="font-medium text-app-text">
-                    {trackedKeywordGroupCount}
+                    {trackedAppUsageCount}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
@@ -12760,6 +13089,7 @@ function AuthenticatedApp({
                     }`;
                     const groupAsoDiffs =
                       competitorAsoDiffsByGroupId.get(card.group.groupId) || [];
+                    const groupAsoSnapshots = card.asoLatestSnapshots;
                     const asoFieldFilter =
                       competitorAsoFieldFilterByGroup[card.group.groupId] ||
                       "all";
@@ -12774,6 +13104,7 @@ function AuthenticatedApp({
                         ...card.trackedKeywords.map(
                           (trackedKeyword) => trackedKeyword.country,
                         ),
+                        ...groupAsoSnapshots.map((snapshot) => snapshot.country),
                         ...groupAsoDiffs.map((diff) => diff.country),
                       ]),
                     ).sort((a, b) => a.localeCompare(b));
@@ -12801,8 +13132,9 @@ function AuthenticatedApp({
                     const groupAsoChangedCountries = new Set(
                       groupAsoDiffs.map((diff) => diff.country),
                     );
-                    const groupAsoSnapshotCount = card.history.length;
-                    const groupAsoLatestSnapshotAt = card.snapshot?.loadedAt || null;
+                    const groupAsoSnapshotCount = groupAsoSnapshots.length;
+                    const groupAsoLatestSnapshotAt =
+                      groupAsoSnapshots[0]?.capturedAt || null;
                     const groupAsoStatus =
                       groupAsoDiffs.length > 0
                         ? {
@@ -13242,36 +13574,15 @@ function AuthenticatedApp({
                             {card.trackedKeywordGroups.length > 0 ? (
                               <div className="mt-4 space-y-3">
                                 {card.trackedKeywordGroups.map((keywordGroup) => {
-                                  const defaultSummaryCountryCode =
-                                    keywordGroup.countryViews.find(
-                                      (countryView) =>
-                                        countryView.trackedKeyword.country === country,
-                                    )?.trackedKeyword.country ||
-                                    [...keywordGroup.countryViews].sort(
-                                      (a, b) =>
-                                        new Date(
-                                          b.trackedKeyword.lastCheckedAt || 0,
-                                        ).getTime() -
-                                        new Date(
-                                          a.trackedKeyword.lastCheckedAt || 0,
-                                        ).getTime(),
-                                    )[0]?.trackedKeyword.country ||
-                                    keywordGroup.countryViews[0]?.trackedKeyword
-                                      .country;
+                                  const keywordCardState =
+                                    getCompetitorTrackedKeywordCardState({
+                                      keywordGroup,
+                                      workspaceCountry: country,
+                                      selectedCountriesByGroup:
+                                        competitorSummaryCountryByKeywordGroup,
+                                    });
                                   const selectedCountryView =
-                                    keywordGroup.countryViews.find(
-                                      (countryView) =>
-                                        countryView.trackedKeyword.country ===
-                                        competitorSummaryCountryByKeywordGroup[
-                                          keywordGroup.groupKey
-                                        ],
-                                    ) ||
-                                    keywordGroup.countryViews.find(
-                                      (countryView) =>
-                                        countryView.trackedKeyword.country ===
-                                        defaultSummaryCountryCode,
-                                    ) ||
-                                    keywordGroup.countryViews[0];
+                                    keywordCardState.selectedCountryView;
                                   const trackedKeyword =
                                     selectedCountryView?.trackedKeyword;
                                   const isExpanded =
@@ -13305,7 +13616,26 @@ function AuthenticatedApp({
                                           </p>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                          {keywordGroup.countries.length > 1 && (
+                                          {keywordCardState.showEditCountries && (
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                openCompetitorTrackedKeywordCountryPicker(
+                                                  {
+                                                    groupId: keywordGroup.groupId,
+                                                    keyword: keywordGroup.keyword,
+                                                  },
+                                                )
+                                              }
+                                              className="inline-flex items-center gap-2 rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted hover:text-cyan-200"
+                                              aria-label={`Edit tracked countries for ${keywordGroup.keyword}`}
+                                              title="Edit tracked countries"
+                                            >
+                                              <Globe className="h-3.5 w-3.5" />
+                                              Edit Countries
+                                            </button>
+                                          )}
+                                          {keywordCardState.showCountrySwitcher && (
                                             <select
                                               value={trackedKeyword.country}
                                               onChange={(event) =>
@@ -13587,6 +13917,7 @@ function AuthenticatedApp({
                 trackedCountryRowsForExport={trackedCountryRowsForReports}
                 competitorGroups={competitorGroups}
                 competitorAsoDiffs={competitorAsoDiffs}
+                competitorAsoLatestSnapshots={competitorAsoLatestSnapshots}
                 competitorTrackedKeywordsByGroupId={
                   competitorTrackedKeywordsByGroupId
                 }
@@ -13601,13 +13932,16 @@ function AuthenticatedApp({
                   rankedKeywords: trackedDashboardStats.rankedCount,
                   top10Count: trackedOverviewStats.top10Count,
                   top3Count: trackedOverviewStats.top3Count,
-                  trackedAppCount: trackedOverviewStats.trackedAppCount,
+                  trackedAppCount: trackedAppUsageCount,
                   averageRank: trackedOverviewStats.averageRank,
                   range4To10Count: trackedOverviewStats.range4To10Count,
                   range11To50Count: trackedOverviewStats.range11To50Count,
                 }}
                 defaultCountry={country}
                 defaultStore={storeType}
+                onEditCompetitorKeywordCountries={
+                  openCompetitorTrackedKeywordCountryPicker
+                }
                 onExportSnapshotChange={setReportsExportSnapshot}
               />
             </div>
@@ -13748,7 +14082,10 @@ function AuthenticatedApp({
                     {trackedKeywordGroupCount > 0 ? (
                       <div className="flex flex-wrap items-center gap-1.5 lg:gap-2 text-[10px] lg:text-xs">
                         <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-app-text-muted">
-                          {trackedDashboardStats.totalGroups} groups
+                          {trackedViewAppCount} tracked app{trackedViewAppCount === 1 ? "" : "s"}
+                        </span>
+                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-app-text-muted">
+                          {trackedDashboardStats.totalGroups} keyword group{trackedDashboardStats.totalGroups === 1 ? "" : "s"}
                         </span>
                         <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-emerald-300">
                           {trackedDashboardStats.rankedCount} ranking
@@ -17417,7 +17754,8 @@ function AuthenticatedApp({
         </div>
         <CountryMultiSelectModal
           disabledCountries={
-            trackCountryPickerState?.selectionKind === "tracked_edit"
+            trackCountryPickerState?.selectionKind === "tracked_edit" ||
+            trackCountryPickerState?.selectionKind === "competitor_tracked_edit"
               ? []
               : trackCountryPickerState?.existingTrackedCountries || []
           }
@@ -17432,6 +17770,9 @@ function AuthenticatedApp({
           title={
             trackCountryPickerState?.selectionKind === "competitor_draft"
               ? "Choose countries for this competitor keyword"
+              : trackCountryPickerState?.selectionKind ===
+                    "competitor_tracked_edit"
+                ? "Edit competitor tracked countries"
               : trackCountryPickerState?.selectionKind === "tracked_edit"
                 ? "Edit tracked countries"
                 : "Track keyword by country"
@@ -17446,6 +17787,15 @@ function AuthenticatedApp({
                 in this competitor draft. Tracking starts after you save or
                 update the group.
               </>
+            ) : trackCountryPickerState?.selectionKind ===
+                "competitor_tracked_edit" ? (
+              <>
+                Add or remove countries for{" "}
+                <span className="font-medium text-cyan-300">
+                  "{trackCountryPickerState?.keyword || ""}"
+                </span>{" "}
+                inside this competitor group.
+              </>
             ) : trackCountryPickerState?.selectionKind === "tracked_edit" ? (
               <>
                 Add or remove countries for{" "}
@@ -17459,6 +17809,9 @@ function AuthenticatedApp({
           selectedLabel={
             trackCountryPickerState?.selectionKind === "competitor_draft"
               ? "In draft"
+              : trackCountryPickerState?.selectionKind ===
+                  "competitor_tracked_edit"
+                ? "Tracking"
               : trackCountryPickerState?.selectionKind === "tracked_edit"
                 ? "Tracking"
                 : "Selected"
@@ -17471,6 +17824,9 @@ function AuthenticatedApp({
           submitLabel={
             trackCountryPickerState?.selectionKind === "competitor_draft"
               ? "Add To Draft"
+              : trackCountryPickerState?.selectionKind ===
+                  "competitor_tracked_edit"
+                ? "Save Countries"
               : trackCountryPickerState?.selectionKind === "tracked_edit"
                 ? "Save Countries"
               : "Track Countries"

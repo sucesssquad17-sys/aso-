@@ -68,11 +68,13 @@ export const PRICING_INCLUDED_COPY =
 export const PRICING_INCLUDED_CAPABILITIES: PricingIncludedCapability[] = [
   { label: "App Store & Google Play tracking", sub: "iOS + Android in one workspace" },
   { label: "Keyword rank tracking", sub: "Per country, per store" },
+  { label: "AI-Powered Keyword Discovery", sub: "Intelligent keyword recommendations" },
+  { label: "ASO Comparison", sub: "Head-to-head visibility metrics" },
   { label: "Competitor analysis", sub: "Track rivals side by side" },
   { label: "Daily automated monitoring", sub: "Runs every day, hands-free" },
   { label: "Rank change alerts", sub: "Notified when positions shift" },
   { label: "Trend charts & history", sub: "See rank movement over time" },
-  { label: "Competitor battle mode", sub: "Head-to-head keyword overlap" },
+  { label: "Weekly Email Reports", sub: "Movement summaries delivered to your inbox" },
   { label: "PDF reports & data export", sub: "Share or archive at any time" },
 ];
 
@@ -170,5 +172,16 @@ export function getPlanPriceLabel(
     return configuredLabel;
   }
 
-  return interval === "monthly" ? plan.priceLabel : null;
+  // Fallback: for yearly, calculate from monthly price (10 months = 2 months free)
+  if (interval === "yearly") {
+    const monthlyLabel = billingStatus?.planPricing?.[plan.id]?.["monthly"]?.priceLabel || plan.priceLabel;
+    const match = monthlyLabel?.match(/(\d+)/);
+    if (match) {
+      const yearly = parseInt(match[1], 10) * 10;
+      return `$${yearly}/yr`;
+    }
+    return null;
+  }
+
+  return plan.priceLabel;
 }

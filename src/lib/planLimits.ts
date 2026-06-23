@@ -146,6 +146,19 @@ export function getTrackedAppIdentityKey(app: TrackedAppLike) {
   return app.appKey || `${app.store}:${String(app.appId)}`;
 }
 
+export function getTrackedAppIdentityKeysFromTrackedKeywords(
+  trackedKeywords: Array<Pick<TrackedKeywordLike, "appId" | "store">>,
+) {
+  return new Set(
+    trackedKeywords.map((trackedKeyword) =>
+      getTrackedAppIdentityKey({
+        appId: trackedKeyword.appId,
+        store: trackedKeyword.store,
+      }),
+    ),
+  );
+}
+
 export function getTrackedKeywordIdentityKey(keyword: TrackedKeywordLike) {
   return `${keyword.store}:${String(keyword.appId)}:${keyword.keyword.toLowerCase()}:${keyword.country.toLowerCase()}`;
 }
@@ -221,10 +234,8 @@ export function getTrackedKeywordActivity(state: GovernedTrackingState, limits: 
 }
 
 export function countPlanUsage(state: GovernedTrackingState, limits?: PlanLimits): PlanUsage {
-  const trackedApps = new Set(
-    state.trackedApps
-      .filter((app) => app.kind === "own")
-      .map((app) => getTrackedAppIdentityKey(app)),
+  const trackedApps = getTrackedAppIdentityKeysFromTrackedKeywords(
+    state.trackedKeywords,
   ).size;
   const competitorGroups = new Set(
     state.competitorGroups.map((group) => group.groupId),

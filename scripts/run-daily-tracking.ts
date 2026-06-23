@@ -1754,16 +1754,17 @@ async function getStoreAppDetails(appId: string, storeType: StoreType, country: 
   if (storeType === 'ios') {
     details = await store.app({ id: appId, country, requestOptions: appStoreRequestOptions });
   } else {
-    if (googlePlayRequestOptions.agent) {
+    try {
       details = await gplay.app({ appId, country, requestOptions: googlePlayRequestOptions });
-    } else {
-      try {
-        details = await gplay.app({ appId, country, requestOptions: googlePlayRequestOptions });
-      } catch (error) {
-        console.warn(`google-play-scraper app lookup failed for "${appId}", falling back to web parsing.`);
-        const html = await fetchPlayStoreHtml(`/store/apps/details?id=${encodeURIComponent(appId)}`, country);
-        details = parsePlayStoreAppDetails(html, appId);
-      }
+    } catch (error) {
+      console.warn(
+        `google-play-scraper app lookup failed for "${appId}"${googlePlayRequestOptions.agent ? ' via proxy' : ''}, falling back to web parsing.`,
+      );
+      const html = await fetchPlayStoreHtml(
+        `/store/apps/details?id=${encodeURIComponent(appId)}`,
+        country,
+      );
+      details = parsePlayStoreAppDetails(html, appId);
     }
   }
 

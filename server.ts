@@ -38,6 +38,8 @@ import {
   type Firestore,
 } from 'firebase-admin/firestore';
 import {
+  filterUnresolvedCompetitorTrackedKeywords,
+  filterUnresolvedTrackedKeywords,
   getGlobalTrackingRunKey as getSharedGlobalTrackingRunKey,
   getZonedDateParts as getSharedZonedDateParts,
   initializeFirebaseAdminAppFromEnv,
@@ -47,6 +49,7 @@ import {
   refreshAllTrackingState as refreshSharedAllTrackingState,
   refreshTrackedKeywordRecord as refreshSharedTrackedKeywordRecord,
   shouldRunTrackingRefresh,
+  type TrackingRefreshMode,
   TRACKING_HISTORY_LIMIT as SHARED_TRACKING_HISTORY_LIMIT,
 } from './src/lib/backendTracking';
 import {
@@ -68,7 +71,7 @@ import {
   getBillingPlanRank,
   getCompetitorTrackedKeywordIdentityKey,
   getPlanLimits,
-  getTrackedAppIdentityKey,
+  getTrackedAppIdentityKeysFromTrackedKeywords,
   getTrackedKeywordActivity,
   getTrackedKeywordIdentityKey,
   resolveBillingPlanId,
@@ -108,6 +111,10 @@ import {
   type KeywordContext,
   type KeywordMarketSample,
 } from './src/lib/keywordMetrics';
+import {
+  isDiscoveryKeywordCandidate,
+  shouldAdmitDiscoveryCandidate,
+} from './src/lib/discoveryKeywordGating';
 
 if (process.env.NODE_ENV !== 'production') {
   process.env.DISABLE_HMR = 'true';
@@ -425,7 +432,7 @@ type DailyTrackingStatusRecord = Partial<DailyTrackingSummary> & {
   watchdogRetryEligible?: boolean;
   leaseOwner?: string;
   leaseExpiresAt?: string;
-  lastTrigger?: 'automatic' | 'manual' | 'watchdog';
+  lastTrigger?: 'automatic' | 'manual' | 'watchdog' | 'recovery';
 };
 type DodoEnvironment = 'test_mode' | 'live_mode';
 type DodoSubscriptionEventType =
@@ -501,7 +508,7 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     keywordLimit: 40,
     batchSize: 12,
     earlyExitRankings: 10,
-    minCheckedKeywords: 0,
+    minCheckedKeywords: 12,
     searchDepth: 100,
     competitorSeedLimit: 3,
     competitorResultsPerSeed: 12,
@@ -512,7 +519,7 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     keywordLimit: 80,
     batchSize: 10,
     earlyExitRankings: 20,
-    minCheckedKeywords: 0,
+    minCheckedKeywords: 20,
     searchDepth: 150,
     competitorSeedLimit: 5,
     competitorResultsPerSeed: 16,
@@ -1580,6 +1587,14 @@ function readOptionalString(value: unknown, field: string, maxLength: number) {
 
 function readOptionalBoolean(value: unknown) {
   return value === true;
+}
+
+function readRequiredObjectRecord(value: unknown, field: string) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw createBadRequestError(`${field} must be an object.`);
+  }
+
+  return value as Record<string, unknown>;
 }
 
 function readStoreType(value: unknown) {
@@ -2658,10 +2673,8 @@ function getGovernedIdentitySets(
   >,
 ) {
   return {
-    trackedApps: new Set(
-      state.trackedApps
-        .filter((trackedApp) => trackedApp.kind === 'own')
-        .map((trackedApp) => getTrackedAppIdentityKey(trackedApp)),
+    trackedApps: getTrackedAppIdentityKeysFromTrackedKeywords(
+      state.trackedKeywords,
     ),
     competitorGroups: new Set(
       state.competitorGroups.map((group) => group.groupId),
@@ -2707,6 +2720,85 @@ function getTrackedKeywordScopedState(
             getCompetitorTrackedKeywordIdentityKey(trackedKeyword),
           ),
       ),
+    },
+  };
+}
+
+function getGlobalRunDayKey(runKey: string) {
+  const [dayKey] = runKey.split('T');
+  return dayKey;
+}
+
+function getGlobalDayKeyForTimestamp(timestamp: string) {
+  const parts = getZonedDateParts(new Date(timestamp), GLOBAL_TRACKING_TIMEZONE);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function getUnresolvedCompetitorAsoTargetCount(
+  state: Pick<
+    NormalizedUserTrackingDocument,
+    'competitorGroups' | 'competitorTrackedKeywords' | 'competitorAsoLatestSnapshots'
+  >,
+  runKey: string,
+) {
+  if (!state.competitorGroups.length) {
+    return 0;
+  }
+
+  const runDayKey = getGlobalRunDayKey(runKey);
+  const latestByKey = new Map(
+    state.competitorAsoLatestSnapshots.map((snapshot) => [
+      getComparableCompetitorAsoSnapshotKey(snapshot),
+      snapshot,
+    ]),
+  );
+
+  let unresolvedTargets = 0;
+  state.competitorGroups.forEach((group) => {
+    const trackedCountries = getCompetitorTrackedCountriesForGroup(
+      group,
+      state.competitorTrackedKeywords,
+    );
+    trackedCountries.forEach((trackedCountry) => {
+      group.competitors.forEach((app) => {
+        const key = `${group.groupId}:${app.appId}:${trackedCountry}`;
+        const latestSnapshot = latestByKey.get(key);
+        if (!latestSnapshot || getGlobalDayKeyForTimestamp(latestSnapshot.capturedAt) !== runDayKey) {
+          unresolvedTargets += 1;
+        }
+      });
+    });
+  });
+
+  return unresolvedTargets;
+}
+
+function getTrackingRecoveryScope(
+  state: NormalizedUserTrackingDocument,
+  runKey: string,
+) {
+  const trackedKeywords = filterUnresolvedTrackedKeywords(
+    state.trackedKeywords,
+    runKey,
+  ) as TrackedKeywordRecord[];
+  const competitorTrackedKeywords = filterUnresolvedCompetitorTrackedKeywords(
+    state.competitorTrackedKeywords,
+    runKey,
+  ) as CompetitorTrackedKeywordRecord[];
+
+  return {
+    scopedState: {
+      ...state,
+      trackedKeywords,
+      competitorTrackedKeywords,
+    },
+    counts: {
+      trackedKeywords: trackedKeywords.length,
+      competitorTrackedApps: competitorTrackedKeywords.reduce(
+        (sum, trackedKeyword) => sum + trackedKeyword.apps.length,
+        0,
+      ),
+      competitorAsoTargets: getUnresolvedCompetitorAsoTargetCount(state, runKey),
     },
   };
 }
@@ -3720,7 +3812,7 @@ async function sendEmailAlertEvents(
 
 function buildCronFailureEmailHtml(input: {
   runKey: string;
-  trigger: 'automatic' | 'manual' | 'watchdog';
+  trigger: 'automatic' | 'manual' | 'watchdog' | 'recovery';
   startedAt: string;
   finishedAt: string;
   durationMs: number;
@@ -3747,7 +3839,7 @@ function buildCronFailureEmailHtml(input: {
 
 async function sendCronFailureEmail(input: {
   runKey: string;
-  trigger: 'automatic' | 'manual' | 'watchdog';
+  trigger: 'automatic' | 'manual' | 'watchdog' | 'recovery';
   startedAt: string;
   finishedAt: string;
   durationMs: number;
@@ -3927,7 +4019,10 @@ async function refreshTrackedKeywordRecord(
           refresh,
           depth,
           getUpstreamDeadline(),
-          { proxyFallbackOnNotRanked: true },
+          {
+            proxyFallbackOnNotRanked: true,
+            proxyFirst: true,
+          },
         ),
       normalizeTrackedKeywordError: (error) =>
         normalizeApiError(error, 'Tracked keyword check failed.').message,
@@ -4258,7 +4353,7 @@ async function acquireDailyTrackingLease(
     runKey: string;
     ownerId: string;
     force?: boolean;
-    trigger?: 'automatic' | 'manual' | 'watchdog';
+    trigger?: 'automatic' | 'manual' | 'watchdog' | 'recovery';
   },
 ) {
   const now = new Date();
@@ -4545,8 +4640,24 @@ async function getGooglePlayRankWithFallback(
   contextLabel: 'discovery' | 'ranking',
   options?: {
     proxyFallbackOnNotRanked?: boolean;
+    proxyFirst?: boolean;
   },
 ) {
+  if (options?.proxyFirst === true && googlePlayProxyRequestOptions.agent) {
+    console.warn(
+      `[${contextLabel}] Using proxy-first Google Play rank lookup for "${keyword}".`,
+    );
+    return await getGooglePlayRankViaSearch(
+      keyword,
+      appId,
+      country,
+      depth,
+      googlePlayProxyRequestOptions,
+      deadlineAt,
+      failureMessage,
+    );
+  }
+
   try {
     const directRank = await getGooglePlayRankWeb(keyword, appId, country, depth);
     if (
@@ -5096,10 +5207,15 @@ async function getKeywordRank(
   deadlineAt = getUpstreamDeadline(),
   options?: {
     proxyFallbackOnNotRanked?: boolean;
+    proxyFirst?: boolean;
   },
 ) {
   const rankingDepth = normalizeRankingDepth(depth);
-  const proxyVerificationKey = options?.proxyFallbackOnNotRanked ? 'verify-proxy' : 'standard';
+  const proxyVerificationKey = options?.proxyFirst
+    ? 'proxy-first'
+    : options?.proxyFallbackOnNotRanked
+      ? 'verify-proxy'
+      : 'standard';
   const cacheKey = `${storeType}-${country}-${appId}-${keyword}-${rankingDepth}-${proxyVerificationKey}`;
   const cachedRank = rankingCache.get<number>(cacheKey);
   if (cachedRank !== undefined && !refresh) {
@@ -5197,191 +5313,12 @@ async function listenOnAvailablePort(
   throw lastError ?? new Error(`Unable to bind a server port starting from ${preferredPort}`);
 }
 
-async function refreshTrackedKeywordState(
-  state: TrackingState,
-  options?: {
-    updateScheduleMetadata?: boolean;
-    runKey?: string;
-  },
-) {
-  if (!state.trackedKeywords.length) {
-    return {
-      nextState: {
-        trackedKeywords: [],
-        rankHistory: state.rankHistory,
-        schedule: options?.updateScheduleMetadata
-          ? {
-              ...state.schedule,
-              lastRunAt: new Date().toISOString(),
-              lastRunKey: options.runKey ?? state.schedule.lastRunKey,
-            }
-          : state.schedule,
-      },
-      checked: 0,
-      changed: 0,
-      failed: 0,
-    };
-  }
-
-  const refreshResults = await mapWithConcurrency(
-    state.trackedKeywords,
-    TRACKING_REFRESH_CONCURRENCY,
-    (trackedKeyword) => refreshTrackedKeywordRecord(trackedKeyword),
-  );
-
-  const changed = refreshResults.filter((result) => result.previousRank !== result.trackedKeyword.lastRank).length;
-  const failed = refreshResults.filter((result) => result.hadError).length;
-
-  return {
-    nextState: {
-      trackedKeywords: refreshResults.map((result) => result.trackedKeyword),
-      rankHistory: mergeRankHistory(
-        state.rankHistory,
-        refreshResults.flatMap((result) => (result.historyEntry ? [result.historyEntry] : [])),
-      ),
-      schedule: options?.updateScheduleMetadata
-        ? {
-            ...state.schedule,
-            lastRunAt: new Date().toISOString(),
-            lastRunKey: options.runKey ?? state.schedule.lastRunKey,
-          }
-        : state.schedule,
-    },
-    checked: refreshResults.length,
-    changed,
-    failed,
-  };
-}
-
-async function refreshCompetitorTrackedKeywordState(
-  state: TrackingState,
-  options?: {
-    updateScheduleMetadata?: boolean;
-    runKey?: string;
-  },
-) {
-  if (!state.competitorTrackedKeywords.length) {
-    return {
-      nextState: {
-        competitorTrackedKeywords: [],
-        competitorRankHistory: state.competitorRankHistory,
-        schedule: options?.updateScheduleMetadata
-          ? {
-              ...state.schedule,
-              lastRunAt: new Date().toISOString(),
-              lastRunKey: options.runKey ?? state.schedule.lastRunKey,
-            }
-          : state.schedule,
-      },
-      checked: 0,
-      changed: 0,
-      failed: 0,
-    };
-  }
-
-  const refreshResults = await mapWithConcurrency(
-    state.competitorTrackedKeywords,
-    TRACKING_REFRESH_CONCURRENCY,
-    async (trackedKeyword) => {
-      const refreshedAt = new Date().toISOString();
-      const appResults = await Promise.all(
-        trackedKeyword.apps.map(async (app) => {
-          try {
-            const rank = await getKeywordRank(
-              trackedKeyword.keyword,
-              app.appId,
-              trackedKeyword.store,
-              trackedKeyword.country,
-              true,
-              TRACKED_KEYWORD_RANKING_DEPTH,
-            );
-
-            return {
-              previousRank: app.lastRank,
-              app: {
-                ...app,
-                lastRank: rank,
-                lastChecked: refreshedAt,
-                lastCheckStatus: rank === -1 ? ('not_ranked' as const) : ('ok' as const),
-                lastError: undefined,
-              },
-              historyEntry: {
-                trackedKeywordId: trackedKeyword.trackedKeywordId,
-                groupId: trackedKeyword.groupId,
-                keyword: trackedKeyword.keyword,
-                appId: app.appId,
-                appKey: app.appKey,
-                store: trackedKeyword.store,
-                country: trackedKeyword.country,
-                rank,
-                rankDepth: TRACKED_KEYWORD_RANKING_DEPTH,
-                timestamp: refreshedAt,
-              } satisfies CompetitorRankHistoryRecord,
-              hadError: false,
-            };
-          } catch (error) {
-            console.warn(
-              `Competitor tracked keyword refresh failed for "${trackedKeyword.keyword}" [${trackedKeyword.country}] / ${app.title}`,
-              error,
-            );
-            return {
-              previousRank: app.lastRank,
-              app: {
-                ...app,
-                lastChecked: refreshedAt,
-                lastCheckStatus: 'error' as const,
-                lastError: normalizeApiError(error, 'Competitor keyword check failed.').message,
-              },
-              historyEntry: null,
-              hadError: true,
-            };
-          }
-        }),
-      );
-
-      return {
-        trackedKeyword: {
-          ...trackedKeyword,
-          apps: appResults.map((result) => result.app),
-          updatedAt: refreshedAt,
-          lastCheckedAt: refreshedAt,
-        },
-        historyEntries: appResults.flatMap((result) => (result.historyEntry ? [result.historyEntry] : [])),
-        changed: appResults.filter((result) => result.previousRank !== result.app.lastRank).length,
-        failed: appResults.filter((result) => result.hadError).length,
-      };
-    },
-  );
-
-  return {
-    nextState: {
-      competitorTrackedKeywords: mergeCompetitorTrackedKeywords(
-        state.competitorTrackedKeywords,
-        refreshResults.map((result) => result.trackedKeyword),
-      ),
-      competitorRankHistory: mergeCompetitorRankHistory(
-        state.competitorRankHistory,
-        refreshResults.flatMap((result) => result.historyEntries),
-      ),
-      schedule: options?.updateScheduleMetadata
-        ? {
-            ...state.schedule,
-            lastRunAt: new Date().toISOString(),
-            lastRunKey: options.runKey ?? state.schedule.lastRunKey,
-          }
-        : state.schedule,
-    },
-    checked: refreshResults.reduce((sum, result) => sum + result.trackedKeyword.apps.length, 0),
-    changed: refreshResults.reduce((sum, result) => sum + result.changed, 0),
-    failed: refreshResults.reduce((sum, result) => sum + result.failed, 0),
-  };
-}
-
 async function refreshAllTrackingState(
   state: TrackingState,
   options?: {
     updateScheduleMetadata?: boolean;
     runKey?: string;
+    mode?: TrackingRefreshMode;
   },
 ) {
   return refreshSharedAllTrackingState(
@@ -5404,7 +5341,10 @@ async function refreshAllTrackingState(
           refresh,
           depth,
           getUpstreamDeadline(),
-          { proxyFallbackOnNotRanked: true },
+          {
+            proxyFallbackOnNotRanked: true,
+            proxyFirst: true,
+          },
         ),
       normalizeTrackedKeywordError: (error) =>
         normalizeApiError(error, 'Tracked keyword check failed.').message,
@@ -5422,6 +5362,9 @@ async function captureCompetitorAsoState(
     'competitorGroups' | 'competitorTrackedKeywords' | 'competitorAsoLatestSnapshots' | 'alertRules' | 'notificationSettings'
   >,
   runKey: string,
+  options?: {
+    mode?: TrackingRefreshMode;
+  },
 ) {
   if (!state.competitorGroups.length) {
     return {
@@ -5454,6 +5397,7 @@ async function captureCompetitorAsoState(
   let checked = 0;
   let failed = 0;
   const createdDiffs: CompetitorAsoDiffRecord[] = [];
+  const runDayKey = getGlobalRunDayKey(runKey);
 
   await mapWithConcurrency(state.competitorGroups, 1, async (group) => {
     const trackedCountries = getCompetitorTrackedCountriesForGroup(
@@ -5462,6 +5406,16 @@ async function captureCompetitorAsoState(
     );
     await mapWithConcurrency(trackedCountries, 1, async (trackedCountry) => {
       await mapWithConcurrency(group.competitors, 2, async (app) => {
+        const comparableKey = `${group.groupId}:${app.appId}:${trackedCountry}`;
+        const latestSnapshot = latestByKey.get(comparableKey);
+        if (
+          options?.mode === 'unresolved_only' &&
+          latestSnapshot &&
+          getGlobalDayKeyForTimestamp(latestSnapshot.capturedAt) === runDayKey
+        ) {
+          return;
+        }
+
         const capturedAt = new Date().toISOString();
         try {
           const details = await getStoreAppDetails(
@@ -5490,7 +5444,6 @@ async function captureCompetitorAsoState(
             capturedAt,
             payload,
           };
-          const comparableKey = getComparableCompetitorAsoSnapshotKey(snapshot);
           const previousSnapshot = latestByKey.get(comparableKey);
           latestByKey.set(comparableKey, snapshot);
           checked += 1;
@@ -5743,6 +5696,7 @@ async function runAllUserTrackingSchedules(
   runKey: string,
   options?: {
     force?: boolean;
+    mode?: TrackingRefreshMode;
   },
 ): Promise<DailyTrackingSummary> {
   if (userTrackingSchedulerPromise) {
@@ -5788,10 +5742,36 @@ async function runAllUserTrackingSchedules(
       }
 
       const planLimits = getResolvedPlanLimits(userData);
-      const { scopedState, activity } = getTrackedKeywordScopedState(state, planLimits);
-      const refreshed = await refreshAllTrackingState(scopedState, {
+      const { scopedState } = getTrackedKeywordScopedState(state, planLimits);
+      const recoveryScope =
+        options?.mode === 'unresolved_only'
+          ? getTrackingRecoveryScope(scopedState, runKey)
+          : {
+              scopedState,
+              counts: {
+                trackedKeywords: scopedState.trackedKeywords.length,
+                competitorTrackedApps: scopedState.competitorTrackedKeywords.reduce(
+                  (sum, trackedKeyword) => sum + trackedKeyword.apps.length,
+                  0,
+                ),
+                competitorAsoTargets: getUnresolvedCompetitorAsoTargetCount(
+                  scopedState,
+                  runKey,
+                ),
+              },
+            };
+      const hasTrackedRefreshWork =
+        recoveryScope.counts.trackedKeywords > 0 ||
+        recoveryScope.counts.competitorTrackedApps > 0;
+      const hasCompetitorAsoWork = recoveryScope.counts.competitorAsoTargets > 0;
+      if (!hasTrackedRefreshWork && !hasCompetitorAsoWork) {
+        return;
+      }
+
+      const refreshed = await refreshAllTrackingState(recoveryScope.scopedState, {
         updateScheduleMetadata: true,
         runKey,
+        mode: options?.mode,
       });
       const nextTrackedKeywords = mergeTrackedKeywords(
         state.trackedKeywords,
@@ -5819,6 +5799,7 @@ async function runAllUserTrackingSchedules(
           notificationSettings: state.notificationSettings,
         },
         runKey,
+        { mode: options?.mode },
       );
       const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
         userDoc.ref,
@@ -5841,7 +5822,7 @@ async function runAllUserTrackingSchedules(
       } satisfies UserTrackingDocument, { merge: true });
 
       ran += 1;
-      checked += activity.activeTrackedKeywords;
+      checked += refreshed.checked;
       changed += refreshed.changed;
       failed += refreshed.failed;
       asoChecked += asoResult.checked;
@@ -5872,7 +5853,8 @@ async function runAndPersistAllUserTrackingSchedules(
   runKey: string,
   options?: {
     force?: boolean;
-    trigger?: 'automatic' | 'manual' | 'watchdog';
+    mode?: TrackingRefreshMode;
+    trigger?: 'automatic' | 'manual' | 'watchdog' | 'recovery';
   },
 ) {
   const adminDb = getFirebaseAdminDb();
@@ -5903,6 +5885,7 @@ async function runAndPersistAllUserTrackingSchedules(
   try {
     const summary = await runAllUserTrackingSchedules(runKey, {
       force: options?.force,
+      mode: options?.mode,
     });
     const finalStatus = getDailyTrackingFinalStatus(summary);
     const finishedAt = new Date().toISOString();
@@ -6372,38 +6355,6 @@ async function buildKeywordCandidates(
 }
 const genai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
-function isValidASOKeyword(k: unknown): k is string {
-  if (typeof k !== 'string') return false;
-  const trimmed = k.trim().toLowerCase();
-
-  if (trimmed.length < 2 || trimmed.length > 40) return false;
-
-  // Basic allowed chars: letters, numbers, spaces, hyphen, ampersand, dot
-  if (/[^a-z0-9\s\-\.&]/i.test(trimmed)) return false;
-
-  const words = trimmed.split(/\s+/);
-  if (words.length > 6) return false;
-
-  // Reject stemmed or broken tokens
-  const badStems = new Set(['articl', 'featur', 'gam', 'improv', 'introduc', 'manag', 'messag', 'optim', 'perform', 'provid', 'resolv', 'stat', 'updat', 'experienc', 'enhanc', 'bugfix']);
-  if (words.some((word) => badStems.has(word))) return false;
-
-  // Reject pure trash words with no search intent
-  const pureTrashWords = new Set(['version', 'release', 'notes', 'bug', 'bugs', 'fix', 'fixes', 'fixed', 'improvement', 'improvements', 'performance', 'experience']);
-  if (words.some((word) => pureTrashWords.has(word))) return false;
-
-  const lowIntentWords = new Set(['download', 'install', 'update', 'updates', 'support', 'user', 'users', 'app', 'apps', 'free', 'premium', 'pro']);
-  const fillers = new Set(['and', 'the', 'for', 'with', 'to', 'in', 'of', 'a', 'an', 'is', 'by', 'on', 'at', 'it', 'my', 'your', 'this', 'that', 'how', 'what', 'why', 'get', 'let']);
-
-  // Reject if the ENTIRE phrase is just low-intent words and fillers (e.g., "free app for you")
-  if (words.every((word) => fillers.has(word) || lowIntentWords.has(word))) return false;
-
-  // Reject trailing fillers like "fitness for"
-  if (words.length > 1 && fillers.has(words[words.length - 1])) return false;
-
-  return true;
-}
-
 function dedupeKeywords(keywords: string[]) {
   const seen = new Set<string>();
   return keywords.filter((keyword) => {
@@ -6422,7 +6373,7 @@ async function refineKeywordsWithGemini(
   keywords: string[];
   rawCount: number;
   geminiCount: number;
-  strictValidCount: number;
+  sanitizedGeminiCount: number;
   fallbackAddedCount: number;
 }> {
   const limit = DISCOVERY_PROFILES[mode].keywordLimit;
@@ -6438,12 +6389,13 @@ Category: "${context.category || 'N/A'}"
 I have scraped the following potential keywords from competitors:
 ${rawKeywords.join(', ')}
 
-Your task is to refine this list and discover as many relevant keywords as possible:
+Your task is to significantly expand and refine this list to discover a large variety of relevant keywords:
 1. Return real, human-searchable App Store / Google Play keywords with search intent.
-2. Filter out broken app-description fragments or stemmed tokens (e.g., "featur").
-3. You may include long-tail keywords (up to 5-6 words) if they are highly relevant.
-4. Keep the list broad but avoid generic filler-only phrases.
-5. Return EXACTLY a JSON array of up to ${limit} strings. NEVER use markdown formatting.`;
+2. Expand on the provided list by generating synonyms, adjacent intents, feature phrases, problem/benefit phrases, and long-tail variations up to 8 words.
+3. Do not be overly strict—if a keyword might be searched by a real user looking for this type of app, include it!
+4. Include a mix of head terms, mid-tail terms, and long-tail phrases. Broader exploratory terms are welcome.
+5. Avoid obvious junk like changelog phrases, release notes, or bug-fix wording.
+6. Return EXACTLY a JSON array of up to ${limit * 3} strings. NEVER use markdown formatting.`;
 
     try {
       const response = await genai.models.generateContent({
@@ -6472,30 +6424,32 @@ Your task is to refine this list and discover as many relevant keywords as possi
     }
   }
 
-  const strictValid = dedupeKeywords(geminiKeywords.filter(isValidASOKeyword));
-  const strictKeywords = strictValid.slice(0, limit);
-  const seen = new Set(strictKeywords.map((keyword) => normalizeKeyword(keyword)));
+  const sanitizedGeminiKeywords = dedupeKeywords(
+    geminiKeywords.filter(isDiscoveryKeywordCandidate),
+  );
+  const primaryKeywords = sanitizedGeminiKeywords.slice(0, limit);
+  const seen = new Set(primaryKeywords.map((keyword) => normalizeKeyword(keyword)));
   const fallbackKeywords: string[] = [];
 
-  for (const keyword of dedupeKeywords(rawKeywords.filter(isValidASOKeyword))) {
+  for (const keyword of dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate))) {
     const normalized = normalizeKeyword(keyword);
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     fallbackKeywords.push(keyword);
-    if (strictKeywords.length + fallbackKeywords.length >= limit) {
+    if (primaryKeywords.length + fallbackKeywords.length >= limit) {
       break;
     }
   }
 
   console.log(
-    `[keyword-refine] raw=${rawKeywords.length} gemini=${geminiKeywords.length} strictValid=${strictValid.length} fallbackAdded=${fallbackKeywords.length}`,
+    `[keyword-refine] raw=${rawKeywords.length} gemini=${geminiKeywords.length} sanitizedGemini=${sanitizedGeminiKeywords.length} fallbackAdded=${fallbackKeywords.length}`,
   );
 
   return {
-    keywords: [...strictKeywords, ...fallbackKeywords],
+    keywords: [...primaryKeywords, ...fallbackKeywords],
     rawCount: rawKeywords.length,
     geminiCount: geminiKeywords.length,
-    strictValidCount: strictValid.length,
+    sanitizedGeminiCount: sanitizedGeminiKeywords.length,
     fallbackAddedCount: fallbackKeywords.length,
   };
 }
@@ -6606,14 +6560,13 @@ async function discoverRankedKeywords(input: {
   });
 
   const rankedCandidates = metricCandidates
-    .filter((candidate) => {
-      const hasStrongSignal = candidate.features.exactTitleMatch > 0 ||
-        candidate.features.exactTitleSegment > 0 ||
-        candidate.features.orderedTitleCoverage >= 0.75 ||
-        candidate.features.semanticCoverage >= 0.5 ||
-        candidate.features.categorySemanticCoverage >= 0.5;
-      return hasStrongSignal || candidate.displayQuality >= 35;
-    })
+    .filter((candidate) =>
+      shouldAdmitDiscoveryCandidate(
+        input.mode,
+        candidate.features,
+        candidate.displayQuality,
+      ),
+    )
     .sort((a, b) => {
       if (b.baseline.relevance !== a.baseline.relevance) return b.baseline.relevance - a.baseline.relevance;
       if (a.baseline.difficulty !== b.baseline.difficulty) return a.baseline.difficulty - b.baseline.difficulty;
@@ -6621,6 +6574,10 @@ async function discoverRankedKeywords(input: {
       return a.keyword.length - b.keyword.length;
     })
     .slice(0, profile.keywordLimit);
+
+  console.log(
+    `[discovery-candidates] mode=${input.mode} raw=${refined.rawCount} gemini=${refined.geminiCount} sanitizedGemini=${refined.sanitizedGeminiCount} admitted=${rankedCandidates.length}`,
+  );
 
   const featuresByKeyword = new Map(
     metricCandidates.map((candidate) => [normalizeKeyword(candidate.keyword), candidate.features]),
@@ -6723,14 +6680,13 @@ async function discoverRankedKeywords(input: {
   }
 
   const rankings = validRankings
-    .filter((candidate) => {
-      const hasStrongSignal = candidate.featureQuality.exactTitleMatch > 0 ||
-        candidate.featureQuality.exactTitleSegment > 0 ||
-        candidate.featureQuality.orderedTitleCoverage >= 0.75 ||
-        candidate.featureQuality.semanticCoverage >= 0.5 ||
-        candidate.featureQuality.categorySemanticCoverage >= 0.5;
-      return hasStrongSignal || candidate.displayQuality >= 35;
-    })
+    .filter((candidate) =>
+      shouldAdmitDiscoveryCandidate(
+        input.mode,
+        candidate.featureQuality,
+        candidate.displayQuality,
+      ),
+    )
     .sort((a, b) => {
       if (a.rank !== b.rank) return a.rank - b.rank;
       return b.relevance - a.relevance;
@@ -6769,6 +6725,10 @@ async function discoverRankedKeywords(input: {
     rankings,
     suggestions,
   };
+
+  console.log(
+    `[discovery-result] mode=${input.mode} checked=${checkedKeywords} candidates=${rankedCandidates.length} rankings=${rankings.length} suggestions=${suggestions.length} failed=${failedLookups}`,
+  );
 
   discoveryCache.set(cacheKey, payload);
   return payload;
@@ -7172,11 +7132,16 @@ async function startServer() {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
 
+      const requestBody = readRequiredObjectRecord(req.body, 'body');
+      const nextStateInput =
+        'state' in requestBody
+          ? readRequiredObjectRecord(requestBody.state, 'state')
+          : requestBody;
       const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
       const snapshot = await userDocRef.get();
       const currentUserData = snapshot.data() as UserTrackingDocument | undefined;
       const currentState = normalizeUserTrackingDocument(currentUserData);
-      const nextState = normalizeUserTrackingDocument(req.body?.state ?? req.body);
+      const nextState = normalizeUserTrackingDocument(nextStateInput);
       const mergedState = mergeEditableUserTrackingState(currentState, nextState);
       const planLimits = getResolvedPlanLimits(currentUserData);
 
@@ -7696,6 +7661,59 @@ async function startServer() {
     }
   });
 
+  app.post('/api/cron/recover', async (req, res) => {
+    try {
+      const cronSecret = process.env.CRON_SECRET?.trim();
+      if (!cronSecret) {
+        throw createConfigurationError('CRON_SECRET is not configured on the server.');
+      }
+
+      if (req.header('x-cron-secret') !== cronSecret) {
+        throw createForbiddenError('Missing or invalid cron secret.');
+      }
+
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const now = new Date();
+      const runKey = getGlobalTrackingRunKey(now);
+      const statusRef = adminDb.doc('system/dailyTracking');
+      const statusSnapshot = await statusRef.get();
+      const statusData = statusSnapshot.data() as DailyTrackingStatusRecord | undefined;
+      if (hasActiveDailyTrackingLease(statusData, now)) {
+        return res.status(409).json({
+          status: 'running',
+          timestamp: now.toISOString(),
+          runKey,
+          reason: 'run-still-in-flight',
+          startedAt: statusData?.lastStartedAt,
+          retryCount: statusData?.retryCount || 0,
+          nextRetryAt: statusData?.leaseExpiresAt,
+        });
+      }
+
+      console.log(`[cron] Recovery trigger received for ${runKey}. Running unresolved-only catch-up.`);
+      const userSummary = await runAndPersistAllUserTrackingSchedules(runKey, {
+        force: true,
+        mode: 'unresolved_only',
+        trigger: 'recovery',
+      });
+
+      return res.json({
+        status: 'success',
+        timestamp: now.toISOString(),
+        runKey,
+        mode: 'unresolved_only',
+        userSummary,
+      });
+    } catch (error: any) {
+      console.error('[cron] Recovery failed:', error);
+      return sendApiError(res, error, 'Cron recovery failed to execute.');
+    }
+  });
+
   app.get('/api/cron/watchdog', async (req, res) => {
     try {
       const cronSecret = process.env.CRON_SECRET?.trim();
@@ -7833,6 +7851,7 @@ async function startServer() {
         expectedRunKey,
         {
           force,
+          mode: force ? 'unresolved_only' : 'full',
           trigger: 'watchdog',
         },
       );
