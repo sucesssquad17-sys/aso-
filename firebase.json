@@ -16,7 +16,11 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "server.cjs",
+      "server.cjs.map",
+      "tracking-job.cjs",
+      "tracking-job.cjs.map"
     ],
     "rewrites": [
       {
@@ -33,4 +37,3 @@
     ]
   }
 }
-
