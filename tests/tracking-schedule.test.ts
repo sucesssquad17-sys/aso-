@@ -3,6 +3,8 @@ import test from 'node:test';
 import {
   filterUnresolvedCompetitorTrackedKeywords,
   filterUnresolvedTrackedKeywords,
+  getGlobalTrackingWatchdogDueAtIso,
+  isGlobalTrackingWatchdogWindowOpen,
   normalizeTrackingSchedule,
   shouldRunTrackingRefresh,
   shouldRetryCompetitorTrackedAppForRun,
@@ -66,6 +68,17 @@ test('shared schedule normalization defaults missing enabled to true', () => {
   assert.equal(normalized.enabled, true);
   assert.equal(normalized.time, '09:00');
   assert.equal(normalized.timezone, 'Asia/Kolkata');
+});
+
+test('global watchdog window stays closed at midnight and opens at the due time', () => {
+  const midnightIst = new Date('2026-06-22T18:30:00.000Z');
+
+  assert.equal(getGlobalTrackingWatchdogDueAtIso(midnightIst, 60), '2026-06-23T04:30:00.000Z');
+  assert.equal(isGlobalTrackingWatchdogWindowOpen(midnightIst, 60), false);
+  assert.equal(
+    isGlobalTrackingWatchdogWindowOpen(new Date('2026-06-23T04:30:00.000Z'), 60),
+    true,
+  );
 });
 
 test('tracking refresh eligibility requires tracked data and respects lastRunKey unless forced', () => {

@@ -1,13 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 $PROJECT_ID="aso-analyzer-pro-app"
-$REGION="asia-south1"
+$REGION="us-central1"
 $SA_EMAIL="tracking-worker-sa@${PROJECT_ID}.iam.gserviceaccount.com"
-$IMAGE_NAME="gcr.io/${PROJECT_ID}/daily-tracking-worker"
+$IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/cloud-run-source-deploy/daily-tracking-worker:latest"
 $JOB_NAME="daily-tracking-worker"
 
 echo "Building and pushing the Docker image using Cloud Build..."
-gcloud builds submit --config=cloudbuild.job.yaml .
+gcloud builds submit --config=cloudbuild.job.yaml --substitutions=_IMAGE_NAME="$IMAGE_NAME" .
 
 echo "Deploying the Cloud Run Job..."
 gcloud run jobs deploy $JOB_NAME `

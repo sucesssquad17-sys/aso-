@@ -8,6 +8,7 @@ import {
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import {
   DEFAULT_GLOBAL_TRACKING_TIME,
+  GLOBAL_TRACKING_UTC_OFFSET_MINUTES,
   GLOBAL_TRACKING_TIMEZONE,
 } from './trackingTime';
 
@@ -154,6 +155,7 @@ export function getZonedDateParts(date: Date, timeZone: string) {
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      hourCycle: 'h23',
       hour12: false,
     })
       .formatToParts(date)
@@ -161,11 +163,13 @@ export function getZonedDateParts(date: Date, timeZone: string) {
       .map((part) => [part.type, part.value]),
   );
 
+  const rawHour = Number(parts.hour);
+
   return {
     year: String(parts.year),
     month: String(parts.month),
     day: String(parts.day),
-    hour: Number(parts.hour),
+    hour: rawHour === 24 ? 0 : rawHour,
     minute: Number(parts.minute),
   };
 }
@@ -291,6 +295,48 @@ export function getGlobalTrackingRunKey(
 ) {
   const parts = getZonedDateParts(date, timeZone);
   return `${parts.year}-${parts.month}-${parts.day}T${time}`;
+}
+
+export function getGlobalTrackingScheduledMinutes(
+  time = DEFAULT_GLOBAL_TRACKING_TIME,
+) {
+  const [hour, minute] = time.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+export function getGlobalTrackingWatchdogDueAtIso(
+  date: Date,
+  delayMinutes: number,
+  time = DEFAULT_GLOBAL_TRACKING_TIME,
+  timeZone = GLOBAL_TRACKING_TIMEZONE,
+) {
+  const parts = getZonedDateParts(date, timeZone);
+  const year = Number(parts.year);
+  const month = Number(parts.month);
+  const day = Number(parts.day);
+  const scheduledMinutes = getGlobalTrackingScheduledMinutes(time) + delayMinutes;
+  const dueHour = Math.floor(scheduledMinutes / 60);
+  const dueMinute = scheduledMinutes % 60;
+  return new Date(
+    Date.UTC(
+      year,
+      month - 1,
+      day,
+      dueHour,
+      dueMinute - GLOBAL_TRACKING_UTC_OFFSET_MINUTES,
+    ),
+  ).toISOString();
+}
+
+export function isGlobalTrackingWatchdogWindowOpen(
+  date: Date,
+  delayMinutes: number,
+  time = DEFAULT_GLOBAL_TRACKING_TIME,
+  timeZone = GLOBAL_TRACKING_TIMEZONE,
+) {
+  return date.getTime() >= Date.parse(
+    getGlobalTrackingWatchdogDueAtIso(date, delayMinutes, time, timeZone),
+  );
 }
 
 function getLegacyTrackingGroupId({

@@ -41,9 +41,11 @@ import {
   filterUnresolvedCompetitorTrackedKeywords,
   filterUnresolvedTrackedKeywords,
   getGlobalTrackingRunKey as getSharedGlobalTrackingRunKey,
+  getGlobalTrackingWatchdogDueAtIso as getSharedGlobalTrackingWatchdogDueAtIso,
   getZonedDateParts as getSharedZonedDateParts,
   initializeFirebaseAdminAppFromEnv,
   isGlobalTrackingRunTime as isSharedGlobalTrackingRunTime,
+  isGlobalTrackingWatchdogWindowOpen as isSharedGlobalTrackingWatchdogWindowOpen,
   mergeRankHistory as mergeSharedRankHistory,
   normalizeTrackingSchedule as normalizeSharedTrackingSchedule,
   refreshAllTrackingState as refreshSharedAllTrackingState,
@@ -142,7 +144,6 @@ const UPSTREAM_REQUEST_TIMEOUT_MS = 30000;
 const UPSTREAM_FAILURE_CACHE_TTL_SECONDS = 15;
 const RANKING_FETCH_TIMEOUT_MS = 20000;
 const GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES = 60;
-const GLOBAL_TRACKING_UTC_OFFSET_MINUTES = 330;
 const DAILY_TRACKING_LEASE_OWNER = `service:${process.pid}:${crypto.randomUUID()}`;
 const DODO_WEBHOOK_LEASE_TTL_MINUTES = 15;
 const DODO_WEBHOOK_PROCESS_OWNER = `dodo:${process.pid}:${crypto.randomUUID()}`;
@@ -4356,35 +4357,22 @@ function getGlobalTrackingRunKey(date: Date) {
   return getSharedGlobalTrackingRunKey(date, DEFAULT_TRACKING_SCHEDULE.time, GLOBAL_TRACKING_TIMEZONE);
 }
 
-function getGlobalTrackingScheduledMinutes() {
-  const [hour, minute] = DEFAULT_TRACKING_SCHEDULE.time.split(':').map(Number);
-  return hour * 60 + minute;
-}
-
 function isGlobalTrackingWatchdogWindowOpen(date: Date) {
-  const parts = getZonedDateParts(date, GLOBAL_TRACKING_TIMEZONE);
-  const currentMinutes = parts.hour * 60 + parts.minute;
-  return currentMinutes >= getGlobalTrackingScheduledMinutes() + GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES;
+  return isSharedGlobalTrackingWatchdogWindowOpen(
+    date,
+    GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES,
+    DEFAULT_TRACKING_SCHEDULE.time,
+    GLOBAL_TRACKING_TIMEZONE,
+  );
 }
 
 function getGlobalTrackingWatchdogDueAtIso(date: Date) {
-  const parts = getZonedDateParts(date, GLOBAL_TRACKING_TIMEZONE);
-  const year = Number(parts.year);
-  const month = Number(parts.month);
-  const day = Number(parts.day);
-  const scheduledMinutes =
-    getGlobalTrackingScheduledMinutes() + GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES;
-  const dueHour = Math.floor(scheduledMinutes / 60);
-  const dueMinute = scheduledMinutes % 60;
-  return new Date(
-    Date.UTC(
-      year,
-      month - 1,
-      day,
-      dueHour,
-      dueMinute - GLOBAL_TRACKING_UTC_OFFSET_MINUTES,
-    ),
-  ).toISOString();
+  return getSharedGlobalTrackingWatchdogDueAtIso(
+    date,
+    GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES,
+    DEFAULT_TRACKING_SCHEDULE.time,
+    GLOBAL_TRACKING_TIMEZONE,
+  );
 }
 
 function getMinutesSinceIsoTimestamp(timestamp: string | undefined, now: Date) {
