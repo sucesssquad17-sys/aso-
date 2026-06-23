@@ -1,3 +1,5 @@
+import { normalizeCountryCode } from "./countries";
+
 export type AlertStoreType = "android" | "ios";
 
 export type AlertConditionType =
@@ -50,6 +52,7 @@ export type NotificationSettings = {
   pushEnabled: boolean;
   permission: NotificationPermission | "unsupported";
   lastToken?: string;
+  lastTokenId?: string;
   tokenUpdatedAt?: string;
 };
 
@@ -255,7 +258,8 @@ export function normalizeAlertRule(input: unknown): AlertRule | null {
         new Set(
           candidate.countries
             .filter((country) => typeof country === "string" && country.trim())
-            .map((country) => country.trim().toLowerCase()),
+            .map((country) => normalizeCountryCode(country, ""))
+            .filter((country) => Boolean(country)),
         ),
       )
     : [];
@@ -278,7 +282,7 @@ export function normalizeAlertRule(input: unknown): AlertRule | null {
   }
   return {
     id: candidate.id.trim(),
-    enabled: true,
+    enabled: candidate.enabled !== false,
     groupId: candidate.groupId.trim(),
     appId: candidate.appId.trim(),
     keyword: candidate.keyword.trim(),
@@ -291,9 +295,9 @@ export function normalizeAlertRule(input: unknown): AlertRule | null {
       ? {
           targetAppIds: Array.from(
             new Set(
-              candidate.targetAppIds.filter(
-                (entry) => typeof entry === "string" && entry.trim(),
-              ),
+              candidate.targetAppIds
+                .filter((entry) => typeof entry === "string" && entry.trim())
+                .map((entry) => entry.trim()),
             ),
           ),
         }
@@ -308,9 +312,9 @@ export function normalizeAlertRule(input: unknown): AlertRule | null {
       ? {
           baselineKeys: Array.from(
             new Set(
-              candidate.baselineKeys.filter(
-                (entry) => typeof entry === "string" && entry.trim(),
-              ),
+              candidate.baselineKeys
+                .filter((entry) => typeof entry === "string" && entry.trim())
+                .map((entry) => entry.trim()),
             ),
           ),
         }
@@ -350,6 +354,9 @@ export function normalizeNotificationSettings(
     permission,
     ...(typeof candidate.lastToken === "string" && candidate.lastToken
       ? { lastToken: candidate.lastToken }
+      : {}),
+    ...(typeof candidate.lastTokenId === "string" && candidate.lastTokenId
+      ? { lastTokenId: candidate.lastTokenId }
       : {}),
     ...(typeof candidate.tokenUpdatedAt === "string"
       ? { tokenUpdatedAt: candidate.tokenUpdatedAt }

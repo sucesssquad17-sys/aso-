@@ -448,6 +448,8 @@ export interface UserAppStateDocument {
   notificationSettings?: NotificationSettings;
   legalAcceptedAt?: string;
   legalVersion?: string;
+  stateVersion?: number;
+  serverUpdatedAt?: string;
   updatedAt?: string;
   migratedFromLocalAt?: string;
 }

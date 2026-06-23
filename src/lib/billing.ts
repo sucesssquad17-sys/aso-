@@ -176,8 +176,9 @@ export function getPlanPriceLabel(
   if (interval === "yearly") {
     const monthlyLabel = billingStatus?.planPricing?.[plan.id]?.["monthly"]?.priceLabel || plan.priceLabel;
     const match = monthlyLabel?.match(/(\d+)/);
-    if (match) {
-      const yearly = parseInt(match[1], 10) * 10;
+    const monthlyAmount = match?.[1];
+    if (monthlyAmount) {
+      const yearly = parseInt(monthlyAmount, 10) * 10;
       return `$${yearly}/yr`;
     }
     return null;
