@@ -89,11 +89,15 @@ export function WorkspaceMetricCard({
   accent?: "cyan" | "emerald" | "amber" | "violet" | "slate";
 }) {
   return (
-    <div className={cn("workspace-metric-card", `workspace-metric-${accent}`)}>
-      <div className="workspace-metric-label">{label}</div>
-      <div className="workspace-metric-value">{value}</div>
-      {hint ? <div className="workspace-metric-hint">{hint}</div> : null}
-      {trend ? <div className="workspace-metric-trend">{trend}</div> : null}
+    <div className={cn("workspace-metric-card flex flex-col", `workspace-metric-${accent}`)}>
+      <div className="workspace-metric-label mb-1 !text-[10px] sm:!text-[11px]">{label}</div>
+      <div className="workspace-metric-value !text-[1.15rem] sm:!text-3xl">{value}</div>
+      {hint ? (
+        <div className="workspace-metric-hint mt-auto pt-1.5 !text-[10px] leading-tight sm:pt-2 sm:!text-xs line-clamp-2">
+          {hint}
+        </div>
+      ) : null}
+      {trend ? <div className="workspace-metric-trend mt-1.5 sm:mt-2">{trend}</div> : null}
     </div>
   );
 }
@@ -105,7 +109,7 @@ export function WorkspaceMetricGrid({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={cn("workspace-metric-grid", className)}>{children}</div>;
+  return <div className={cn("workspace-metric-grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-4", className)}>{children}</div>;
 }
 
 export function WorkspaceNavButton({
@@ -232,7 +236,7 @@ export function MobileDataCard({
   return (
     <div
       className={cn(
-        "workspace-panel !gap-2 !p-3 sm:!gap-3 sm:!p-4 md:hidden",
+        "workspace-panel workspace-mobile-data-card !gap-2 !p-3 sm:!gap-3 sm:!p-4 md:hidden",
         className,
       )}
     >

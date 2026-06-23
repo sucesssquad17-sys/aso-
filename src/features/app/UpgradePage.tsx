@@ -138,9 +138,9 @@ function UsageBar({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <span className="text-[13px] font-medium text-slate-600 dark:text-app-text-muted">{label}</span>
-        <span className={`text-[13px] font-bold tabular-nums tracking-wide ${textColor}`}>
+      <div className="mb-1.5 flex items-center justify-between gap-3 sm:mb-2">
+        <span className="text-xs font-medium text-slate-600 dark:text-app-text-muted sm:text-[13px]">{label}</span>
+        <span className={`text-xs font-bold tabular-nums tracking-wide sm:text-[13px] ${textColor}`}>
           {used} / {total === null ? "∞" : total}
         </span>
       </div>
@@ -344,12 +344,12 @@ export function UpgradePage({
       </div>
 
       {/* ── Sticky nav bar ────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/50 dark:border-app-border/50 bg-white/80 dark:bg-app-surface/80 px-4 py-3 backdrop-blur-md sm:px-6">
-        <div className="flex items-center gap-2">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/50 dark:border-app-border/50 bg-white/80 dark:bg-app-surface/80 px-3 py-2 backdrop-blur-md sm:px-6 sm:py-3">
+        <div className="flex min-w-0 items-center gap-2">
           {canReturnToWorkspace ? (
             <button
               onClick={onReturn}
-              className="group inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white"
+              className="group inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white sm:px-3 sm:text-xs"
             >
               <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
               Back to workspace
@@ -361,13 +361,13 @@ export function UpgradePage({
             </div>
           )}
           {signedInAccount ? (
-            <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted sm:inline-flex">
+            <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted lg:inline-flex">
               <Mail className="h-3.5 w-3.5" />
               {signedInAccount}
             </div>
           ) : null}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {billingStatus?.environment === "test" && (
             <span className="rounded-md bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 shadow-sm border border-amber-200/50 dark:bg-amber-900/20 dark:border-amber-800/50 dark:text-amber-500">
               Test mode
@@ -399,34 +399,34 @@ export function UpgradePage({
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-24 pt-16 sm:px-6 md:px-10">
+      <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-16 md:px-10">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <div className="mb-14 text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400">
+        <div className="mb-8 text-center sm:mb-14">
+          <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/60 bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-[10px]">
             <Sparkles className="h-3 w-3" />
             Upgrade your workspace
           </div>
-          <h1 className="mt-8 text-4xl font-black leading-[1.1] tracking-tight text-slate-900 dark:text-app-text sm:text-[3.5rem]">
+          <h1 className="mt-4 text-[2.1rem] font-black leading-[1.05] tracking-tight text-slate-900 dark:text-app-text sm:mt-8 sm:text-[3.5rem]">
             Pick the depth that fits
             <br />
             <span className="mt-2 inline-block text-blue-600 dark:text-blue-500">
               your portfolio.
             </span>
           </h1>
-          <p className="mx-auto mt-8 max-w-xl text-base leading-relaxed text-app-text-muted dark:text-app-text-muted">
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-8 sm:text-base">
             Every plan includes all features. Only tracked apps, competitor groups, and keyword capacity scale per tier.
           </p>
         </div>
 
         {/* ── Current plan + usage ───────────────────────────────────────── */}
 
-        <div className="mb-12 flex flex-col sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mb-8 flex flex-col gap-4 sm:mb-12 sm:grid sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {/* Plan card */}
           <div className="workspace-panel order-2 sm:order-1">
             <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
               Your membership
             </p>
-            <p className="mt-4 text-[1.75rem] font-black tracking-tight text-slate-900 dark:text-app-text">
+              <p className="mt-3 text-[1.45rem] font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-4 sm:text-[1.75rem]">
               {isActivating
                 ? "Activating trial"
                 : isSelectionRequired
@@ -474,7 +474,7 @@ export function UpgradePage({
             {currentPeriodEnd && (
               <p className="mt-1 text-xs font-medium text-app-text-muted dark:text-app-text-muted">Renews {currentPeriodEnd}</p>
             )}
-            <div className="mt-5 self-start">
+            <div className="mt-4 self-start sm:mt-5">
               <div
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${
                   isPremium
@@ -502,7 +502,7 @@ export function UpgradePage({
             <div className="flex-1" />
 
             {(billingError || !billingConnected) && (
-              <div className="mt-6 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-app-border dark:bg-app-surface-muted/50">
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-app-border dark:bg-app-surface-muted/50 sm:mt-6 sm:p-4">
                 <Headphones className="h-5 w-5 shrink-0 text-blue-500" />
                 <p className="text-xs font-medium leading-relaxed text-slate-600 dark:text-app-text-muted">
                   {isLoading
@@ -516,10 +516,10 @@ export function UpgradePage({
           {/* Usage bars */}
           {accessState === "active" && billingStatus?.usage && billingStatus?.planLimits ? (
             <div className="workspace-panel order-1 sm:order-2 sm:col-span-1 lg:col-span-2">
-              <p className="mb-6 text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
+              <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted sm:mb-6">
                 Capacity usage
               </p>
-              <div className="flex flex-1 flex-col justify-center space-y-7">
+              <div className="flex flex-1 flex-col justify-center space-y-5 sm:space-y-7">
                 <UsageBar
                   used={billingStatus.usage.trackedApps}
                   total={billingStatus.planLimits.trackedApps}
@@ -544,15 +544,15 @@ export function UpgradePage({
                   <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                     Premium capacities
                   </p>
-                  <h3 className="mt-3 text-xl font-black tracking-tight text-slate-900 dark:text-app-text">
+                  <h3 className="mt-2 text-lg font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-3 sm:text-xl">
                     Compare plan limits before you start
                   </h3>
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted">
+                  <p className="mt-1.5 max-w-xl text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-2 sm:text-sm">
                     Switch between plans to see how tracked app, competitor group, and keyword capacity scales.
                   </p>
                 </div>
                 {selectedCapacityPlan ? (
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-left shadow-sm dark:border-blue-900/50 dark:bg-blue-950/30">
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-left shadow-sm dark:border-blue-900/50 dark:bg-blue-950/30 sm:px-4 sm:py-3">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">
                       Selected plan
                     </p>
@@ -568,7 +568,7 @@ export function UpgradePage({
                 ) : null}
               </div>
 
-              <div className="mt-6">
+              <div className="mt-4 sm:mt-6">
                 <div className="mb-3 flex items-center gap-2">
                   <div className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300">
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -577,7 +577,7 @@ export function UpgradePage({
                     Preview limits for
                   </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-3 xl:grid-cols-4">
                   {capacityPreviewPlans.map((plan) => {
                     const isActive = plan.id === selectedCapacityPlanId;
                     const planPriceLabel = getPlanPriceLabel(
@@ -590,7 +590,7 @@ export function UpgradePage({
                         key={plan.id}
                         type="button"
                         onClick={() => setSelectedCapacityPlanId(plan.id)}
-                        className={`rounded-2xl border px-4 py-3 text-left transition-all ${
+                          className={`rounded-2xl border px-3 py-2.5 text-left transition-all sm:px-4 sm:py-3 ${
                           isActive
                             ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/15"
                             : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text dark:hover:border-blue-700 dark:hover:bg-app-surface-strong"
@@ -630,7 +630,7 @@ export function UpgradePage({
               </div>
 
               {selectedCapacityPlan && selectedCapacityLimits ? (
-                <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 dark:border-app-border dark:bg-app-surface/50">
+                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 dark:border-app-border dark:bg-app-surface/50 sm:mt-6 sm:p-5">
                   {selectedCapacityPlan.contactOnly ? (
                     <div className="grid gap-4 md:grid-cols-3">
                       <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-app-border dark:bg-app-surface-muted/70">
@@ -684,34 +684,34 @@ export function UpgradePage({
         </div>
 
         {/* ── Everything included ───────────────────────────────────────── */}
-        <div className="workspace-panel relative mb-12 overflow-hidden !border-slate-200/60 bg-slate-50/50 dark:bg-app-surface-muted/50">
+        <div className="workspace-panel relative mb-8 overflow-hidden !border-slate-200/60 bg-slate-50/50 dark:bg-app-surface-muted/50 sm:mb-12">
           {/* Subtle gradient background inside */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f0f7ff] to-transparent dark:from-blue-950/20" />
           
           <div className="relative z-10">
-            <div className="mb-10 flex flex-col items-center text-center">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-4 py-1.5 text-[10px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400">
+            <div className="mb-6 flex flex-col items-center text-center sm:mb-10">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400 sm:px-4 sm:py-1.5 sm:text-[10px]">
                 Every plan includes
               </div>
-              <h2 className="mt-5 text-3xl font-black tracking-tight text-slate-900 dark:text-app-text md:text-[2rem]">
+              <h2 className="mt-3 text-[1.6rem] font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-5 md:text-[2rem]">
                 All features. Every tier.
               </h2>
-              <p className="mt-3 max-w-md text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted">
+              <p className="mt-2 max-w-md text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-3 sm:text-sm">
                 Features are never gated. Only tracked apps, competitor groups, and keyword slots scale.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2 sm:gap-y-8 lg:grid-cols-4">
               {PRICING_INCLUDED_CAPABILITIES.map((cap) => {
                 const Icon = FEATURE_ICONS[cap.label] || CheckCircle2;
                 return (
-                  <div key={cap.label} className="flex items-start gap-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] border border-slate-200/60 bg-white text-blue-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-blue-400">
+                  <div key={cap.label} className="flex items-start gap-3 sm:gap-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/60 bg-white text-blue-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-blue-400 sm:h-10 sm:w-10 sm:rounded-[14px]">
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
                       <div className="text-[13px] font-bold text-slate-900 dark:text-app-text">{cap.label}</div>
-                      <div className="mt-1 text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted">{cap.sub}</div>
+                      <div className="mt-1 hidden text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted sm:block">{cap.sub}</div>
                     </div>
                   </div>
                 );
@@ -721,7 +721,7 @@ export function UpgradePage({
         </div>
 
         {/* ── Pricing Cards ────────────────────────────────────────────────── */}
-        <div className="mb-8 flex justify-center">
+        <div className="mb-6 flex justify-center sm:mb-8">
           <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-app-border dark:bg-app-surface-muted">
             {allIntervals.map((interval) => {
               const isActive = selectedInterval === interval;
@@ -730,7 +730,7 @@ export function UpgradePage({
                   key={interval}
                   type="button"
                   onClick={() => setSelectedInterval(interval)}
-                  className={`rounded-full px-5 py-2.5 sm:py-2 text-sm font-semibold transition-colors ${
+                  className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors sm:px-5 sm:py-2.5 sm:text-sm ${
                     isActive
                       ? "bg-blue-600 text-white"
                       : "text-slate-600 hover:text-slate-900 dark:text-app-text-muted dark:hover:text-white"
@@ -743,7 +743,7 @@ export function UpgradePage({
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
+        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
           {PUBLIC_BILLING_PLANS.map((plan) => {
             const isHighlight = plan.highlight;
             const priceLabel = getPlanPriceLabel(billingStatus, plan, selectedInterval);
@@ -755,13 +755,13 @@ export function UpgradePage({
                 key={plan.id}
                 className={`workspace-panel relative h-full transition-all ${
                   isHighlight
-                    ? "border-2 border-blue-600 px-6 pb-6 pt-10 shadow-xl shadow-blue-500/10 z-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
+                    ? "border-2 border-blue-600 px-4 pb-4 pt-8 shadow-xl shadow-blue-500/10 z-10 sm:px-6 sm:pb-6 sm:pt-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
                     : "!border !border-slate-200 dark:!border-app-border hover:shadow-md"
                 }`}
               >
                 {/* Popular banner */}
                 {isHighlight && (
-                  <div className="absolute inset-x-0 top-0 flex h-[26px] items-center justify-center rounded-t-[18px] bg-blue-600">
+                    <div className="absolute inset-x-0 top-0 flex h-[22px] items-center justify-center rounded-t-[18px] bg-blue-600 sm:h-[26px]">
                     <span className="text-[9px] font-bold uppercase tracking-widest text-app-text">Popular</span>
                   </div>
                 )}
@@ -783,11 +783,11 @@ export function UpgradePage({
                 </div>
 
                 {/* Price */}
-                <div className="mt-5">
-                  <div className="text-[2.25rem] font-black leading-none tracking-tight text-slate-900 dark:text-app-text">
+                <div className="mt-4 sm:mt-5">
+                  <div className="text-[1.8rem] font-black leading-none tracking-tight text-slate-900 dark:text-app-text sm:text-[2.25rem]">
                     {(priceLabel || "Custom").replace("/mo", "")}
                   </div>
-                  <div className="mt-2 min-h-[1.25rem] text-[11px] font-medium text-app-text-muted dark:text-app-text-muted">
+                  <div className="mt-1 min-h-[1rem] text-[10px] font-medium text-app-text-muted dark:text-app-text-muted sm:mt-2 sm:min-h-[1.25rem] sm:text-[11px]">
                     {!plan.contactOnly &&
                       `/mo · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
                     {plan.contactOnly && "custom terms"}
@@ -795,19 +795,19 @@ export function UpgradePage({
                 </div>
 
                 {/* Description */}
-                <p className="mt-5 min-h-[3rem] text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted">
+                <p className="mt-3 min-h-[2rem] text-[11px] leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-5 sm:min-h-[3rem] sm:text-xs">
                   {plan.description}
                 </p>
 
                 {/* Divider */}
-                <div className="my-5 h-px w-full bg-slate-100 dark:bg-app-surface-strong" />
+                <div className="my-4 h-px w-full bg-slate-100 dark:bg-app-surface-strong sm:my-5" />
 
                 {/* Features */}
-                <div className="flex-1 space-y-3.5">
+                <div className="flex-1 space-y-2.5 sm:space-y-3.5">
                   {featureLines.map((line) => (
                     <div
                       key={line}
-                      className="flex items-start gap-3 text-[12px] font-medium text-slate-700 dark:text-app-text-muted"
+                      className="flex items-start gap-2.5 text-[11px] font-medium text-slate-700 dark:text-app-text-muted sm:gap-3 sm:text-[12px]"
                     >
                       <Check
                         className="mt-0.5 h-[14px] w-[14px] shrink-0 text-blue-600 dark:text-blue-400"
