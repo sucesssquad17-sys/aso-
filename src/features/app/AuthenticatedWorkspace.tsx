@@ -116,6 +116,7 @@ import type { ThemeMode } from "../../lib/theme";
 import {
   countPlanUsage,
   getCompetitorTrackedKeywordIdentityKey,
+  getTrackedAppIdentityKeysForPlanUsage,
   getTrackedAppIdentityKeysFromTrackedKeywords,
   getTrackedKeywordActivity,
   getTrackedKeywordIdentityKey as getPlanTrackedKeywordIdentityKey,
@@ -408,9 +409,17 @@ export function getCompetitorTrackedKeywordCardState({
 }
 
 export function getTrackedAppUsageCountForOverview(
-  trackedKeywords: Array<Pick<TrackedKeyword, "appId" | "store">>,
+  trackedAppsOrKeywords:
+    | TrackedAppRecord[]
+    | Array<Pick<TrackedKeyword, "appId" | "store">>,
+  trackedKeywords?: Array<Pick<TrackedKeyword, "appId" | "store">>,
 ) {
-  return getTrackedAppIdentityKeysFromTrackedKeywords(trackedKeywords).size;
+  const effectiveTrackedApps = trackedKeywords ? (trackedAppsOrKeywords as TrackedAppRecord[]) : [];
+  const effectiveTrackedKeywords = trackedKeywords || trackedAppsOrKeywords;
+  return getTrackedAppIdentityKeysForPlanUsage({
+    trackedApps: effectiveTrackedApps,
+    trackedKeywords: effectiveTrackedKeywords,
+  }).size;
 }
 
 export function getTrackedViewAppCountForOverview(
@@ -2799,6 +2808,14 @@ type NotificationServerStatus = {
   lastTokenUpdatedAt?: string | null;
 };
 
+type PersistUserStateResponse = {
+  success: boolean;
+  planLimits?: PlanLimits;
+  usage?: BillingStatus["usage"];
+  stateVersion?: number;
+  serverUpdatedAt?: string;
+};
+
 type NotificationTestResult = {
   delivered: number;
   failed: number;
@@ -4709,6 +4726,9 @@ function AuthenticatedApp({
   const pushSetupErrorRef = React.useRef<string | null>(null);
   const userStatePersistQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const userStatePersistVersionRef = React.useRef(0);
+  const userStatePersistTimerRef = React.useRef<number | null>(null);
+  const userStateBaseVersionRef = React.useRef(0);
+  const lastPersistedUserStateSignatureRef = React.useRef<string | null>(null);
   const billingActivationPollRunRef = React.useRef(0);
   const deleteAccountConfirmationPhrase = "delete my account";
   const paywallDismissStorageKey = `aso-paywall-dismissed:${currentUser.uid}`;
@@ -4798,25 +4818,36 @@ function AuthenticatedApp({
     [currentUser, isDemoMode],
   );
   const persistUserStateRemotely = React.useCallback(
-    async (state: UserAppStateDocument) => {
+    async (
+      state: UserAppStateDocument,
+      options?: {
+        signature?: string;
+        baseStateVersion?: number;
+      },
+    ) => {
       if (isDemoMode) {
-        return { success: true } as const;
+        return { success: true } satisfies PersistUserStateResponse;
       }
       const payload = serializeUserStateForFirestore(state);
-      const result = await fetchAuthedJson<{
-        success: boolean;
-        planLimits?: PlanLimits;
-        usage?: BillingStatus["usage"];
-      }>(
+      const result = await fetchAuthedJson<PersistUserStateResponse>(
         "/api/user-state",
         {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ state: payload }),
+          body: JSON.stringify({
+            state: payload,
+            baseStateVersion: options?.baseStateVersion ?? userStateBaseVersionRef.current,
+          }),
         },
       );
+      if (typeof result.stateVersion === "number") {
+        userStateBaseVersionRef.current = result.stateVersion;
+      }
+      if (options?.signature) {
+        lastPersistedUserStateSignatureRef.current = options.signature;
+      }
       setBillingStatus((prev) =>
         prev
           ? {
@@ -4831,27 +4862,47 @@ function AuthenticatedApp({
     [fetchAuthedJson, isDemoMode],
   );
   const queueUserStatePersist = React.useCallback(
-    (state: UserAppStateDocument) => {
+    (state: UserAppStateDocument, signature: string) => {
       if (isDemoMode) {
+        return Promise.resolve();
+      }
+      if (signature === lastPersistedUserStateSignatureRef.current) {
         return Promise.resolve();
       }
       const version = userStatePersistVersionRef.current + 1;
       userStatePersistVersionRef.current = version;
-      userStatePersistQueueRef.current = userStatePersistQueueRef.current
-        .catch(() => undefined)
-        .then(async () => {
-          if (version !== userStatePersistVersionRef.current) {
-            return;
-          }
-          await persistUserStateRemotely(state);
-        });
-      return userStatePersistQueueRef.current;
+      if (userStatePersistTimerRef.current !== null) {
+        window.clearTimeout(userStatePersistTimerRef.current);
+      }
+      return new Promise<void>((resolve, reject) => {
+        userStatePersistTimerRef.current = window.setTimeout(() => {
+          userStatePersistTimerRef.current = null;
+          userStatePersistQueueRef.current = userStatePersistQueueRef.current
+            .catch(() => undefined)
+            .then(async () => {
+              if (version !== userStatePersistVersionRef.current) {
+                return;
+              }
+              await persistUserStateRemotely(state, {
+                signature,
+                baseStateVersion: userStateBaseVersionRef.current,
+              });
+            });
+          userStatePersistQueueRef.current.then(resolve).catch(reject);
+        }, 750);
+      });
     },
     [isDemoMode, persistUserStateRemotely],
   );
   useEffect(() => {
+    if (userStatePersistTimerRef.current !== null) {
+      window.clearTimeout(userStatePersistTimerRef.current);
+      userStatePersistTimerRef.current = null;
+    }
     userStatePersistQueueRef.current = Promise.resolve();
     userStatePersistVersionRef.current = 0;
+    userStateBaseVersionRef.current = 0;
+    lastPersistedUserStateSignatureRef.current = null;
   }, [currentUser.uid]);
   useEffect(() => {
     setHasLoadedBillingStatus(isDemoMode);
@@ -5359,6 +5410,13 @@ function AuthenticatedApp({
         );
         const shouldPersistInitialLegalAcceptance =
           !legalAlreadyAccepted && initialLegalAccepted;
+        const nextLegalAcceptedAt = shouldPersistInitialLegalAcceptance
+          ? new Date().toISOString()
+          : remoteState?.legalAcceptedAt;
+        const nextLegalVersion =
+          legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
+            ? LEGAL_VERSION
+            : remoteState?.legalVersion;
         const nextBookmarks = hasRemoteState
           ? Array.isArray(remoteState?.bookmarks)
             ? remoteState.bookmarks
@@ -5465,11 +5523,12 @@ function AuthenticatedApp({
           hasRemoteState ? remoteState?.notificationSettings : undefined,
           getBrowserNotificationPermission(),
         );
+        let bootstrappedState: UserAppStateDocument | null = null;
         if (cancelled) {
           return;
         }
         if (!hasRemoteState || shouldPersistInitialLegalAcceptance) {
-          await persistUserStateRemotely({
+          const initialState: UserAppStateDocument = {
             bookmarks: nextBookmarks,
             trackedApps: nextTrackedApps,
             trackedKeywords: nextTrackedKeywords,
@@ -5483,17 +5542,25 @@ function AuthenticatedApp({
             trackingSchedule: nextTrackingSchedule,
             alertRules: nextAlertRules,
             notificationSettings: nextNotificationSettings,
-            legalAcceptedAt:
-              legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
-                ? new Date().toISOString()
-                : remoteState?.legalAcceptedAt,
-            legalVersion:
-              legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
-                ? LEGAL_VERSION
-                : remoteState?.legalVersion,
+            legalAcceptedAt: nextLegalAcceptedAt,
+            legalVersion: nextLegalVersion,
             migratedFromLocalAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+          };
+          bootstrappedState = initialState;
+          const initialSignature = JSON.stringify(
+            serializeUserStateForFirestore(initialState),
+          );
+          const persistedState = await persistUserStateRemotely(initialState, {
+            signature: initialSignature,
+            baseStateVersion:
+              typeof remoteState?.stateVersion === "number"
+                ? remoteState.stateVersion
+                : 0,
           });
+          if (typeof persistedState.stateVersion === "number") {
+            userStateBaseVersionRef.current = persistedState.stateVersion;
+          }
           if (shouldPersistInitialLegalAcceptance) {
             onLegalAcceptedPersisted();
           }
@@ -5504,6 +5571,33 @@ function AuthenticatedApp({
         if (cancelled) {
           return;
         }
+        const hydratedState: UserAppStateDocument = {
+          bookmarks: nextBookmarks,
+          trackedApps: nextTrackedApps,
+          trackedKeywords: nextTrackedKeywords,
+          rankHistory: nextRankHistory,
+          appAnalysisSnapshots: nextAppAnalysisSnapshots,
+          competitorGroups: normalizedCompetitorGroupsWithKeywords,
+          competitorGroupSnapshots: nextCompetitorGroupSnapshots,
+          competitorAsoLatestSnapshots: nextCompetitorAsoLatestSnapshots,
+          competitorTrackedKeywords: nextCompetitorTrackedKeywords,
+          competitorRankHistory: nextCompetitorRankHistory,
+          trackingSchedule: nextTrackingSchedule,
+          alertRules: nextAlertRules,
+          notificationSettings: nextNotificationSettings,
+          legalAcceptedAt:
+            bootstrappedState?.legalAcceptedAt ?? nextLegalAcceptedAt,
+          legalVersion: bootstrappedState?.legalVersion ?? nextLegalVersion,
+          migratedFromLocalAt:
+            bootstrappedState?.migratedFromLocalAt ?? remoteState?.migratedFromLocalAt,
+        };
+        userStateBaseVersionRef.current =
+          typeof remoteState?.stateVersion === "number"
+            ? remoteState.stateVersion
+            : userStateBaseVersionRef.current;
+        lastPersistedUserStateSignatureRef.current = JSON.stringify(
+          serializeUserStateForFirestore(hydratedState),
+        );
         setBookmarks(nextBookmarks);
         setTrackedApps(nextTrackedApps);
         setTrackedKeywords(nextTrackedKeywords);
@@ -5586,24 +5680,36 @@ function AuthenticatedApp({
   useEffect(() => {
     if (isDemoMode || !userStateHydrated || isApplyingUserState.current) return;
     const persistUserState = async () => {
+      const nextState: UserAppStateDocument = {
+        bookmarks,
+        trackedApps,
+        trackedKeywords,
+        rankHistory: allRankHistory,
+        appAnalysisSnapshots,
+        competitorGroups,
+        competitorGroupSnapshots,
+        competitorAsoLatestSnapshots,
+        competitorTrackedKeywords,
+        competitorRankHistory,
+        trackingSchedule,
+        alertRules,
+        notificationSettings,
+        updatedAt: new Date().toISOString(),
+      };
+      const signature = JSON.stringify(serializeUserStateForFirestore(nextState));
+      if (signature === lastPersistedUserStateSignatureRef.current) {
+        return;
+      }
       try {
-        await queueUserStatePersist({
-          bookmarks,
-          trackedApps,
-          trackedKeywords,
-          rankHistory: allRankHistory,
-          appAnalysisSnapshots,
-          competitorGroups,
-          competitorGroupSnapshots,
-          competitorAsoLatestSnapshots,
-          competitorTrackedKeywords,
-          competitorRankHistory,
-          trackingSchedule,
-          alertRules,
-          notificationSettings,
-          updatedAt: new Date().toISOString(),
-        });
+        await queueUserStatePersist(nextState, signature);
       } catch (err) {
+        if (err instanceof ApiRequestError && err.status === 409) {
+          lastPersistedUserStateSignatureRef.current = signature;
+          toast.error(
+            "This account changed in another session. Refresh to sync the latest saved data.",
+          );
+          return;
+        }
         logError(err, { context: "persistUserState", uid: currentUser.uid });
       }
     };
@@ -6087,8 +6193,8 @@ function AuthenticatedApp({
     [trackedApps],
   );
   const trackedAppUsageCount = React.useMemo(
-    () => getTrackedAppUsageCountForOverview(trackedKeywords),
-    [trackedKeywords],
+    () => getTrackedAppUsageCountForOverview(trackedApps, trackedKeywords),
+    [trackedApps, trackedKeywords],
   );
   const billingAccessState: BillingAccessState = isDemoMode
     ? "active"
@@ -6105,8 +6211,12 @@ function AuthenticatedApp({
     [billingStatus, hasActiveBillingAccess],
   );
   const currentTrackedAppLimitKeys = React.useMemo(
-    () => getTrackedAppIdentityKeysFromTrackedKeywords(trackedKeywords),
-    [trackedKeywords],
+    () =>
+      getTrackedAppIdentityKeysForPlanUsage({
+        trackedApps,
+        trackedKeywords,
+      }),
+    [trackedApps, trackedKeywords],
   );
   const currentCompetitorGroupLimitKeys = React.useMemo(
     () => new Set(competitorGroups.map((group) => group.groupId)),

@@ -402,11 +402,15 @@ type UserTrackingDocument = {
   subscriptionUpdatedAt?: string;
   billingReviewRequired?: boolean;
   billingReviewReason?: string;
-  accountStatus?: 'active' | 'deleted';
+  accountStatus?: 'active' | 'deleting' | 'deleted';
   deletedAt?: string;
   authDeletedAt?: string;
+  authDeleteFailedAt?: string;
+  authDeleteError?: string;
   legalAcceptedAt?: string;
   legalVersion?: string;
+  stateVersion?: number;
+  serverUpdatedAt?: string;
   migratedFromLocalAt?: string;
   updatedAt?: string;
 };
@@ -418,6 +422,8 @@ type NormalizedUserTrackingDocument = TrackingState & {
   notificationSettings: NotificationSettings;
   legalAcceptedAt?: string;
   legalVersion?: string;
+  stateVersion: number;
+  serverUpdatedAt?: string;
   migratedFromLocalAt?: string;
 };
 type DailyTrackingStatusRecord = Partial<DailyTrackingSummary> & {
@@ -545,8 +551,11 @@ const DEFAULT_TRACKING_SCHEDULE: TrackingSchedule = {
   time: DEFAULT_GLOBAL_TRACKING_TIME,
   timezone: GLOBAL_TRACKING_TIMEZONE,
 };
+const LEGACY_FILE_TRACKING_SCHEDULER_ENABLED =
+  process.env.ENABLE_LEGACY_FILE_TRACKING_SCHEDULER?.trim() === 'true';
 const GLOBAL_TRACKING_WATCHDOG_RETRY_INTERVAL_MINUTES = 60;
 const GLOBAL_TRACKING_WATCHDOG_RUNNING_GRACE_MINUTES = 120;
+const GLOBAL_TRACKING_WATCHDOG_MAX_RETRIES = 3;
 
 let trackingStateCache: TrackingState | null = null;
 let trackingStateWriteQueue = Promise.resolve();
@@ -627,6 +636,7 @@ type ApiErrorCode =
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
   | 'RATE_LIMITED'
+  | 'STALE_USER_STATE'
   | 'CONFIGURATION_ERROR'
   | 'UPSTREAM_TIMEOUT'
   | 'UPSTREAM_UNAVAILABLE'
@@ -1289,7 +1299,7 @@ async function resolveBillingUserDocument(
     const userDocRef = adminDb.collection('users').doc(firebaseUid);
     const userDoc = await userDocRef.get();
     if (userDoc.exists) {
-      return userDocRef;
+      return { userDocRef, matchedBy: 'firebase_uid' as const };
     }
   }
 
@@ -1301,7 +1311,7 @@ async function resolveBillingUserDocument(
       .limit(1)
       .get();
     if (!customerMatch.empty) {
-      return customerMatch.docs[0].ref;
+      return { userDocRef: customerMatch.docs[0].ref, matchedBy: 'dodo_customer_id' as const };
     }
   }
 
@@ -1313,7 +1323,7 @@ async function resolveBillingUserDocument(
       .limit(1)
       .get();
     if (!emailMatch.empty) {
-      return emailMatch.docs[0].ref;
+      return { userDocRef: emailMatch.docs[0].ref, matchedBy: 'billing_email' as const };
     }
   }
 
@@ -1375,11 +1385,12 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     throw createConfigurationError('Firebase Admin is not configured on the server.');
   }
 
-  const userDocRef = await resolveBillingUserDocument(adminDb, event);
-  if (!userDocRef) {
+  const resolvedUser = await resolveBillingUserDocument(adminDb, event);
+  if (!resolvedUser) {
     console.warn(`[dodo] No matching user found for webhook ${event.type}.`);
     return;
   }
+  const { userDocRef, matchedBy } = resolvedUser;
   const existingSnapshot = await userDocRef.get();
   const existingUserData = existingSnapshot.data() as UserTrackingDocument | undefined;
   const deletedAccount = isDeletedUserTrackingDocument(existingUserData);
@@ -1397,6 +1408,7 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     subscriptionStatus === 'active' &&
     Boolean(resolvedProductSelection) &&
     metadataMatchesProductSelection &&
+    matchedBy !== 'billing_email' &&
     !deletedAccount;
   const billingEmail = event.data.customer?.email?.trim().toLowerCase();
   const resolvedPlanId = canGrantPaidPlan
@@ -1411,6 +1423,8 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
             resolvedProductSelection &&
             !metadataMatchesProductSelection
           ? 'metadata_mismatch'
+          : subscriptionStatus === 'active' && matchedBy === 'billing_email'
+            ? 'email_only_webhook_match'
           : null;
   const billingReviewRequired = Boolean(billingReviewReason);
 
@@ -1427,6 +1441,11 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
   ) {
     console.warn(
       `[dodo] Active subscription metadata mismatch for user ${userDocRef.id}. product=${resolvedProductSelection.productId} mappedPlan=${resolvedProductSelection.planId}/${resolvedProductSelection.interval} metadataPlan=${metadata.planId || 'missing'}/${metadata.interval || 'missing'}. Premium access was not granted.`,
+    );
+  }
+  if (matchedBy === 'billing_email' && subscriptionStatus === 'active') {
+    console.warn(
+      `[dodo] Active subscription webhook for user ${userDocRef.id} matched only by billing email. Premium access was not granted pending manual review.`,
     );
   }
   if (deletedAccount && subscriptionStatus === 'active') {
@@ -2420,9 +2439,9 @@ function mergeTrackedKeywords(
 }
 
 function getCompetitorTrackedKeywordKey(
-  record: Pick<CompetitorTrackedKeywordRecord, 'groupId' | 'keyword' | 'country'>,
+  record: Pick<CompetitorTrackedKeywordRecord, 'groupId' | 'keyword' | 'country' | 'store'>,
 ) {
-  return `${record.groupId}:${normalizeCountryCode(record.country, 'us')}:${record.keyword.toLowerCase()}`;
+  return `${record.groupId}:${record.store}:${normalizeCountryCode(record.country, 'us')}:${record.keyword.toLowerCase()}`;
 }
 
 function mergeCompetitorTrackedKeywords(
@@ -2568,6 +2587,14 @@ function normalizeUserTrackingDocument(data: any): NormalizedUserTrackingDocumen
     legalVersion:
       typeof data?.legalVersion === 'string' && data.legalVersion
         ? data.legalVersion
+        : undefined,
+    stateVersion:
+      typeof data?.stateVersion === 'number' && Number.isFinite(data.stateVersion)
+        ? Math.max(0, Math.trunc(data.stateVersion))
+        : 0,
+    serverUpdatedAt:
+      typeof data?.serverUpdatedAt === 'string' && data.serverUpdatedAt
+        ? data.serverUpdatedAt
         : undefined,
     migratedFromLocalAt:
       typeof data?.migratedFromLocalAt === 'string' && data.migratedFromLocalAt
@@ -2894,12 +2921,19 @@ function mergeEditableAlertRules(current: AlertRule[], next: AlertRule[]) {
   const currentById = new Map(current.map((rule) => [rule.id, rule]));
   return next.map((rule) => {
     const existing = currentById.get(rule.id);
+    const allowedBaselineKeys = new Set(
+      rule.countries.map((country) => buildTrackedAlertCountryKey(rule, country)),
+    );
     return {
       ...rule,
       createdAt: existing?.createdAt || rule.createdAt,
       updatedAt: rule.updatedAt || existing?.updatedAt,
       ...(existing?.baselineKeys
-        ? { baselineKeys: [...existing.baselineKeys] }
+        ? {
+            baselineKeys: existing.baselineKeys.filter((key) =>
+              allowedBaselineKeys.has(key),
+            ),
+          }
         : {}),
     };
   });
@@ -2911,7 +2945,7 @@ function mergeEditableNotificationSettings(
 ): NotificationSettings {
   return {
     ...next,
-    lastToken: current.lastToken,
+    ...(current.lastTokenId ? { lastTokenId: current.lastTokenId } : {}),
     tokenUpdatedAt: current.tokenUpdatedAt,
   };
 }
@@ -2928,6 +2962,49 @@ function mergeEditableTrackingSchedule(
     lastRunAt: current.lastRunAt,
     lastRunKey: current.lastRunKey,
   };
+}
+
+function mergeCompetitorGroupSnapshots(
+  existing: CompetitorGroupSnapshotRecord[],
+  incoming: CompetitorGroupSnapshotRecord[],
+  activeGroupIds: Set<string>,
+) {
+  const bySnapshotId = new Map<string, CompetitorGroupSnapshotRecord>();
+  [...existing, ...incoming]
+    .filter((snapshot) => activeGroupIds.has(snapshot.groupId))
+    .sort((a, b) => new Date(a.loadedAt).getTime() - new Date(b.loadedAt).getTime())
+    .forEach((snapshot) => {
+      bySnapshotId.set(snapshot.snapshotId, snapshot);
+    });
+
+  return Array.from(bySnapshotId.values()).sort(
+    (a, b) => new Date(b.loadedAt).getTime() - new Date(a.loadedAt).getTime(),
+  );
+}
+
+function mergeCompetitorAsoLatestSnapshots(
+  existing: CompetitorAsoSnapshotRecord[],
+  incoming: CompetitorAsoSnapshotRecord[],
+  allowedTargetKeys: Set<string>,
+) {
+  const byTargetKey = new Map<string, CompetitorAsoSnapshotRecord>();
+  [...existing, ...incoming]
+    .filter((snapshot) =>
+      allowedTargetKeys.has(
+        `${snapshot.groupId}:${snapshot.appId}:${normalizeCountryCode(snapshot.country, 'us')}`,
+      ),
+    )
+    .sort((a, b) => new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime())
+    .forEach((snapshot) => {
+      byTargetKey.set(
+        `${snapshot.groupId}:${snapshot.appId}:${normalizeCountryCode(snapshot.country, 'us')}`,
+        snapshot,
+      );
+    });
+
+  return Array.from(byTargetKey.values()).sort(
+    (a, b) => new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
+  );
 }
 
 function mergeEditableUserTrackingState(
@@ -2965,13 +3042,15 @@ function mergeEditableUserTrackingState(
     ),
     appAnalysisSnapshots: nextState.appAnalysisSnapshots,
     competitorGroups: nextState.competitorGroups,
-    competitorGroupSnapshots: nextState.competitorGroupSnapshots,
-    competitorAsoLatestSnapshots: currentState.competitorAsoLatestSnapshots.filter(
-      (snapshot) =>
-        competitorGroupIds.has(snapshot.groupId) &&
-        competitorGroupCountryKeys.has(
-          `${snapshot.groupId}:${snapshot.appId}:${snapshot.country}`,
-        ),
+    competitorGroupSnapshots: mergeCompetitorGroupSnapshots(
+      currentState.competitorGroupSnapshots,
+      nextState.competitorGroupSnapshots,
+      competitorGroupIds,
+    ),
+    competitorAsoLatestSnapshots: mergeCompetitorAsoLatestSnapshots(
+      currentState.competitorAsoLatestSnapshots,
+      nextState.competitorAsoLatestSnapshots,
+      competitorGroupCountryKeys,
     ),
     competitorTrackedKeywords: mergeEditableCompetitorTrackedKeywords(
       currentState.competitorTrackedKeywords,
@@ -2995,6 +3074,8 @@ function mergeEditableUserTrackingState(
     ),
     legalAcceptedAt: nextState.legalAcceptedAt ?? currentState.legalAcceptedAt,
     legalVersion: nextState.legalVersion ?? currentState.legalVersion,
+    stateVersion: currentState.stateVersion,
+    serverUpdatedAt: currentState.serverUpdatedAt,
     migratedFromLocalAt:
       nextState.migratedFromLocalAt ?? currentState.migratedFromLocalAt,
   };
@@ -3059,7 +3140,7 @@ function assertPlanLimitTransition(
 }
 
 function buildTrackedAlertCountryKey(rule: AlertRule, country: string) {
-  return `${rule.id}:${country}`;
+  return `${rule.id}:${rule.groupId}:${rule.appId}:${rule.store}:${rule.keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
 }
 
 function sanitizeAlertEventId(input: string) {
@@ -3083,12 +3164,13 @@ function createAlertRunKey(prefix: 'schedule' | 'manual' | 'test') {
 }
 
 function getComparableTrackedKey({
+  groupId,
   appId,
   keyword,
   store,
   country,
-}: Pick<TrackedKeywordRecord, 'appId' | 'keyword' | 'store' | 'country'>) {
-  return `${store}:${String(appId)}:${keyword.toLowerCase()}:${country}`;
+}: Pick<TrackedKeywordRecord, 'groupId' | 'appId' | 'keyword' | 'store' | 'country'>) {
+  return `${String(groupId)}:${store}:${String(appId)}:${keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
 }
 
 function getComparableCompetitorAsoSnapshotKey({
@@ -3908,6 +3990,7 @@ async function evaluateAndDispatchAlertRules(
 
     for (const country of rule.countries) {
       const trackedKey = getComparableTrackedKey({
+        groupId: rule.groupId,
         appId: rule.appId,
         keyword: rule.keyword,
         store: rule.store,
@@ -5660,6 +5743,9 @@ async function runTrackedKeywordRefreshJob(options?: {
 }
 
 async function maybeRunScheduledTrackingCheck() {
+  if (!LEGACY_FILE_TRACKING_SCHEDULER_ENABLED) {
+    return;
+  }
   const state = await loadTrackingState();
   const schedule = normalizeTrackingSchedule(state.schedule);
   const hasTrackedData =
@@ -5723,6 +5809,12 @@ async function runAllUserTrackingSchedules(
     await mapWithConcurrency(snapshot.docs, 1, async (userDoc) => {
       await refreshDailyTrackingLease(statusRef, DAILY_TRACKING_LEASE_OWNER);
       const userData = userDoc.data() as UserTrackingDocument | undefined;
+      if (
+        userData?.accountStatus === 'deleted' ||
+        userData?.accountStatus === 'deleting'
+      ) {
+        return;
+      }
       const state = normalizeUserTrackingDocument(userData);
       if (
         !state.trackedKeywords.length &&
@@ -6797,7 +6889,12 @@ async function startServer() {
         return res.json({ received: true, duplicate: true });
       }
       if (claim.status === 'processing') {
-        return res.json({ received: true, processing: true });
+        return res.status(409).json({
+          received: true,
+          processing: true,
+          retryable: true,
+          error: 'Webhook event is already being processed.',
+        });
       }
 
       try {
@@ -7032,6 +7129,14 @@ async function startServer() {
       const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
       const snapshot = await userDocRef.get();
       const userData = snapshot.data() as UserTrackingDocument | undefined;
+      const deleteRequestedAt = new Date().toISOString();
+
+      if (snapshot.exists) {
+        await userDocRef.set({
+          accountStatus: 'deleting',
+          updatedAt: deleteRequestedAt,
+        } satisfies Partial<UserTrackingDocument>, { merge: true });
+      }
 
       await Promise.all([
         deleteCollectionDocuments(userDocRef.collection(USER_ALERT_EVENTS_COLLECTION)),
@@ -7048,7 +7153,6 @@ async function startServer() {
       ]);
 
       if (hasRetainedAccountState(userData)) {
-        const deletedAt = new Date().toISOString();
         const deleteWorkspaceDataPayload: DocumentData = {
           bookmarks: FieldValue.delete(),
           trackedApps: FieldValue.delete(),
@@ -7064,15 +7168,17 @@ async function startServer() {
           alertRules: FieldValue.delete(),
           notificationSettings: FieldValue.delete(),
           migratedFromLocalAt: FieldValue.delete(),
-          accountStatus: 'deleted',
-          deletedAt,
+          accountStatus: 'deleting',
+          deletedAt: deleteRequestedAt,
           authDeletedAt: FieldValue.delete(),
+          authDeleteFailedAt: FieldValue.delete(),
+          authDeleteError: FieldValue.delete(),
           isPremium: false,
           pendingPlanId: FieldValue.delete(),
           pendingInterval: FieldValue.delete(),
           billingReviewRequired: true,
           billingReviewReason: 'account_deleted',
-          updatedAt: deletedAt,
+          updatedAt: deleteRequestedAt,
         };
         await userDocRef.set(
           deleteWorkspaceDataPayload,
@@ -7082,13 +7188,32 @@ async function startServer() {
         await userDocRef.delete();
       }
 
-      await adminAuth.deleteUser(decodedToken.uid);
+      try {
+        await adminAuth.deleteUser(decodedToken.uid);
+      } catch (error) {
+        if (snapshot.exists) {
+          await userDocRef.set(
+            {
+              accountStatus: 'deleting',
+              authDeleteFailedAt: new Date().toISOString(),
+              authDeleteError:
+                error instanceof Error ? error.message.slice(0, 500) : 'Unknown auth deletion failure.',
+              updatedAt: new Date().toISOString(),
+            } satisfies Partial<UserTrackingDocument>,
+            { merge: true },
+          );
+        }
+        throw error;
+      }
       if (hasRetainedAccountState(userData)) {
         await userDocRef.set(
           {
+            accountStatus: 'deleted',
             authDeletedAt: new Date().toISOString(),
+            authDeleteFailedAt: FieldValue.delete(),
+            authDeleteError: FieldValue.delete(),
             updatedAt: new Date().toISOString(),
-          } satisfies UserTrackingDocument,
+          } satisfies DocumentData,
           { merge: true },
         );
       }
@@ -7137,13 +7262,30 @@ async function startServer() {
         'state' in requestBody
           ? readRequiredObjectRecord(requestBody.state, 'state')
           : requestBody;
+      const requestedBaseStateVersion =
+        typeof requestBody.baseStateVersion === 'number' &&
+        Number.isFinite(requestBody.baseStateVersion)
+          ? Math.max(0, Math.trunc(requestBody.baseStateVersion))
+          : 0;
       const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
       const snapshot = await userDocRef.get();
       const currentUserData = snapshot.data() as UserTrackingDocument | undefined;
       const currentState = normalizeUserTrackingDocument(currentUserData);
+      if (requestedBaseStateVersion !== currentState.stateVersion) {
+        throw new ApiError(
+          'Your account data changed in another session. Refresh and try again.',
+          {
+            status: 409,
+            code: 'STALE_USER_STATE',
+            retryable: false,
+          },
+        );
+      }
       const nextState = normalizeUserTrackingDocument(nextStateInput);
       const mergedState = mergeEditableUserTrackingState(currentState, nextState);
       const planLimits = getResolvedPlanLimits(currentUserData);
+      const serverUpdatedAt = new Date().toISOString();
+      const nextStateVersion = currentState.stateVersion + 1;
 
       assertPlanLimitTransition(currentState, mergedState, planLimits);
       const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
@@ -7178,13 +7320,17 @@ async function startServer() {
         ...(mergedState.migratedFromLocalAt
           ? { migratedFromLocalAt: mergedState.migratedFromLocalAt }
           : {}),
-        updatedAt: new Date().toISOString(),
+        stateVersion: nextStateVersion,
+        serverUpdatedAt,
+        updatedAt: serverUpdatedAt,
       } satisfies UserTrackingDocument, { merge: true });
 
       res.json({
         success: true,
         planLimits,
         usage: getNormalizedPlanUsage(mergedState, planLimits),
+        stateVersion: nextStateVersion,
+        serverUpdatedAt,
       });
     } catch (error) {
       return sendApiError(res, error, 'Failed to save user state.');
@@ -7213,6 +7359,8 @@ async function startServer() {
       const currentNotificationSettings = normalizeNotificationSettings(
         currentUserData?.notificationSettings,
       );
+      const { lastToken: _legacyLastToken, ...currentNotificationSettingsSafe } =
+        currentNotificationSettings;
 
       await userDocRef
         .collection(USER_PUSH_TOKENS_COLLECTION)
@@ -7226,8 +7374,8 @@ async function startServer() {
 
       await userDocRef.set({
         notificationSettings: {
-          ...currentNotificationSettings,
-          lastToken: token,
+          ...currentNotificationSettingsSafe,
+          lastTokenId: tokenId,
           tokenUpdatedAt: registeredAt,
         },
         updatedAt: registeredAt,
@@ -7484,10 +7632,18 @@ async function startServer() {
       if (!eventIds.length) {
         throw createBadRequestError('Provide one or more alert event IDs to mark as read.');
       }
+      const eventRefs = eventIds.map((eventId) => userEventsRef.doc(eventId));
+      const snapshots = await adminDb.getAll(...eventRefs);
+      const existingRefs = snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => snapshot.ref);
       await Promise.all(
-        eventIds.map((eventId) => userEventsRef.doc(eventId).set({ readAt: nowIso }, { merge: true })),
+        existingRefs.map((eventRef) => eventRef.set({ readAt: nowIso }, { merge: true })),
       );
-      res.json({ ok: true, success: true, updated: eventIds.length });
+      res.json({
+        ok: true,
+        success: true,
+        updated: existingRefs.length,
+        missing: eventIds.length - existingRefs.length,
+      });
     } catch (error) {
       return sendApiError(res, error, 'Failed to update alert history.');
     }
@@ -7839,6 +7995,21 @@ async function startServer() {
             statusData.lastRetryAt,
             GLOBAL_TRACKING_WATCHDOG_RETRY_INTERVAL_MINUTES,
           ),
+        });
+      }
+
+      if (
+        isCurrentRun &&
+        (statusData?.retryCount || 0) >= GLOBAL_TRACKING_WATCHDOG_MAX_RETRIES
+      ) {
+        return res.json({
+          status: statusData?.lastStatus || 'error',
+          timestamp: now.toISOString(),
+          expectedRunKey,
+          dueAt,
+          action: 'none',
+          reason: 'max-retries-reached',
+          retryCount: statusData?.retryCount || 0,
         });
       }
 

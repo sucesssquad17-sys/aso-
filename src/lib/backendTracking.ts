@@ -350,8 +350,10 @@ export function mergeRankHistory(
     .slice(-historyLimit);
 }
 
-function getCompetitorTrackedKeywordKey(record: Pick<CompetitorTrackedKeywordRecord, 'groupId' | 'keyword'>) {
-  return `${record.groupId}:${record.keyword.toLowerCase()}`;
+function getCompetitorTrackedKeywordKey(
+  record: Pick<CompetitorTrackedKeywordRecord, 'groupId' | 'keyword' | 'country' | 'store'>,
+) {
+  return `${record.groupId}:${record.store}:${record.keyword.toLowerCase()}:${record.country.toLowerCase()}`;
 }
 
 function getCompetitorTrackedKeywordAppKey(
@@ -689,6 +691,7 @@ async function refreshCompetitorTrackedKeywordState<TState extends TrackingState
           lastCheckedAt: refreshedAt,
         },
         historyEntries: appResults.flatMap((result) => (result.historyEntry ? [result.historyEntry] : [])),
+        checked: appResults.length,
         changed: appResults.filter((result) => result.previousRank !== result.app.lastRank).length,
         failed: appResults.filter((result) => result.hadError).length,
       };
@@ -714,7 +717,7 @@ async function refreshCompetitorTrackedKeywordState<TState extends TrackingState
           }
         : state.schedule,
     },
-    checked: refreshResults.reduce((sum, result) => sum + result.trackedKeyword.apps.length, 0),
+    checked: refreshResults.reduce((sum, result) => sum + result.checked, 0),
     changed: refreshResults.reduce((sum, result) => sum + result.changed, 0),
     failed: refreshResults.reduce((sum, result) => sum + result.failed, 0),
   };

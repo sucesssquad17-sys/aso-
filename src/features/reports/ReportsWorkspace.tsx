@@ -340,13 +340,19 @@ function ChartTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ color?: string; name?: string; value?: number }>;
-  label?: string;
+  payload?: ReadonlyArray<{
+    color?: string;
+    name?: string | number;
+    value?: unknown;
+  }>;
+  label?: unknown;
 }) {
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border border-app-border/70 bg-app-surface/95 px-3 py-2 text-xs text-app-text shadow-2xl">
-      <p className="font-semibold text-app-text">{label}</p>
+      <p className="font-semibold text-app-text">
+        {typeof label === "string" || typeof label === "number" ? label : ""}
+      </p>
       <div className="mt-2 space-y-1.5">
         {payload.map((entry) => (
           <div
@@ -1761,13 +1767,22 @@ export default function ReportsWorkspace({
   ]);
 
   const onExportSnapshotChangeRef = React.useRef(onExportSnapshotChange);
+  const lastReportedExportSnapshotKeyRef = React.useRef<string | null>(null);
+  const reportExportSnapshotKey = React.useMemo(
+    () => JSON.stringify(reportExportSnapshot),
+    [reportExportSnapshot],
+  );
   React.useEffect(() => {
     onExportSnapshotChangeRef.current = onExportSnapshotChange;
   });
 
   React.useEffect(() => {
+    if (lastReportedExportSnapshotKeyRef.current === reportExportSnapshotKey) {
+      return;
+    }
+    lastReportedExportSnapshotKeyRef.current = reportExportSnapshotKey;
     onExportSnapshotChangeRef.current?.(reportExportSnapshot);
-  }, [reportExportSnapshot]);
+  }, [reportExportSnapshot, reportExportSnapshotKey]);
 
   return (
     <div className="space-y-6">
