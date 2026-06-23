@@ -12190,14 +12190,20 @@ function AuthenticatedApp({
                     <div className="relative">
                       <button
                         onClick={() => setIsSetupGuideOpen((prev) => !prev)}
-                        className={cn("workspace-icon-button", isSetupGuideOpen && "bg-cyan-500/10 text-cyan-300")}
+                        className={cn(
+                          "workspace-icon-button workspace-setup-trigger inline-flex items-center gap-1.5",
+                          isSetupGuideOpen && "bg-cyan-500/10 text-cyan-300",
+                        )}
                         title="Show setup guide"
                       >
                         <BookOpen className="h-4 w-4" />
+                        <span className="workspace-setup-trigger-copy">
+                          Setup {completedOnboardingStepCount}/{onboardingSteps.length}
+                        </span>
                       </button>
                       {isSetupGuideOpen && (
-                        <div className="workspace-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-xs rounded-2xl p-3 shadow-xl sm:w-80 sm:max-w-sm sm:p-4">
-                          <div className="mb-3 flex items-center justify-between sm:mb-4">
+                        <div className="workspace-popover workspace-setup-popover absolute right-0 top-full z-50 mt-2 shadow-xl sm:w-80 sm:max-w-sm sm:p-4">
+                          <div className="mb-2 flex items-center justify-between sm:mb-4">
                             <div className="flex items-center gap-2">
                               <BellRing className="h-4 w-4 text-cyan-400" />
                               <h3 className="font-bold text-app-text">Quick Start</h3>
@@ -12206,15 +12212,15 @@ function AuthenticatedApp({
                               {completedOnboardingStepCount}/{onboardingSteps.length}
                             </div>
                           </div>
-                          <p className="mb-3 text-[10px] leading-relaxed text-app-text-muted sm:mb-4 sm:text-xs">
+                          <p className="workspace-setup-popover-copy mb-3 text-[10px] leading-relaxed text-app-text-muted sm:mb-4 sm:text-xs">
                             Follow these steps once and the app starts paying you back: analyze your app, track a keyword, add competitors, then turn on alerts.
                           </p>
-                          <div className="flex flex-col gap-2">
+                          <div className="flex flex-col gap-1.5 sm:gap-2">
                             {onboardingSteps.map((step, index) => (
                               <div
                                 key={step.id}
                                 className={cn(
-                                  "rounded-xl border p-2 sm:p-3",
+                                  "workspace-setup-step rounded-xl border p-2 sm:p-3",
                                   step.isComplete
                                     ? "border-app-border/50 bg-app-surface-strong/50"
                                     : "border-app-border/60 bg-app-surface-strong/80"
@@ -12240,7 +12246,7 @@ function AuthenticatedApp({
                                     >
                                       {step.title}
                                     </h4>
-                                    <p className="mt-0.5 text-[9px] leading-tight text-app-text-muted sm:mt-1 sm:text-[10px]">
+                                    <p className="workspace-setup-step-copy mt-0.5 text-[9px] leading-tight text-app-text-muted sm:mt-1 sm:text-[10px]">
                                       {step.description}
                                     </p>
                                     {!step.isComplete && (
@@ -12333,14 +12339,20 @@ function AuthenticatedApp({
                     <div className="relative workspace-mobile-only">
                       <button
                         onClick={() => setIsSetupGuideOpen((prev) => !prev)}
-                        className={cn("workspace-icon-button", isSetupGuideOpen && "bg-cyan-500/10 text-cyan-300")}
+                        className={cn(
+                          "workspace-icon-button workspace-setup-trigger inline-flex items-center gap-1.5",
+                          isSetupGuideOpen && "bg-cyan-500/10 text-cyan-300",
+                        )}
                         title="Show setup guide"
                       >
                         <BookOpen className="h-4 w-4" />
+                        <span className="workspace-setup-trigger-copy">
+                          Setup {completedOnboardingStepCount}/{onboardingSteps.length}
+                        </span>
                       </button>
                       {isSetupGuideOpen && (
-                        <div className="workspace-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-xs rounded-2xl p-3 shadow-xl sm:w-80 sm:max-w-sm sm:p-4">
-                          <div className="mb-3 flex items-center justify-between sm:mb-4">
+                        <div className="workspace-popover workspace-setup-popover absolute right-0 top-full z-50 mt-2 shadow-xl sm:w-80 sm:max-w-sm sm:p-4">
+                          <div className="mb-2 flex items-center justify-between sm:mb-4">
                             <div className="flex items-center gap-2">
                               <BellRing className="h-4 w-4 text-cyan-400" />
                               <h3 className="font-bold text-app-text">Quick Start</h3>
@@ -12349,15 +12361,15 @@ function AuthenticatedApp({
                               {completedOnboardingStepCount}/{onboardingSteps.length}
                             </div>
                           </div>
-                          <p className="mb-3 text-[10px] leading-relaxed text-app-text-muted sm:mb-4 sm:text-xs">
+                          <p className="workspace-setup-popover-copy mb-3 text-[10px] leading-relaxed text-app-text-muted sm:mb-4 sm:text-xs">
                             Follow these steps once and the app starts paying you back: analyze your app, track a keyword, add competitors, then turn on alerts.
                           </p>
-                          <div className="flex flex-col gap-2">
+                          <div className="flex flex-col gap-1.5 sm:gap-2">
                             {onboardingSteps.map((step, index) => (
                               <div
                                 key={step.id}
                                 className={cn(
-                                  "rounded-xl border p-2 sm:p-3",
+                                  "workspace-setup-step rounded-xl border p-2 sm:p-3",
                                   step.isComplete
                                     ? "border-app-border/50 bg-app-surface-strong/50"
                                     : "border-app-border/60 bg-app-surface-strong/80"
@@ -12383,7 +12395,7 @@ function AuthenticatedApp({
                                     >
                                       {step.title}
                                     </h4>
-                                    <p className="mt-0.5 text-[9px] leading-tight text-app-text-muted sm:mt-1 sm:text-[10px]">
+                                    <p className="workspace-setup-step-copy mt-0.5 text-[9px] leading-tight text-app-text-muted sm:mt-1 sm:text-[10px]">
                                       {step.description}
                                     </p>
                                     {!step.isComplete && (
@@ -12544,7 +12556,7 @@ function AuthenticatedApp({
                             type="button"
                             onClick={() => setIsPdfExportOptionsOpen((prev) => !prev)}
                             disabled={isExporting}
-                            className="workspace-secondary-button inline-flex items-center gap-2 disabled:opacity-60"
+                            className="workspace-secondary-button inline-flex items-center gap-1.5 px-3 py-2 text-xs disabled:opacity-60"
                           >
                             {isExporting ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -12554,7 +12566,7 @@ function AuthenticatedApp({
                             Export PDF
                           </button>
                           {isPdfExportOptionsOpen ? (
-                            <div className="workspace-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-4 shadow-xl">
+                            <div className="workspace-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-1rem)] max-w-sm rounded-2xl p-3 shadow-xl sm:p-4">
                               <div className="flex items-center justify-between gap-3">
                                 <div>
                                   <div className="workspace-chip-label">PDF Export</div>
@@ -13444,43 +13456,43 @@ function AuthenticatedApp({
                                 </button>
                               </div>
                             </div>
-                            <div className="mt-4 grid gap-3 md:grid-cols-4">
-                              <div className="workspace-metric-card">
-                                <div className="workspace-chip-label">
+                            <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+                              <div className="workspace-metric-card flex flex-col p-3 sm:p-5">
+                                <div className="workspace-chip-label mb-1 !text-[10px] sm:!text-[11px]">
                                   Total Changes
                                 </div>
-                                <div className="workspace-metric-value">
+                                <div className="workspace-metric-value !text-xl sm:!text-3xl">
                                   {groupAsoDiffs.length}
                                 </div>
                               </div>
-                              <div className="workspace-metric-card">
-                                <div className="workspace-chip-label">
+                              <div className="workspace-metric-card flex flex-col p-3 sm:p-5">
+                                <div className="workspace-chip-label mb-1 !text-[10px] sm:!text-[11px]">
                                   Changed Apps
                                 </div>
-                                <div className="workspace-metric-value">
+                                <div className="workspace-metric-value !text-xl sm:!text-3xl">
                                   {groupAsoChangedApps.size}
                                 </div>
                               </div>
-                              <div className="workspace-metric-card">
-                                <div className="workspace-chip-label">
+                              <div className="workspace-metric-card flex flex-col p-3 sm:p-5">
+                                <div className="workspace-chip-label mb-1 !text-[10px] sm:!text-[11px]">
                                   Countries
                                 </div>
-                                <div className="workspace-metric-value">
+                                <div className="workspace-metric-value !text-xl sm:!text-3xl">
                                   {groupAsoChangedCountries.size}
                                 </div>
                               </div>
-                              <div className="workspace-metric-card">
-                                <div className="workspace-chip-label">
+                              <div className="workspace-metric-card flex flex-col p-3 sm:p-5">
+                                <div className="workspace-chip-label mb-1 !text-[10px] sm:!text-[11px]">
                                   Last Snapshot
                                 </div>
-                                <div className="workspace-metric-value !text-lg lg:!text-xl">
+                                <div className="workspace-metric-value !text-[14px] sm:!text-[16px] lg:!text-lg">
                                   {groupAsoLatestSnapshotAt
                                     ? formatTrackingChartDateTime(
                                         groupAsoLatestSnapshotAt,
                                       )
                                     : "—"}
                                 </div>
-                                <div className="workspace-metric-hint">
+                                <div className="workspace-metric-hint mt-auto line-clamp-2 pt-1.5 !text-[10px] leading-tight sm:pt-2 sm:!text-xs">
                                   {groupAsoDiffs[0]
                                     ? `Latest change ${formatTrackingChartDateTime(
                                         groupAsoDiffs[0].detectedAt,
@@ -13489,7 +13501,7 @@ function AuthenticatedApp({
                                       ? "No baseline captured yet"
                                       : groupAsoSnapshotCount === 1
                                         ? "Comparison starts next run"
-                                        : "No ASO changes detected"}
+                                        : "No recent changes detected"}
                                 </div>
                               </div>
                             </div>
@@ -14211,7 +14223,7 @@ function AuthenticatedApp({
 
                   {trackedKeywordGroupCount > 0 && (
                     <>
-                      <div className="mt-3 grid grid-cols-2 gap-2 lg:mt-4 lg:gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_220px]">
+                      <div className="workspace-compact-controls mt-3 grid grid-cols-2 gap-2 lg:mt-4 lg:gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_220px]">
                         <div className="col-span-2 lg:col-span-1 relative">
                           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 -translate-y-1/2 text-app-text-muted" />
                           <input
@@ -14267,7 +14279,7 @@ function AuthenticatedApp({
                         </select>
                       </div>
 
-                      <div className="mt-2.5 flex flex-wrap items-center gap-1 lg:gap-2 lg:mt-3 text-[10px] lg:text-xs">
+                      <div className="workspace-compact-controls mt-2 flex flex-wrap items-center gap-1 lg:gap-2 lg:mt-3 text-[10px] lg:text-xs">
                         <button
                           type="button"
                           onClick={() => setExpandedTrackedGroupIds(visibleTrackedGroupIds)}
@@ -14302,7 +14314,7 @@ function AuthenticatedApp({
                 </WorkspacePanel>
 
                 {billingStatusForUi?.usage?.pausedTrackedKeywords ? (
-                  <div className="workspace-warning-banner rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
+                  <div className="workspace-warning-banner workspace-compact-banner rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
                     <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                       <div className="workspace-warning-copy inline-flex items-center gap-2">
                         <AlertCircle className="workspace-warning-icon h-4 w-4 text-amber-300" />
@@ -14326,7 +14338,7 @@ function AuthenticatedApp({
                     </div>
                   </div>
                 ) : null}
-                <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-xs text-app-text-muted">
+                <div className="workspace-compact-banner rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-xs text-app-text-muted">
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="inline-flex items-center gap-2">
                       <BellRing className="w-4 h-4 text-cyan-400" />
@@ -14341,33 +14353,24 @@ function AuthenticatedApp({
               {(() => {
                 if (trackedKeywordGroupCount === 0) {
                   return (
-                    <div className="text-center py-16 bg-app-surface-muted/80 rounded-3xl shadow-xl shadow-slate-900/20 border border-app-border/60">
-                      {" "}
-                      <Bell className="w-12 h-12 text-app-text-muted mx-auto mb-4" />{" "}
-                      <p className="text-app-text-muted font-medium">
-                        No keywords tracked yet.
-                      </p>{" "}
-                      <p className="text-sm text-app-text-muted mt-2">
-                        Search for an app, check a keyword ranking, and click
-                        "Track Keyword" to monitor it here.
-                      </p>{" "}
-                    </div>
+                    <WorkspaceEmptyBlock
+                      icon={Bell}
+                      title="No keywords tracked yet"
+                      description='Search for an app, check a keyword ranking, and tap "Track Keyword" to monitor it here.'
+                    />
                   );
                 }
                 if (processedTrackedAppGroups.length === 0) {
                   return (
-                    <div className="text-center py-12 bg-app-surface-muted/80 rounded-3xl shadow-xl border border-app-border/60">
-                      {" "}
-                      <p className="text-app-text-muted font-medium">
-                        {" "}
-                        No tracked keyword groups for{" "}
-                        {trackFilterCountry === "all"
+                    <WorkspaceEmptyBlock
+                      icon={Search}
+                      title="No tracked groups match"
+                      description={`No tracked keyword groups for ${
+                        trackFilterCountry === "all"
                           ? "all countries"
-                          : findCountryName(trackFilterCountry) ||
-                            trackFilterCountry}{" "}
-                        match your filter.{" "}
-                      </p>{" "}
-                    </div>
+                          : findCountryName(trackFilterCountry) || trackFilterCountry
+                      } match this filter.`}
+                    />
                   );
                 }
                 return (
@@ -14403,12 +14406,12 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={appGroup.appKey}
-                            className="rounded-3xl border border-app-border/80 bg-app-surface/55 shadow-xl shadow-black/35 ring-1 ring-inset ring-slate-400/10"
+                            className="workspace-compact-card rounded-3xl border border-app-border/80 bg-app-surface/55 shadow-xl shadow-black/35 ring-1 ring-inset ring-slate-400/10"
                           >
-                            <div className="border-b border-app-border/70 bg-app-surface-muted/35 px-4 py-4 sm:px-5">
-                              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                            <div className="workspace-compact-card-header border-b border-app-border/70 bg-app-surface-muted/35 px-4 py-4 sm:px-5">
+                              <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                                 <div className="flex items-start gap-3">
-                                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl border border-app-border/75 bg-app-surface-muted/90 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
+                                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-app-border/75 bg-app-surface-muted/90 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)] sm:h-11 sm:w-11">
                                     {selectedStoreGroup.store === "ios" ? (
                                       <Apple className="h-4 w-4 text-app-text" />
                                     ) : (
@@ -14417,7 +14420,7 @@ function AuthenticatedApp({
                                   </div>
                                   <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <h3 className="truncate text-base font-semibold text-app-text">
+                                      <h3 className="workspace-mobile-clamp-2 text-base font-semibold text-app-text sm:truncate">
                                         {appGroup.appTitle}
                                       </h3>
                                       <span className="rounded-full border border-app-border/60 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
@@ -14426,7 +14429,7 @@ function AuthenticatedApp({
                                           : "Android"}
                                       </span>
                                     </div>
-                                    <p className="mt-1 text-sm text-app-text-muted">
+                                    <p className="workspace-mobile-subtle-copy mt-1 text-sm text-app-text-muted">
                                       Tracked keywords stay inside this app, and the store switch only changes this app block.
                                     </p>
                                     <p className="mt-1 text-xs text-app-text-muted">
@@ -14472,7 +14475,7 @@ function AuthenticatedApp({
                                       );
                                     })}
                                   </div>
-                                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:gap-2 sm:text-xs">
                                     <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-cyan-300">
                                       {selectedStoreGroup.groups.length} keywords
                                     </span>
@@ -14494,7 +14497,7 @@ function AuthenticatedApp({
                                 </div>
                               </div>
                             </div>
-                              <div className="space-y-3 bg-app-surface/20 p-3 sm:p-4">
+                              <div className="workspace-compact-card-body space-y-3 bg-app-surface/20 p-3 sm:p-4">
                               {selectedStoreGroup.groups.map((group) => {
                         const groupImprovement = group.improvement;
                         const isExpanded = expandedTrackedGroupIds.includes(
@@ -14570,9 +14573,9 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={group.groupId}
-                            className="rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/35 bg-app-surface-muted/75 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                            className="workspace-compact-card rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/35 bg-app-surface-muted/75 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                           >
-                            <div className="flex flex-col gap-3 px-4 py-3 sm:px-5 lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)_72px_minmax(280px,1.35fr)_76px_32px] lg:items-center lg:gap-4">
+                            <div className="flex flex-col gap-2.5 px-3 py-2.5 sm:px-5 lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)_72px_minmax(280px,1.35fr)_76px_32px] lg:items-center lg:gap-4">
                               {" "}
                               {/* App + keyword */}{" "}
                               <button
@@ -14593,7 +14596,7 @@ function AuthenticatedApp({
                                 </div>{" "}
                                 <div className="min-w-0">
                                   {" "}
-                                  <p className="text-sm font-semibold text-app-text truncate leading-tight">
+                                  <p className="workspace-mobile-clamp-2 text-sm font-semibold text-app-text sm:truncate leading-tight">
                                     {group.appTitle}
                                   </p>{" "}
                                   <p className="text-xs text-cyan-400/80 font-medium truncate mt-0.5">
@@ -14668,7 +14671,7 @@ function AuthenticatedApp({
                                   </span>
                                 )}{" "}
                               </div>{" "}
-                              <div className="rounded-xl border border-app-border/50 bg-app-surface/45 px-4 py-3">
+                              <div className="rounded-xl border border-app-border/50 bg-app-surface/45 px-3 py-2.5 sm:px-4 sm:py-3">
                                 <div className="mb-2 flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">

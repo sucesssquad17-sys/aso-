@@ -391,13 +391,13 @@ function ReportSection({
 }) {
   return (
     <WorkspacePanel tone="muted">
-      <div className="mb-4 flex items-start gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-app-border/70 bg-app-surface-muted/80">
+      <div className="mb-3 flex items-start gap-2.5 sm:mb-4 sm:gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-app-border/70 bg-app-surface-muted/80 sm:h-10 sm:w-10 sm:rounded-2xl">
           <Icon className="h-4 w-4 text-cyan-300" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-app-text">{title}</h3>
-          <p className="mt-1 text-sm text-app-text-muted">{description}</p>
+          <h3 className="text-base font-semibold text-app-text sm:text-lg">{title}</h3>
+          <p className="mt-1 text-xs text-app-text-muted sm:text-sm">{description}</p>
         </div>
       </div>
       {children}
@@ -417,17 +417,21 @@ function CompactStatGrid({
   columnsClassName?: string;
 }) {
   return (
-    <div className={`grid gap-3 md:grid-cols-2 ${columnsClassName}`}>
+    <div className={`grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 ${columnsClassName}`}>
       {items.map((item) => (
         <div
           key={item.label}
-          className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-4"
+          className="flex flex-col rounded-xl border border-app-border/60 bg-app-surface/40 p-3 sm:rounded-2xl sm:p-4"
         >
-          <div className="workspace-chip-label">{item.label}</div>
-          <div className="mt-1 text-2xl font-display font-bold text-app-text">
+          <div className="workspace-chip-label !text-[10px] sm:!text-[11px] mb-1">
+            {item.label}
+          </div>
+          <div className="text-xl font-bold text-app-text font-display sm:text-2xl">
             {item.value}
           </div>
-          <div className="mt-2 text-xs text-app-text-muted">{item.hint}</div>
+          <div className="mt-auto hidden pt-1.5 text-[10px] leading-tight text-app-text-muted sm:block sm:pt-2 sm:text-xs">
+            {item.hint}
+          </div>
         </div>
       ))}
     </div>
@@ -454,9 +458,9 @@ function MovementRowsList({
               key={row.id}
               type="button"
               onClick={() => onSelectKeyword(row.keyword)}
-              className="w-full overflow-hidden rounded-2xl border border-app-border/70 bg-app-surface/45 px-4 py-4 text-left transition-colors hover:border-cyan-500/30 hover:bg-app-surface-muted/70"
+              className="w-full overflow-hidden rounded-xl border border-app-border/70 bg-app-surface/45 px-3 py-3 text-left transition-colors hover:border-cyan-500/30 hover:bg-app-surface-muted/70 sm:rounded-2xl sm:px-4 sm:py-4"
             >
-              <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
+              <div className="flex flex-col gap-2.5 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-app-text">
@@ -469,7 +473,9 @@ function MovementRowsList({
                       {row.country.toUpperCase()}
                     </span>
                   </div>
-                  <p className="mt-1 text-sm text-app-text-muted">{row.historyLabel}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-app-text-muted sm:text-sm">
+                    {row.historyLabel}
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span
@@ -482,7 +488,7 @@ function MovementRowsList({
                   </span>
                 </div>
               </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_108px_108px_132px]">
+              <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_108px_108px_132px] sm:mt-4 sm:gap-3">
                 <div className="min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                     App
@@ -572,13 +578,13 @@ function TabbedMovementSection({
 
   return (
     <WorkspacePanel tone="muted">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="workspace-chip-label">{title}</div>
-          <h3 className="mt-1 text-lg font-semibold text-app-text">
+          <h3 className="mt-1 text-base font-semibold text-app-text sm:text-lg">
             {description}
           </h3>
-          <p className="mt-1 text-sm text-app-text-muted">
+          <p className="mt-1 hidden text-sm text-app-text-muted sm:block">
             {activeTab.panelDescription}
           </p>
         </div>
@@ -1883,8 +1889,8 @@ export default function ReportsWorkspace({
               </select>
             </div>
             {hasKeywordDrilldown ? (
-              <div className="mt-3 lg:mt-4 flex flex-wrap items-center gap-2 lg:gap-3 rounded-xl lg:rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-3 py-2 lg:px-4 lg:py-3">
-                <span className="text-xs lg:text-sm text-app-text-muted">
+              <div className="workspace-compact-banner mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/8 px-3 py-2 lg:mt-4 lg:gap-3 lg:rounded-2xl lg:px-4 lg:py-3">
+                <span className="text-xs text-app-text-muted lg:text-sm">
                   Viewing keyword drilldown for{" "}
                   <span className="font-semibold text-cyan-200">
                     {reportKeywordFilter}
@@ -1924,7 +1930,7 @@ export default function ReportsWorkspace({
                 description="Adjust the report filters or wait for more tracked rank history in this period."
               />
             ) : (
-              <div className="h-80 w-full min-w-0">
+              <div className="workspace-mobile-chart h-80 w-full min-w-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <RechartsLineChart data={myTrendData}>
                     <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
@@ -1961,18 +1967,18 @@ export default function ReportsWorkspace({
             <button
               type="button"
               onClick={() => setIsTrackedOverviewOpen((current) => !current)}
-              className="flex w-full items-center justify-between gap-4 text-left"
+              className="flex w-full items-center justify-between gap-3 text-left sm:gap-4"
             >
               <div>
                 <div className="workspace-chip-label">Secondary Overview</div>
-                <h3 className="mt-1 text-lg font-semibold text-app-text">
+                <h3 className="mt-1 text-base font-semibold text-app-text sm:text-lg">
                   Ranking coverage at a glance
                 </h3>
-                <p className="mt-1 text-sm text-app-text-muted">
+                <p className="mt-1 hidden text-sm text-app-text-muted sm:block">
                   Expand for the fuller tracked distribution and monitoring snapshot.
                 </p>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-xs font-semibold text-app-text">
+              <span className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/60 px-2.5 py-1.5 text-[10px] font-semibold text-app-text sm:px-3 sm:py-2 sm:text-xs">
                 {isTrackedOverviewOpen ? "Hide overview" : "Show overview"}
                 {isTrackedOverviewOpen ? (
                   <ChevronUp className="h-4 w-4" />
@@ -1983,12 +1989,12 @@ export default function ReportsWorkspace({
             </button>
 
             {isTrackedOverviewOpen ? (
-              <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_320px]">
-                <div className="space-y-5">
-                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.7fr)_320px] sm:mt-5 sm:gap-5">
+                <div className="space-y-4 sm:space-y-5">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="workspace-chip-label">Overview</div>
-                      <h4 className="mt-1 text-xl font-semibold text-app-text">
+                      <h4 className="mt-1 text-lg font-semibold text-app-text sm:text-xl">
                         Ranking coverage at a glance
                       </h4>
                     </div>
@@ -2059,8 +2065,8 @@ export default function ReportsWorkspace({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-center">
-                    <div className="h-52 w-full lg:max-w-[210px]">
+                  <div className="mt-4 flex flex-col gap-3 lg:mt-5 lg:flex-row lg:items-center lg:gap-4">
+                    <div className="h-44 w-full sm:h-52 lg:max-w-[210px]">
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -2090,16 +2096,16 @@ export default function ReportsWorkspace({
                       {trackedDistributionItems.map((item) => (
                         <div
                           key={item.label}
-                          className="flex items-center justify-between rounded-2xl border border-app-border/60 bg-app-surface/45 px-4 py-3"
+                           className="flex items-center justify-between rounded-xl border border-app-border/60 bg-app-surface/45 px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3"
                         >
                           <div className="inline-flex items-center gap-2 text-sm font-semibold text-app-text">
                             <span
                               className="h-2.5 w-2.5 rounded-full"
                               style={{ background: item.color }}
                             />
-                            {item.label}
+                            <span className="line-clamp-1">{item.label}</span>
                           </div>
-                          <span className="text-xl font-display font-bold text-app-text">
+                          <span className="text-lg font-display font-bold text-app-text sm:text-xl">
                             {item.value}
                           </span>
                         </div>
@@ -2125,7 +2131,7 @@ export default function ReportsWorkspace({
       ) : (
         <>
           <WorkspacePanel tone="muted">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <div className="workspace-compact-controls grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
               <select
                 value={competitorGroupFilter}
                 onChange={(event) => setCompetitorGroupFilter(event.target.value)}
@@ -2155,8 +2161,8 @@ export default function ReportsWorkspace({
               </select>
             </div>
             {hasKeywordDrilldown ? (
-              <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
-                <span className="text-sm text-app-text-muted">
+              <div className="workspace-compact-banner mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
+                <span className="text-xs text-app-text-muted sm:text-sm">
                   Viewing keyword drilldown for{" "}
                   <span className="font-semibold text-cyan-200">
                     {reportKeywordFilter}
@@ -2165,7 +2171,7 @@ export default function ReportsWorkspace({
                 <button
                   type="button"
                   onClick={() => setReportKeywordFilter("all")}
-                  className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 py-1.5 text-[10px] font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Back to all keywords
@@ -2179,7 +2185,7 @@ export default function ReportsWorkspace({
                         keyword: reportKeywordFilter,
                       })
                     }
-                    className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 py-1.5 text-[10px] font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
                   >
                     <Globe className="h-3.5 w-3.5" />
                     Edit Countries
@@ -2217,7 +2223,7 @@ export default function ReportsWorkspace({
                     <h3 className="mt-1 text-lg font-semibold text-app-text">
                       Recent competitor metadata changes
                     </h3>
-                    <p className="mt-2 text-sm text-app-text-muted">
+                    <p className="mt-2 hidden text-sm text-app-text-muted sm:block">
                       Brief reporting coverage for title, description, icon,
                       category, and screenshot updates across all tracked
                       countries in this competitor group.
@@ -2236,7 +2242,7 @@ export default function ReportsWorkspace({
                     {selectedCompetitorAsoStatus.emptyMessage}
                   </div>
                 ) : (
-                  <div className="mt-5 overflow-hidden rounded-2xl border border-app-border/60 bg-app-surface/45">
+                  <div className="mt-4 overflow-hidden rounded-2xl border border-app-border/60 bg-app-surface/45 sm:mt-5">
                     <div className="hidden lg:grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       <div>Detected</div>
                       <div>App</div>
@@ -2292,7 +2298,7 @@ export default function ReportsWorkspace({
                     description="This group needs more rank history in the selected period before a comparison trend can be plotted."
                   />
                 ) : (
-                  <div className="h-80 w-full min-w-0">
+                  <div className="workspace-mobile-chart h-80 w-full min-w-0">
                     <ResponsiveContainer width="100%" height="100%">
                       <RechartsLineChart data={competitorTrendData}>
                         <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
