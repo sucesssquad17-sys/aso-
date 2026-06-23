@@ -440,6 +440,7 @@ export interface UserAppStateDocument {
   appAnalysisSnapshots?: AppAnalysisSnapshot[];
   competitorGroups?: CompetitorGroupRecord[];
   competitorGroupSnapshots?: CompetitorGroupSnapshotRecord[];
+  competitorAsoLatestSnapshots?: CompetitorAsoSnapshotRecord[];
   competitorTrackedKeywords?: CompetitorTrackedKeywordRecord[];
   competitorRankHistory?: CompetitorRankHistoryEntry[];
   trackingSchedule?: TrackingSchedule;
@@ -1600,6 +1601,110 @@ export function mergeCompetitorTrackedKeywordCollections(
   return normalizeCompetitorTrackedKeywords(Array.from(mergedByKey.values()));
 }
 
+export function reconcileCompetitorTrackedKeywordCountryEdit({
+  existingRecords,
+  group,
+  keyword,
+  nowIso,
+  selectedCountries,
+}: {
+  existingRecords: CompetitorTrackedKeywordRecord[];
+  group: CompetitorGroupRecord;
+  keyword: string;
+  nowIso: string;
+  selectedCountries: string[];
+}) {
+  const normalizedKeyword = keyword.trim();
+  const normalizedKeywordKey = normalizedKeyword.toLowerCase();
+  const normalizedSelectedCountries = Array.from(
+    new Set(
+      selectedCountries.map((countryCode) =>
+        normalizeCountryCode(countryCode, "us"),
+      ),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+  const epochIso = new Date(0).toISOString();
+  const matchingRecords = existingRecords.filter(
+    (record) =>
+      record.groupId === group.groupId &&
+      record.keyword.trim().toLowerCase() === normalizedKeywordKey,
+  );
+  const existingByCountry = new Map(
+    matchingRecords.map((record) => [
+      normalizeCountryCode(record.country, "us"),
+      record,
+    ]),
+  );
+  const preservedRecords = normalizedSelectedCountries.flatMap((countryCode) => {
+    const existingRecord = existingByCountry.get(countryCode);
+    return existingRecord ? [existingRecord] : [];
+  });
+  const addedCountries = normalizedSelectedCountries.filter(
+    (countryCode) => !existingByCountry.has(countryCode),
+  );
+  const removedRecords = matchingRecords.filter(
+    (record) =>
+      !normalizedSelectedCountries.includes(
+        normalizeCountryCode(record.country, "us"),
+      ),
+  );
+  const seedApps = [group.ownApp, ...group.competitors].map((app) => ({
+    ...app,
+    lastRank: -1,
+    lastChecked: epochIso,
+    lastCheckStatus: "pending" as const,
+    lastError: undefined,
+  }));
+  const addedRecords = addedCountries.map(
+    (countryCode) =>
+      ({
+        trackedKeywordId: createCompetitorTrackedKeywordId(
+          group.groupId,
+          normalizedKeyword,
+          countryCode,
+        ),
+        groupId: group.groupId,
+        keyword: normalizedKeyword,
+        store: group.store,
+        country: countryCode,
+        apps: seedApps.map((app) => ({ ...app })),
+        createdAt: nowIso,
+        updatedAt: nowIso,
+        lastCheckedAt: undefined,
+      }) satisfies CompetitorTrackedKeywordRecord,
+  );
+  const removedTrackedKeywordIds = removedRecords.map(
+    (record) => record.trackedKeywordId,
+  );
+  const nextTrackedKeywordIds = Array.from(
+    new Set(
+      group.trackedKeywordIds
+        .filter((trackedKeywordId) => !removedTrackedKeywordIds.includes(trackedKeywordId))
+        .concat(addedRecords.map((record) => record.trackedKeywordId)),
+    ),
+  );
+  const nextRecords = [...preservedRecords, ...addedRecords].sort(
+    (a, b) =>
+      new Date(b.updatedAt || b.createdAt).getTime() -
+      new Date(a.updatedAt || a.createdAt).getTime(),
+  );
+
+  return {
+    addedCountries,
+    addedRecords,
+    nextRecords,
+    nextTrackedKeywordIds,
+    normalizedKeyword,
+    normalizedSelectedCountries,
+    preservedRecords,
+    removedCountries: removedRecords.map((record) =>
+      normalizeCountryCode(record.country, "us"),
+    ),
+    removedRecords,
+    removedTrackedKeywordIds,
+  };
+}
+
 export function getCompetitorRankHistoryEntryKey(
   entry: CompetitorRankHistoryEntry,
 ) {
@@ -2113,10 +2218,18 @@ export function getTrackedRankDisplay(trackedKeyword: TrackedKeyword) {
 export function normalizeTrackingScheduleState(
   schedule?: Partial<TrackingSchedule>,
 ): TrackingSchedule {
+  const defaults = getDefaultTrackingSchedule();
   return {
     enabled: true,
-    time: DEFAULT_GLOBAL_TRACKING_TIME,
-    timezone: GLOBAL_TRACKING_TIMEZONE,
+    time:
+      typeof schedule?.time === "string" &&
+      /^\d{2}:\d{2}$/.test(schedule.time.trim())
+        ? schedule.time.trim()
+        : defaults.time,
+    timezone:
+      typeof schedule?.timezone === "string" && schedule.timezone.trim()
+        ? schedule.timezone.trim()
+        : defaults.timezone,
     lastRunAt: schedule?.lastRunAt,
     lastRunKey: schedule?.lastRunKey,
   };
@@ -2160,6 +2273,7 @@ export function hasPersistedUserState(
       Array.isArray(state.appAnalysisSnapshots) ||
       Array.isArray(state.competitorGroups) ||
       Array.isArray(state.competitorGroupSnapshots) ||
+      Array.isArray(state.competitorAsoLatestSnapshots) ||
       Array.isArray(state.competitorTrackedKeywords) ||
       Array.isArray(state.competitorRankHistory) ||
       Array.isArray(state.alertRules) ||
@@ -2171,7 +2285,7 @@ export function hasPersistedUserState(
 }
 
 export function serializeUserStateForFirestore(state: UserAppStateDocument) {
-  return JSON.parse(JSON.stringify(state)) as UserAppStateDocument;
+  return serializeEditableUserStateForApi(state);
 }
 
 export function serializeEditableUserStateForApi(
@@ -2194,6 +2308,7 @@ export function serializeEditableUserStateForApi(
       appAnalysisSnapshots: state.appAnalysisSnapshots,
       competitorGroups: state.competitorGroups,
       competitorGroupSnapshots: state.competitorGroupSnapshots,
+      competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
       competitorTrackedKeywords: state.competitorTrackedKeywords?.map(
         (trackedKeyword) => ({
           trackedKeywordId: trackedKeyword.trackedKeywordId,
@@ -2220,8 +2335,10 @@ export function serializeEditableUserStateForApi(
       trackingSchedule: state.trackingSchedule
         ? {
             enabled: true,
-            time: DEFAULT_GLOBAL_TRACKING_TIME,
-            timezone: GLOBAL_TRACKING_TIMEZONE,
+            time: state.trackingSchedule.time,
+            timezone: state.trackingSchedule.timezone,
+            lastRunAt: state.trackingSchedule.lastRunAt,
+            lastRunKey: state.trackingSchedule.lastRunKey,
           }
         : undefined,
       alertRules: state.alertRules?.map((rule) => ({
@@ -2231,9 +2348,11 @@ export function serializeEditableUserStateForApi(
         appId: rule.appId,
         keyword: rule.keyword,
         store: rule.store,
+        scope: rule.scope,
         countries: rule.countries,
         channels: rule.channels,
         conditions: rule.conditions,
+        targetAppIds: rule.targetAppIds,
         createdAt: rule.createdAt,
         updatedAt: rule.updatedAt,
       })),

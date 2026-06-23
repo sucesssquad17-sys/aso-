@@ -24,6 +24,7 @@ import {
   TrendingUp,
   Users,
   Zap,
+  Target,
 } from "lucide-react";
 import {
   type BillingAccessState,
@@ -89,11 +90,13 @@ function formatIntervalLabel(interval?: BillingInterval | null) {
 const FEATURE_ICONS: Record<string, React.ElementType> = {
   "App Store & Google Play tracking": Globe,
   "Keyword rank tracking": TrendingUp,
+  "AI-Powered Keyword Discovery": Sparkles,
+  "ASO Comparison": Target,
   "Competitor analysis": Swords,
   "Daily automated monitoring": Zap,
   "Rank change alerts": Bell,
   "Trend charts & history": BarChart3,
-  "Competitor battle mode": Users,
+  "Weekly Email Reports": Mail,
   "PDF reports & data export": FileText,
 };
 
@@ -179,15 +182,12 @@ export function UpgradePage({
   onReturn,
 }: UpgradePageProps) {
   const availableIntervals = getAvailableBillingIntervals(billingStatus);
+  const allIntervals: BillingInterval[] = ["monthly", "yearly"];
   const [selectedInterval, setSelectedInterval] = React.useState<BillingInterval>(
     availableIntervals[0] || "monthly",
   );
 
-  React.useEffect(() => {
-    if (!availableIntervals.includes(selectedInterval)) {
-      setSelectedInterval(availableIntervals[0] || "monthly");
-    }
-  }, [availableIntervals, selectedInterval]);
+  // No longer needed — we always show both intervals regardless of what's configured
 
   const currentPeriodEnd = formatDate(billingStatus?.currentPeriodEnd);
   const availablePlans = new Set(
@@ -204,7 +204,6 @@ export function UpgradePage({
     null;
   const isSelectionRequired = accessState === "selection_required";
   const isActivating = accessState === "activating";
-  const showIntervalToggle = availableIntervals.length > 1;
   const disablePlanSelection = isPollingActivation;
   const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
   const signedInAccount = currentUserEmail || currentUserLabel;
@@ -420,29 +419,6 @@ export function UpgradePage({
         </div>
 
         {/* ── Current plan + usage ───────────────────────────────────────── */}
-        {showIntervalToggle ? (
-          <div className="mb-12 flex justify-center">
-            <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-app-border dark:bg-app-surface-muted">
-              {availableIntervals.map((interval) => {
-                const isActive = selectedInterval === interval;
-                return (
-                  <button
-                    key={interval}
-                    type="button"
-                    onClick={() => setSelectedInterval(interval)}
-                    className={`rounded-full px-5 py-2.5 sm:py-2 text-sm font-semibold transition-colors ${
-                      isActive
-                        ? "bg-blue-600 text-white"
-                        : "text-slate-600 hover:text-slate-900 dark:text-app-text-muted dark:hover:text-white"
-                    }`}
-                  >
-                    {formatIntervalLabel(interval)}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
 
         <div className="mb-12 flex flex-col sm:grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Plan card */}
@@ -745,6 +721,28 @@ export function UpgradePage({
         </div>
 
         {/* ── Pricing Cards ────────────────────────────────────────────────── */}
+        <div className="mb-8 flex justify-center">
+          <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-app-border dark:bg-app-surface-muted">
+            {allIntervals.map((interval) => {
+              const isActive = selectedInterval === interval;
+              return (
+                <button
+                  key={interval}
+                  type="button"
+                  onClick={() => setSelectedInterval(interval)}
+                  className={`rounded-full px-5 py-2.5 sm:py-2 text-sm font-semibold transition-colors ${
+                    isActive
+                      ? "bg-blue-600 text-white"
+                      : "text-slate-600 hover:text-slate-900 dark:text-app-text-muted dark:hover:text-white"
+                  }`}
+                >
+                  {formatIntervalLabel(interval)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
           {PUBLIC_BILLING_PLANS.map((plan) => {
             const isHighlight = plan.highlight;

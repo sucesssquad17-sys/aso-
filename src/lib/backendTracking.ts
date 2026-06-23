@@ -13,6 +13,7 @@ import {
 
 export type StoreType = 'android' | 'ios';
 export type TrackedKeywordStatus = 'pending' | 'ok' | 'not_ranked' | 'error';
+export type TrackingRefreshMode = 'full' | 'unresolved_only';
 
 export type TrackedKeywordRecord = {
   groupId?: string;
@@ -98,6 +99,16 @@ export type TrackingStateBase = {
 export const TRACKING_REFRESH_CONCURRENCY = 1;
 export const TRACKED_KEYWORD_RANKING_DEPTH = 100;
 export const TRACKING_HISTORY_LIMIT = 5000;
+
+function getRunDayKey(runKey: string) {
+  const [dayKey] = runKey.split('T');
+  return dayKey;
+}
+
+function getDayKeyForTimestamp(timestamp: string, timeZone: string) {
+  const parts = getZonedDateParts(new Date(timestamp), timeZone);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
 
 function stripOuterQuotes(value: string) {
   const trimmed = value.trim();
@@ -197,6 +208,68 @@ export function shouldRunTrackingRefresh(
   return true;
 }
 
+export function shouldRetryTrackedKeywordForRun(
+  trackedKeyword: Pick<TrackedKeywordRecord, 'lastChecked' | 'lastCheckStatus'>,
+  runKey: string,
+  timeZone = GLOBAL_TRACKING_TIMEZONE,
+) {
+  if (!trackedKeyword.lastChecked) {
+    return true;
+  }
+
+  if (getDayKeyForTimestamp(trackedKeyword.lastChecked, timeZone) !== getRunDayKey(runKey)) {
+    return true;
+  }
+
+  return trackedKeyword.lastCheckStatus === 'pending' || trackedKeyword.lastCheckStatus === 'error';
+}
+
+export function shouldRetryCompetitorTrackedAppForRun(
+  app: Pick<CompetitorTrackedKeywordAppRecord, 'lastChecked' | 'lastCheckStatus'>,
+  runKey: string,
+  timeZone = GLOBAL_TRACKING_TIMEZONE,
+) {
+  if (!app.lastChecked) {
+    return true;
+  }
+
+  if (getDayKeyForTimestamp(app.lastChecked, timeZone) !== getRunDayKey(runKey)) {
+    return true;
+  }
+
+  return app.lastCheckStatus === 'pending' || app.lastCheckStatus === 'error';
+}
+
+export function filterUnresolvedTrackedKeywords(
+  trackedKeywords: TrackedKeywordRecord[],
+  runKey: string,
+  timeZone = GLOBAL_TRACKING_TIMEZONE,
+) {
+  return trackedKeywords.filter((trackedKeyword) =>
+    shouldRetryTrackedKeywordForRun(trackedKeyword, runKey, timeZone),
+  );
+}
+
+export function filterUnresolvedCompetitorTrackedKeywords(
+  trackedKeywords: CompetitorTrackedKeywordRecord[],
+  runKey: string,
+  timeZone = GLOBAL_TRACKING_TIMEZONE,
+) {
+  return trackedKeywords.flatMap((trackedKeyword) => {
+    const unresolvedApps = trackedKeyword.apps.filter((app) =>
+      shouldRetryCompetitorTrackedAppForRun(app, runKey, timeZone),
+    );
+    if (!unresolvedApps.length) {
+      return [];
+    }
+
+    return [{
+      ...trackedKeyword,
+      apps: unresolvedApps,
+    }];
+  });
+}
+
 export function getScheduleRunKey(date: Date, schedule: TrackingSchedule) {
   const parts = getZonedDateParts(date, schedule.timezone);
   return `${parts.year}-${parts.month}-${parts.day}T${schedule.time}`;
@@ -240,6 +313,12 @@ export function resolveTrackingGroupId(
       });
 }
 
+function getTrackedKeywordStateKey(
+  record: Pick<TrackedKeywordRecord, 'groupId' | 'appId' | 'keyword' | 'store' | 'country'>,
+) {
+  return `${resolveTrackingGroupId(record)}:${record.store}:${record.country}:${record.appId}:${record.keyword.toLowerCase()}`;
+}
+
 function getTrackingHistoryDayKey(
   entry: RankHistoryRecord,
   timeZone: string,
@@ -273,6 +352,12 @@ export function mergeRankHistory(
 
 function getCompetitorTrackedKeywordKey(record: Pick<CompetitorTrackedKeywordRecord, 'groupId' | 'keyword'>) {
   return `${record.groupId}:${record.keyword.toLowerCase()}`;
+}
+
+function getCompetitorTrackedKeywordAppKey(
+  app: Pick<CompetitorTrackedKeywordAppRecord, 'appKey' | 'appId'>,
+) {
+  return `${app.appKey}:${app.appId}`;
 }
 
 export function mergeCompetitorTrackedKeywords(
@@ -334,6 +419,7 @@ type RefreshDependencies = {
 type RefreshOptions = {
   updateScheduleMetadata?: boolean;
   runKey?: string;
+  mode?: TrackingRefreshMode;
 };
 
 type RefreshResult<TState extends TrackingStateBase> = {
@@ -433,11 +519,16 @@ async function refreshTrackedKeywordState<TState extends TrackingStateBase>(
   dependencies: RefreshDependencies,
   options?: RefreshOptions,
 ): Promise<RefreshResult<TState>> {
-  if (!state.trackedKeywords.length) {
+  const trackedKeywordsToRefresh =
+    options?.mode === 'unresolved_only' && options.runKey
+      ? filterUnresolvedTrackedKeywords(state.trackedKeywords, options.runKey)
+      : state.trackedKeywords;
+
+  if (!trackedKeywordsToRefresh.length) {
     return {
       nextState: {
         ...state,
-        trackedKeywords: [],
+        trackedKeywords: state.trackedKeywords,
         rankHistory: state.rankHistory,
         schedule: options?.updateScheduleMetadata
           ? {
@@ -454,15 +545,24 @@ async function refreshTrackedKeywordState<TState extends TrackingStateBase>(
   }
 
   const refreshResults = await mapWithConcurrency(
-    state.trackedKeywords,
+    trackedKeywordsToRefresh,
     dependencies.concurrency ?? TRACKING_REFRESH_CONCURRENCY,
     (trackedKeyword) => refreshTrackedKeywordRecord(trackedKeyword, dependencies),
+  );
+
+  const refreshedByKey = new Map(
+    refreshResults.map((result) => [
+      getTrackedKeywordStateKey(result.trackedKeyword),
+      result.trackedKeyword,
+    ]),
   );
 
   return {
     nextState: {
       ...state,
-      trackedKeywords: refreshResults.map((result) => result.trackedKeyword),
+      trackedKeywords: state.trackedKeywords.map((trackedKeyword) =>
+        refreshedByKey.get(getTrackedKeywordStateKey(trackedKeyword)) || trackedKeyword,
+      ),
       rankHistory: mergeRankHistory(
         state.rankHistory,
         refreshResults.flatMap((result) => (result.historyEntry ? [result.historyEntry] : [])),
@@ -486,11 +586,16 @@ async function refreshCompetitorTrackedKeywordState<TState extends TrackingState
   dependencies: RefreshDependencies,
   options?: RefreshOptions,
 ): Promise<RefreshResult<TState>> {
-  if (!state.competitorTrackedKeywords.length) {
+  const competitorTrackedKeywordsToRefresh =
+    options?.mode === 'unresolved_only' && options.runKey
+      ? filterUnresolvedCompetitorTrackedKeywords(state.competitorTrackedKeywords, options.runKey)
+      : state.competitorTrackedKeywords;
+
+  if (!competitorTrackedKeywordsToRefresh.length) {
     return {
       nextState: {
         ...state,
-        competitorTrackedKeywords: [],
+        competitorTrackedKeywords: state.competitorTrackedKeywords,
         competitorRankHistory: state.competitorRankHistory,
         schedule: options?.updateScheduleMetadata
           ? {
@@ -507,7 +612,7 @@ async function refreshCompetitorTrackedKeywordState<TState extends TrackingState
   }
 
   const refreshResults = await mapWithConcurrency(
-    state.competitorTrackedKeywords,
+    competitorTrackedKeywordsToRefresh,
     dependencies.concurrency ?? TRACKING_REFRESH_CONCURRENCY,
     async (trackedKeyword) => {
       const refreshedAt = (dependencies.now || (() => new Date().toISOString()))();
@@ -565,7 +670,21 @@ async function refreshCompetitorTrackedKeywordState<TState extends TrackingState
       return {
         trackedKeyword: {
           ...trackedKeyword,
-          apps: appResults.map((result) => result.app),
+          apps: (() => {
+            const refreshedAppsByKey = new Map(
+              appResults.map((result) => [
+                getCompetitorTrackedKeywordAppKey(result.app),
+                result.app,
+              ]),
+            );
+            const existingTrackedKeyword = state.competitorTrackedKeywords.find(
+              (entry) => getCompetitorTrackedKeywordKey(entry) === getCompetitorTrackedKeywordKey(trackedKeyword),
+            );
+            const existingApps = existingTrackedKeyword?.apps || trackedKeyword.apps;
+            return existingApps.map((app) =>
+              refreshedAppsByKey.get(getCompetitorTrackedKeywordAppKey(app)) || app,
+            );
+          })(),
           updatedAt: refreshedAt,
           lastCheckedAt: refreshedAt,
         },

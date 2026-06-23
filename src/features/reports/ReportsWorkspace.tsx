@@ -24,6 +24,45 @@ import {
   LineChart as RechartsLineChart,
 } from "recharts";
 import RankSparkline from "../../components/RankSparkline";
+
+// Stable component defined outside render to avoid recharts infinite loop
+function PieDonutLabel({
+  viewBox,
+  value,
+}: {
+  viewBox?: unknown;
+  value?: unknown;
+}) {
+  const candidateViewBox =
+    viewBox && typeof viewBox === "object"
+      ? (viewBox as { cx?: number; cy?: number })
+      : null;
+  if (
+    !candidateViewBox ||
+    candidateViewBox.cx === undefined ||
+    candidateViewBox.cy === undefined
+  ) {
+    return null;
+  }
+  return (
+    <text
+      x={candidateViewBox.cx}
+      y={candidateViewBox.cy}
+      textAnchor="middle"
+      dominantBaseline="central"
+    >
+      <tspan
+        x={candidateViewBox.cx}
+        y={candidateViewBox.cy}
+        fill="white"
+        fontSize={24}
+        fontWeight={700}
+      >
+        {typeof value === "string" || typeof value === "number" ? value : ""}
+      </tspan>
+    </text>
+  );
+}
 import {
   COUNTRY_OPTIONS as COUNTRIES,
   findCountryName,
@@ -38,6 +77,7 @@ import {
   getTrackedKeywordKey,
   type ChartRankHistoryEntry,
   type CompetitorAsoDiffRecord,
+  type CompetitorAsoSnapshotRecord,
   type CompetitorGroupRecord,
   type CompetitorKeywordChartPoint,
   type CompetitorTrackedKeywordRecord,
@@ -569,11 +609,13 @@ export default function ReportsWorkspace({
   trackedCountryRowsForExport,
   competitorGroups,
   competitorAsoDiffs,
+  competitorAsoLatestSnapshots,
   competitorTrackedKeywordsByGroupId,
   competitorRankHistoryByTrackedKeywordId,
   trackedOverview,
   defaultCountry,
   defaultStore,
+  onEditCompetitorKeywordCountries,
   onExportSnapshotChange,
 }: {
   trackedKeywords: TrackedKeyword[];
@@ -581,6 +623,7 @@ export default function ReportsWorkspace({
   trackedCountryRowsForExport: ReportTrackedCountryRow[];
   competitorGroups: CompetitorGroupRecord[];
   competitorAsoDiffs: CompetitorAsoDiffRecord[];
+  competitorAsoLatestSnapshots: CompetitorAsoSnapshotRecord[];
   competitorTrackedKeywordsByGroupId: Map<string, CompetitorTrackedKeywordRecord[]>;
   competitorRankHistoryByTrackedKeywordId: Map<
     string,
@@ -589,6 +632,10 @@ export default function ReportsWorkspace({
   trackedOverview: TrackedReportOverview;
   defaultCountry: string;
   defaultStore: StoreType;
+  onEditCompetitorKeywordCountries?: (input: {
+    groupId: string;
+    keyword: string;
+  }) => void;
   onExportSnapshotChange?: (snapshot: ReportsPdfSnapshot) => void;
 }) {
   const [reportMode, setReportMode] = React.useState<ReportMode>("my");
@@ -1143,6 +1190,11 @@ export default function ReportsWorkspace({
     ],
   );
 
+  const activeTrackedDistributionItems = React.useMemo(
+    () => trackedDistributionItems.filter((entry) => entry.value > 0),
+    [trackedDistributionItems],
+  );
+
   const mySummaryItems = React.useMemo(
     () => [
       {
@@ -1229,6 +1281,18 @@ export default function ReportsWorkspace({
         : [],
     [competitorAsoDiffs, selectedCompetitorGroup],
   );
+  const selectedCompetitorAsoSnapshots = React.useMemo(
+    () =>
+      selectedCompetitorGroup
+        ? competitorAsoLatestSnapshots
+            .filter((snapshot) => snapshot.groupId === selectedCompetitorGroup.groupId)
+            .sort(
+              (a, b) =>
+                new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime(),
+            )
+        : [],
+    [competitorAsoLatestSnapshots, selectedCompetitorGroup],
+  );
   const selectedCompetitorAsoStatus = React.useMemo(() => {
     if (!selectedCompetitorGroup) {
       return {
@@ -1248,23 +1312,37 @@ export default function ReportsWorkspace({
         emptyMessage: "",
       };
     }
-    if (selectedCompetitorGroup.lastAnalyzedAt) {
+    if (selectedCompetitorAsoSnapshots.length === 0) {
       return {
-        label: "Monitoring active",
-        hint: `Last analysis ${formatReportDateTime(
-          selectedCompetitorGroup.lastAnalyzedAt,
+        label: "Baseline pending",
+        hint: "Waiting for the first scheduled monitoring run.",
+        emptyMessage:
+          "This group has not captured its first ASO baseline yet. The report will populate after monitoring starts and a later run detects a change.",
+      };
+    }
+    if (selectedCompetitorAsoSnapshots.length === 1) {
+      return {
+        label: "Waiting for first comparison",
+        hint: `Baseline saved ${formatReportDateTime(
+          selectedCompetitorAsoSnapshots[0].capturedAt,
         )}`,
         emptyMessage:
-          "No ASO changes have been logged for this group yet. The first run creates a baseline, and later runs only show up here when metadata changes.",
+          "The first ASO baseline has been captured for this group. The next scheduled monitoring run will create the first comparison.",
       };
     }
     return {
-      label: "Baseline pending",
-      hint: "Waiting for the first scheduled monitoring run.",
+      label: "Monitoring active",
+      hint: `Last snapshot ${formatReportDateTime(
+        selectedCompetitorAsoSnapshots[0].capturedAt,
+      )}`,
       emptyMessage:
-        "This group has not captured its first ASO baseline yet. The report will populate after monitoring starts and a later run detects a change.",
+        "No ASO changes have been logged for this group yet. Snapshots are being captured, and rows appear here only when metadata changes.",
     };
-  }, [selectedCompetitorAsoDiffs, selectedCompetitorGroup]);
+  }, [
+    selectedCompetitorAsoDiffs,
+    selectedCompetitorAsoSnapshots,
+    selectedCompetitorGroup,
+  ]);
   const competitorAsoSummaryItems = React.useMemo(
     () => {
       const changedApps = new Set(
@@ -1349,7 +1427,7 @@ export default function ReportsWorkspace({
       {
         label: "Apps Tracked",
         value: trackedOverview.trackedAppCount,
-        hint: "Apps with monitored keywords",
+        hint: "Tracked app records",
       },
       {
         label: "Average Rank",
@@ -1682,9 +1760,14 @@ export default function ReportsWorkspace({
     competitorTrackedKeywordsByGroupId,
   ]);
 
+  const onExportSnapshotChangeRef = React.useRef(onExportSnapshotChange);
   React.useEffect(() => {
-    onExportSnapshotChange?.(reportExportSnapshot);
-  }, [onExportSnapshotChange, reportExportSnapshot]);
+    onExportSnapshotChangeRef.current = onExportSnapshotChange;
+  });
+
+  React.useEffect(() => {
+    onExportSnapshotChangeRef.current?.(reportExportSnapshot);
+  }, [reportExportSnapshot]);
 
   return (
     <div className="space-y-6">
@@ -1842,7 +1925,7 @@ export default function ReportsWorkspace({
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip content={<ChartTooltip />} />
+                    <Tooltip content={ChartTooltip} />
                     <Legend />
                     <Line
                       type="monotone"
@@ -1937,7 +2020,7 @@ export default function ReportsWorkspace({
                         {trackedOverview.trackedAppCount}
                       </div>
                       <div className="mt-2 text-xs text-app-text-muted">
-                        Apps with active monitored keywords
+                        Tracked app records
                       </div>
                     </div>
                   </div>
@@ -1966,9 +2049,7 @@ export default function ReportsWorkspace({
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
-                            data={trackedDistributionItems.filter(
-                              (entry) => entry.value > 0,
-                            )}
+                            data={activeTrackedDistributionItems}
                             cx="50%"
                             cy="50%"
                             innerRadius={48}
@@ -1978,37 +2059,13 @@ export default function ReportsWorkspace({
                             paddingAngle={2}
                             dataKey="value"
                           >
-                            {trackedDistributionItems
-                              .filter((entry) => entry.value > 0)
+                            {activeTrackedDistributionItems
                               .map((entry) => (
                                 <Cell key={entry.label} fill={entry.color} />
                               ))}
                             <Label
-                              content={({ viewBox }) => {
-                                if (
-                                  !viewBox ||
-                                  !("cx" in viewBox) ||
-                                  !("cy" in viewBox)
-                                ) {
-                                  return null;
-                                }
-                                return (
-                                  <text
-                                    x={viewBox.cx}
-                                    y={viewBox.cy}
-                                    textAnchor="middle"
-                                    dominantBaseline="central"
-                                  >
-                                    <tspan
-                                      x={viewBox.cx}
-                                      y={viewBox.cy}
-                                      className="fill-white text-3xl font-bold"
-                                    >
-                                      {trackedOverview.rankedKeywords}
-                                    </tspan>
-                                  </text>
-                                );
-                              }}
+                              content={PieDonutLabel}
+                              value={trackedOverview.rankedKeywords}
                             />
                           </Pie>
                         </PieChart>
@@ -2098,6 +2155,21 @@ export default function ReportsWorkspace({
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Back to all keywords
                 </button>
+                {selectedCompetitorGroup && onEditCompetitorKeywordCountries ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onEditCompetitorKeywordCountries({
+                        groupId: selectedCompetitorGroup.groupId,
+                        keyword: reportKeywordFilter,
+                      })
+                    }
+                    className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
+                  >
+                    <Globe className="h-3.5 w-3.5" />
+                    Edit Countries
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </WorkspacePanel>
@@ -2221,7 +2293,7 @@ export default function ReportsWorkspace({
                           axisLine={false}
                           tickLine={false}
                         />
-                        <Tooltip content={<ChartTooltip />} />
+                        <Tooltip content={ChartTooltip} />
                         <Legend />
                         {competitorTrendMeta.map((meta) => (
                           <Line

@@ -8,8 +8,8 @@
       "store": "android",
       "country": "us",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 5,
-      "lastChecked": "2026-06-13T09:00:52.996Z",
+      "lastRank": 8,
+      "lastChecked": "2026-06-23T09:00:30.179Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -20,8 +20,8 @@
       "store": "android",
       "country": "gb",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 5,
-      "lastChecked": "2026-06-13T09:00:53.785Z",
+      "lastRank": 9,
+      "lastChecked": "2026-06-23T09:00:32.185Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -32,8 +32,8 @@
       "store": "android",
       "country": "ca",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 8,
-      "lastChecked": "2026-06-13T09:00:54.169Z",
+      "lastRank": 9,
+      "lastChecked": "2026-06-23T09:00:32.600Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -44,8 +44,8 @@
       "store": "android",
       "country": "au",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 6,
-      "lastChecked": "2026-06-13T09:00:54.677Z",
+      "lastRank": 9,
+      "lastChecked": "2026-06-23T09:00:33.048Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -56,8 +56,8 @@
       "store": "android",
       "country": "in",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 5,
-      "lastChecked": "2026-06-13T09:00:54.988Z",
+      "lastRank": 13,
+      "lastChecked": "2026-06-23T09:00:33.481Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -68,8 +68,8 @@
       "store": "android",
       "country": "de",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 5,
-      "lastChecked": "2026-06-13T09:00:55.396Z",
+      "lastRank": 8,
+      "lastChecked": "2026-06-23T09:00:33.927Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -80,8 +80,8 @@
       "store": "android",
       "country": "fr",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 5,
-      "lastChecked": "2026-06-13T09:00:55.796Z",
+      "lastRank": 8,
+      "lastChecked": "2026-06-23T09:00:34.937Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -92,8 +92,8 @@
       "store": "android",
       "country": "jp",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 6,
-      "lastChecked": "2026-06-13T09:00:56.196Z",
+      "lastRank": 8,
+      "lastChecked": "2026-06-23T09:00:35.463Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -104,8 +104,8 @@
       "store": "android",
       "country": "kr",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 6,
-      "lastChecked": "2026-06-13T09:00:56.497Z",
+      "lastRank": 9,
+      "lastChecked": "2026-06-23T09:00:35.910Z",
       "lastCheckStatus": "ok"
     },
     {
@@ -116,8 +116,8 @@
       "store": "android",
       "country": "br",
       "createdAt": "1970-01-01T00:00:00.000Z",
-      "lastRank": 5,
-      "lastChecked": "2026-06-13T09:00:56.817Z",
+      "lastRank": 9,
+      "lastChecked": "2026-06-23T09:00:36.378Z",
       "lastCheckStatus": "ok"
     }
   ],
@@ -1222,6 +1222,116 @@
       "timestamp": "2026-06-13T09:00:56.817Z",
       "rankDepth": 100,
       "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "us",
+      "rank": 8,
+      "timestamp": "2026-06-23T09:00:30.179Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "gb",
+      "rank": 9,
+      "timestamp": "2026-06-23T09:00:32.185Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "ca",
+      "rank": 9,
+      "timestamp": "2026-06-23T09:00:32.600Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "au",
+      "rank": 9,
+      "timestamp": "2026-06-23T09:00:33.048Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "in",
+      "rank": 13,
+      "timestamp": "2026-06-23T09:00:33.481Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "de",
+      "rank": 8,
+      "timestamp": "2026-06-23T09:00:33.927Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "fr",
+      "rank": 8,
+      "timestamp": "2026-06-23T09:00:34.937Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "jp",
+      "rank": 8,
+      "timestamp": "2026-06-23T09:00:35.463Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "kr",
+      "rank": 9,
+      "timestamp": "2026-06-23T09:00:35.910Z",
+      "rankDepth": 100,
+      "isSimulated": false
+    },
+    {
+      "groupId": "legacy:android:app.vercel.rizzmaster:rizz wingman",
+      "appId": "app.vercel.rizzmaster",
+      "keyword": "rizz wingman",
+      "store": "android",
+      "country": "br",
+      "rank": 9,
+      "timestamp": "2026-06-23T09:00:36.378Z",
+      "rankDepth": 100,
+      "isSimulated": false
     }
   ],
   "competitorTrackedKeywords": [],
@@ -1233,7 +1343,7 @@
     "enabled": true,
     "time": "09:00",
     "timezone": "UTC",
-    "lastRunAt": "2026-06-21T09:00:43.695Z",
-    "lastRunKey": "2026-06-21T09:00"
+    "lastRunAt": "2026-06-23T09:00:37.322Z",
+    "lastRunKey": "2026-06-23T09:00"
   }
 }
