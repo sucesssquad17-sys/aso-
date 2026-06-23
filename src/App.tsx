@@ -670,7 +670,12 @@ function readLegacyLocalUserState() {
   };
 }
 function serializeUserStateForFirestore(state: UserAppStateDocument) {
-  return JSON.parse(JSON.stringify(state)) as UserAppStateDocument;
+  const {
+    legalAcceptedAt: _legalAcceptedAt,
+    legalVersion: _legalVersion,
+    ...persistableState
+  } = state;
+  return JSON.parse(JSON.stringify(persistableState)) as UserAppStateDocument;
 }
 function normalizeAppDetails(app: any, store: StoreType): AppDetails {
   return {
@@ -1700,11 +1705,11 @@ function AuthenticatedApp({
     [currentUser.uid],
   );
   const fetchAuthedJson = React.useCallback(
-    async <T,>(input: string, init?: RequestInit) => {
+    async <T,>(input: string, init?: RequestInit, options?: { timeoutMs?: number }) => {
       const token = await currentUser.getIdToken();
       const headers = new Headers(init?.headers || {});
       headers.set("Authorization", `Bearer ${token}`);
-      return fetchJson<T>(input, { ...init, headers });
+      return fetchJson<T>(input, { ...init, headers }, options);
     },
     [currentUser],
   );
@@ -1962,20 +1967,21 @@ function AuthenticatedApp({
                 trackedKeywords: nextTrackedKeywords,
                 rankHistory: nextRankHistory,
                 trackingSchedule: nextTrackingSchedule,
-                legalAcceptedAt:
-                  legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
-                    ? new Date().toISOString()
-                    : remoteState?.legalAcceptedAt,
-                legalVersion:
-                  legalAlreadyAccepted || shouldPersistInitialLegalAcceptance
-                    ? LEGAL_VERSION
-                    : remoteState?.legalVersion,
                 migratedFromLocalAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               }),
             }),
           });
           if (shouldPersistInitialLegalAcceptance) {
+            await fetchAuthedJson<{ success: boolean }>("/api/account/legal-acceptance", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                legalVersion: LEGAL_VERSION,
+              }),
+            });
             onLegalAcceptedPersisted();
           }
           safeStorage.removeItem("aso-bookmarks");
@@ -2129,7 +2135,7 @@ function AuthenticatedApp({
       },
     ) => {
       try {
-        const data = await fetchJson<{
+        const data = await fetchAuthedJson<{
           keyword: string;
           rank: number;
           depth?: number;
@@ -2510,7 +2516,7 @@ function AuthenticatedApp({
       const title = targetApp.title
         ? String(targetApp.title).split("-")[0].split(":")[0].trim()
         : "App";
-      const data = await fetchJson<{ metrics?: KeywordMetrics[] }>(
+      const data = await fetchAuthedJson<{ metrics?: KeywordMetrics[] }>(
         "/api/metrics",
         {
           method: "POST",
@@ -2560,7 +2566,7 @@ function AuthenticatedApp({
           mode: cachedDiscovery.mode || activeMode,
         } satisfies DiscoveryPayload;
       }
-      const data = await fetchJson<{
+      const data = await fetchAuthedJson<{
         rankings?: RankedKeyword[];
         suggestions?: KeywordSuggestion[];
         checkedKeywords?: number;
@@ -2617,7 +2623,7 @@ function AuthenticatedApp({
       });
       return payload;
     },
-    [discoveryMode, saveRankHistory],
+    [discoveryMode, fetchAuthedJson, saveRankHistory],
   );
   const discoverKeywords = async (
     app: AppDetails,
@@ -3647,7 +3653,7 @@ function AuthenticatedApp({
     setIsCheckingRank(true);
     try {
       const [data, metrics] = await Promise.all([
-        fetchJson<{ keyword: string; rank: number; depth?: number }>(
+        fetchAuthedJson<{ keyword: string; rank: number; depth?: number }>(
           `/api/ranking?keyword=${encodeURIComponent(keyword)}&appId=${String(id)}&store=${storeType}&country=${country}${isRefresh ? "&refresh=true" : ""}`,
         ),
         estimateKeywordMetrics(keyword),
@@ -3708,7 +3714,7 @@ function AuthenticatedApp({
           } satisfies CompareRankingResult;
         try {
           const [data, metrics] = await Promise.all([
-            fetchJson<{ keyword: string; rank: number }>(
+            fetchAuthedJson<{ keyword: string; rank: number }>(
               `/api/ranking?keyword=${encodeURIComponent(compareKeyword)}&appId=${id}&store=${storeType}&country=${country}`,
             ),
             estimateKeywordMetrics(compareKeyword, app),

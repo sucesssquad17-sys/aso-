@@ -59,7 +59,7 @@ import RankSparkline from "../../components/RankSparkline";
 import { UpgradePage } from "./UpgradePage";
 import ThemeToggle from "../../components/ThemeToggle";
 import { PrivacyPolicyPage, TermsPage } from "../auth/components";
-import { db, messaging } from "../../firebase";
+import { db, getFirebaseWebPushVapidKey, messaging } from "../../firebase";
 import { loadArchivedHistoryCollections } from "../../lib/firestoreHistoryArchive";
 import {
   type BillingAccessState,
@@ -4792,7 +4792,7 @@ function AuthenticatedApp({
     React.useState<string>(() => normalizeCountryCode(country, "us"));
   const [isExporting, setIsExporting] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
-  const firebaseVapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY?.trim() || "";
+  const firebaseVapidKey = getFirebaseWebPushVapidKey();
   const isNotificationSecure = React.useMemo(
     () => isNotificationSecureContext(),
     [],
@@ -4861,6 +4861,20 @@ function AuthenticatedApp({
     },
     [fetchAuthedJson, isDemoMode],
   );
+  const persistLegalAcceptanceRemotely = React.useCallback(async () => {
+    await fetchAuthedJson<{ success: boolean }>(
+      "/api/account/legal-acceptance",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          legalVersion: LEGAL_VERSION,
+        }),
+      },
+    );
+  }, [fetchAuthedJson]);
   const queueUserStatePersist = React.useCallback(
     (state: UserAppStateDocument, signature: string) => {
       if (isDemoMode) {
@@ -5034,7 +5048,7 @@ function AuthenticatedApp({
       if (pushSetupErrorRef.current !== "missing-vapid-key") {
         pushSetupErrorRef.current = "missing-vapid-key";
         toast.error(
-          "Push notifications are unavailable because VITE_FIREBASE_VAPID_KEY is not configured on the server.",
+          "Push notifications are unavailable because the runtime VAPID key is not configured on the server.",
         );
       }
       return;
@@ -5562,6 +5576,7 @@ function AuthenticatedApp({
             userStateBaseVersionRef.current = persistedState.stateVersion;
           }
           if (shouldPersistInitialLegalAcceptance) {
+            await persistLegalAcceptanceRemotely();
             onLegalAcceptedPersisted();
           }
           safeStorage.removeItem("aso-bookmarks");
@@ -5640,6 +5655,7 @@ function AuthenticatedApp({
     initialLegalAccepted,
     isDemoMode,
     onLegalAcceptedPersisted,
+    persistLegalAcceptanceRemotely,
     persistUserStateRemotely,
     userStateDocRef,
   ]);
@@ -5652,18 +5668,7 @@ function AuthenticatedApp({
     }
     setIsSavingLegalConsent(true);
     try {
-      await fetchAuthedJson<{ success: boolean }>(
-        "/api/account/legal-acceptance",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            legalVersion: LEGAL_VERSION,
-          }),
-        },
-      );
+      await persistLegalAcceptanceRemotely();
       setHasAcceptedLegal(true);
       onLegalAcceptedPersisted();
       toast.success("Legal acceptance saved.");
@@ -7802,7 +7807,7 @@ function AuthenticatedApp({
       const title = targetApp.title
         ? String(targetApp.title).split("-")[0].split(":")[0].trim()
         : "App";
-      const data = await fetchJson<{ metrics?: KeywordMetrics[] }>(
+      const data = await fetchAuthedJson<{ metrics?: KeywordMetrics[] }>(
         "/api/metrics",
         {
           method: "POST",
@@ -7852,7 +7857,7 @@ function AuthenticatedApp({
           mode: cachedDiscovery.mode || activeMode,
         } satisfies DiscoveryPayload;
       }
-      const data = await fetchJson<{
+      const data = await fetchAuthedJson<{
         rankings?: RankedKeyword[];
         suggestions?: KeywordSuggestion[];
         checkedKeywords?: number;
@@ -7909,7 +7914,7 @@ function AuthenticatedApp({
       });
       return payload;
     },
-    [discoveryMode, saveRankHistory],
+    [discoveryMode, fetchAuthedJson, saveRankHistory],
   );
   const loadAppDetailsForContext = React.useCallback(
     async (
@@ -8471,7 +8476,7 @@ function AuthenticatedApp({
       const appResults = await Promise.all(
         appsToCheck.map(async (app) => {
           try {
-            const data = await fetchJson<{
+            const data = await fetchAuthedJson<{
               keyword: string;
               rank: number;
               depth?: number;
@@ -8582,7 +8587,7 @@ function AuthenticatedApp({
       const appResults = await Promise.all(
         record.apps.map(async (app) => {
           try {
-            const data = await fetchJson<{ keyword: string; rank: number; depth?: number }>(
+            const data = await fetchAuthedJson<{ keyword: string; rank: number; depth?: number }>(
               `/api/ranking?keyword=${encodeURIComponent(record.keyword)}&appId=${encodeURIComponent(app.appId)}&store=${record.store}&country=${record.country}&refresh=true&depth=${TRACKED_KEYWORD_RANKING_DEPTH}`,
             );
             return {
@@ -10078,7 +10083,7 @@ function AuthenticatedApp({
     setIsCheckingRank(true);
     try {
       const [data, metrics] = await Promise.all([
-        fetchJson<{ keyword: string; rank: number; depth?: number }>(
+        fetchAuthedJson<{ keyword: string; rank: number; depth?: number }>(
           `/api/ranking?keyword=${encodeURIComponent(keyword)}&appId=${String(id)}&store=${storeType}&country=${country}${isRefresh ? "&refresh=true" : ""}`,
         ),
         estimateKeywordMetrics(keyword),
@@ -10138,7 +10143,7 @@ function AuthenticatedApp({
           } satisfies CompareRankingResult;
         try {
           const [data, metrics] = await Promise.all([
-            fetchJson<{ keyword: string; rank: number }>(
+            fetchAuthedJson<{ keyword: string; rank: number }>(
               `/api/ranking?keyword=${encodeURIComponent(compareKeyword)}&appId=${id}&store=${storeType}&country=${country}`,
             ),
             estimateKeywordMetrics(compareKeyword, app),

@@ -382,7 +382,7 @@ function getCompetitorRankHistoryDayKey(
   timeZone: string,
 ) {
   const parts = getZonedDateParts(new Date(entry.timestamp), timeZone);
-  return `${entry.trackedKeywordId}:${entry.appKey}:${parts.year}-${parts.month}-${parts.day}`;
+  return `${entry.groupId}:${entry.store}:${entry.country.toLowerCase()}:${entry.appKey}:${entry.keyword.toLowerCase()}:${parts.year}-${parts.month}-${parts.day}`;
 }
 
 export function mergeCompetitorRankHistory(

@@ -5,6 +5,7 @@ import { getMessaging, type Messaging } from "firebase/messaging";
 
 export type FirebaseClientConfig = FirebaseOptions & {
   firestoreDatabaseId?: string;
+  vapidKey?: string;
 };
 
 export type FirebasePublicConfigResponse = {
@@ -32,6 +33,7 @@ export const RUNTIME_FIREBASE_ENV_KEYS = [
 ] as const;
 
 let firebaseApp: FirebaseApp | null = null;
+let firebaseClientConfig: FirebaseClientConfig | null = null;
 
 export let auth!: Auth;
 export let db!: Firestore;
@@ -60,6 +62,7 @@ export function initializeFirebaseServices(config: FirebaseClientConfig) {
   }
 
   if (!firebaseApp) {
+    firebaseClientConfig = { ...config };
     firebaseApp =
       getApps()[0] ||
       initializeApp({
@@ -90,10 +93,18 @@ export function initializeFirebaseServices(config: FirebaseClientConfig) {
     }
   }
 
+  if (!firebaseClientConfig) {
+    firebaseClientConfig = { ...config };
+  }
+
   return {
     app: firebaseApp,
     auth,
     db,
     messaging,
   };
+}
+
+export function getFirebaseWebPushVapidKey() {
+  return firebaseClientConfig?.vapidKey?.trim() || "";
 }

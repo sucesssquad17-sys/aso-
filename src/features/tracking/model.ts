@@ -2365,8 +2365,6 @@ export function serializeEditableUserStateForApi(
             permission: state.notificationSettings.permission,
           }
         : undefined,
-      legalAcceptedAt: state.legalAcceptedAt,
-      legalVersion: state.legalVersion,
       migratedFromLocalAt: state.migratedFromLocalAt,
       updatedAt: state.updatedAt,
     }),

@@ -71,7 +71,7 @@ import {
   getBillingPlanRank,
   getCompetitorTrackedKeywordIdentityKey,
   getPlanLimits,
-  getTrackedAppIdentityKeysFromTrackedKeywords,
+  getTrackedAppIdentityKeysForPlanUsage,
   getTrackedKeywordActivity,
   getTrackedKeywordIdentityKey,
   resolveBillingPlanId,
@@ -479,6 +479,7 @@ type PublicFirebaseClientConfig = {
   appId?: string;
   measurementId?: string;
   firestoreDatabaseId?: string;
+  vapidKey?: string;
 };
 type DodoSubscriptionPayload = {
   cancel_at_next_billing_date?: boolean;
@@ -815,6 +816,7 @@ function readPublicFirebaseClientConfig(): PublicFirebaseClientConfig {
     measurementId: process.env.VITE_FIREBASE_MEASUREMENT_ID?.trim() || undefined,
     firestoreDatabaseId:
       process.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID?.trim() || undefined,
+    vapidKey: process.env.VITE_FIREBASE_VAPID_KEY?.trim() || undefined,
   };
 }
 
@@ -2467,7 +2469,7 @@ function getCompetitorRankHistoryDayKey(entry: CompetitorRankHistoryRecord) {
     day: '2-digit',
   }).formatToParts(new Date(entry.timestamp));
   const lookup = Object.fromEntries(formatted.map((part) => [part.type, part.value]));
-  return `${entry.trackedKeywordId}:${entry.appKey}:${lookup.year}-${lookup.month}-${lookup.day}`;
+  return `${entry.groupId}:${entry.store}:${normalizeCountryCode(entry.country, 'us')}:${entry.appKey}:${entry.keyword.toLowerCase()}:${lookup.year}-${lookup.month}-${lookup.day}`;
 }
 
 function mergeCompetitorRankHistory(
@@ -2659,20 +2661,36 @@ function hasActiveBillingEntitlement(
   if (isDeletedUserTrackingDocument(data)) {
     return false;
   }
-  if (data?.isPremium) {
-    return true;
-  }
   const effectivePlanId = getEffectiveBillingPlanId(data);
-  if (
-    data?.subscriptionStatus === 'active' &&
-    effectivePlanId !== 'free'
-  ) {
-    return true;
-  }
   if (data?.subscriptionStatus) {
-    return false;
+    return data.subscriptionStatus === 'active' && effectivePlanId !== 'free';
+  }
+  if (data?.isPremium) {
+    return effectivePlanId !== 'free';
   }
   return effectivePlanId !== 'free';
+}
+
+async function requireAuthenticatedBillingAccess(req: express.Request) {
+  const decodedToken = await verifyFirebaseRequest(req);
+  const adminDb = getFirebaseAdminDb();
+  if (!adminDb) {
+    throw createConfigurationError('Firebase Admin is not configured on the server.');
+  }
+
+  const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
+  const userSnapshot = await userDocRef.get();
+  const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+  if (!hasActiveBillingEntitlement(userData)) {
+    throw createForbiddenError('An active billing plan is required for this request.');
+  }
+
+  return {
+    decodedToken,
+    adminDb,
+    userDocRef,
+    userData,
+  };
 }
 
 function getNormalizedPlanUsage(
@@ -2700,9 +2718,10 @@ function getGovernedIdentitySets(
   >,
 ) {
   return {
-    trackedApps: getTrackedAppIdentityKeysFromTrackedKeywords(
-      state.trackedKeywords,
-    ),
+    trackedApps: getTrackedAppIdentityKeysForPlanUsage({
+      trackedApps: state.trackedApps,
+      trackedKeywords: state.trackedKeywords,
+    }),
     competitorGroups: new Set(
       state.competitorGroups.map((group) => group.groupId),
     ),
@@ -7311,12 +7330,6 @@ async function startServer() {
         trackingSchedule: mergedState.schedule,
         alertRules: mergedState.alertRules,
         notificationSettings: mergedState.notificationSettings,
-        ...(mergedState.legalAcceptedAt
-          ? { legalAcceptedAt: mergedState.legalAcceptedAt }
-          : {}),
-        ...(mergedState.legalVersion
-          ? { legalVersion: mergedState.legalVersion }
-          : {}),
         ...(mergedState.migratedFromLocalAt
           ? { migratedFromLocalAt: mergedState.migratedFromLocalAt }
           : {}),
@@ -8097,6 +8110,7 @@ async function startServer() {
   // Keyword ranking
   app.get('/api/ranking', strictRateLimit, async (req, res) => {
     try {
+      await requireAuthenticatedBillingAccess(req);
       const keyword = readRequiredString(req.query.keyword, 'keyword', 120);
       const appId = readRequiredString(req.query.appId, 'appId', 160);
       const country = readOptionalString(req.query.country, 'country', 12) || 'us';
@@ -8123,6 +8137,7 @@ async function startServer() {
   // Deterministic keyword metrics estimation
   app.post('/api/metrics', moderateRateLimit, async (req, res) => {
     try {
+      await requireAuthenticatedBillingAccess(req);
       const keywords = readKeywordArray(req.body?.keywords, 'keywords', 100, 120);
       const title = readOptionalString(req.body?.title, 'title', 200);
       const description = readOptionalString(req.body?.description, 'description', 10000);
@@ -8211,6 +8226,7 @@ async function startServer() {
   // Deterministic keyword generation
   app.post('/api/keywords', strictRateLimit, async (req, res) => {
     try {
+      await requireAuthenticatedBillingAccess(req);
       const title = readRequiredString(req.body?.title, 'title', 200);
       const description = readOptionalString(req.body?.description, 'description', 10000);
       const category = readOptionalString(req.body?.category, 'category', 200);
@@ -8243,6 +8259,7 @@ async function startServer() {
     let appId = 'unknown';
     let storeType: StoreType | 'unknown' = 'unknown';
     try {
+      await requireAuthenticatedBillingAccess(req);
       appId = readRequiredString(req.body?.appId, 'appId', 160);
       const title = readRequiredString(req.body?.title, 'title', 200);
       const description = readOptionalString(req.body?.description, 'description', 10000);
