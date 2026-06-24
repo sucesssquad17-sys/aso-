@@ -12,6 +12,10 @@ import * as gplayModule from 'google-play-scraper';
 import store from 'app-store-scraper';
 import NodeCache from 'node-cache';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import {
+  ProxyAgent as UndiciProxyAgent,
+  type Dispatcher as UndiciDispatcher,
+} from 'undici';
 import { Resend } from 'resend';
 import {
   applicationDefault,
@@ -687,12 +691,14 @@ const gplay = resolveGooglePlayScraper(gplayModule);
 
 let proxyAgent: HttpsProxyAgent<string> | undefined = undefined;
 let proxyUrlString: string | undefined = undefined;
+let playStoreFetchDispatcher: UndiciDispatcher | undefined = undefined;
 if (process.env.PROXY_HOST && process.env.PROXY_PORT) {
   const auth = process.env.PROXY_USERNAME && process.env.PROXY_PASSWORD 
     ? `${process.env.PROXY_USERNAME}:${process.env.PROXY_PASSWORD}@` 
     : '';
   proxyUrlString = `http://${auth}${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`;
   proxyAgent = new HttpsProxyAgent(proxyUrlString);
+  playStoreFetchDispatcher = new UndiciProxyAgent(proxyUrlString);
   console.log(`[Proxy] Configured HttpsProxyAgent with host: ${process.env.PROXY_HOST}`);
 }
 
@@ -4530,7 +4536,10 @@ async function fetchPlayStoreHtml(path: string, country: string, retries = 2, ti
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept-Language': 'en-US,en;q=0.9',
         },
-      });
+        ...(playStoreFetchDispatcher
+          ? { dispatcher: playStoreFetchDispatcher }
+          : {}),
+      } as RequestInit & { dispatcher?: UndiciDispatcher });
 
       if (!response.ok && response.status !== 404) {
         throw new Error(`Google Play returned HTTP ${response.status}`);
@@ -4737,15 +4746,30 @@ async function getGooglePlayRankWithFallback(
     console.warn(
       `[${contextLabel}] Using proxy-first Google Play rank lookup for "${keyword}".`,
     );
-    return await getGooglePlayRankViaSearch(
-      keyword,
-      appId,
-      country,
-      depth,
-      googlePlayProxyRequestOptions,
-      deadlineAt,
-      failureMessage,
-    );
+    try {
+      const proxyRank = await getGooglePlayRankViaSearch(
+        keyword,
+        appId,
+        country,
+        depth,
+        googlePlayProxyRequestOptions,
+        deadlineAt,
+        failureMessage,
+      );
+      if (proxyRank !== -1) {
+        return proxyRank;
+      }
+
+      console.warn(
+        `[${contextLabel}] Proxy-first rank lookup returned not ranked for "${keyword}", retrying direct web lookup.`,
+      );
+    } catch (error) {
+      console.warn(
+        `[${contextLabel}] Proxy-first rank lookup failed for "${keyword}", retrying direct web lookup.`,
+      );
+    }
+
+    return await getGooglePlayRankWeb(keyword, appId, country, depth);
   }
 
   try {
@@ -5763,7 +5787,9 @@ async function maybeRunScheduledTrackingCheck() {
     return;
   }
 
-  const [scheduledHour, scheduledMinute] = schedule.time.split(':').map(Number);
+  const scheduledMinutes = getGlobalTrackingScheduledMinutes(schedule.time);
+  const scheduledHour = Math.floor(scheduledMinutes / 60);
+  const scheduledMinute = scheduledMinutes % 60;
   const now = new Date();
   const currentTime = getZonedDateParts(now, schedule.timezone);
   if (currentTime.hour !== scheduledHour || currentTime.minute !== scheduledMinute) {
@@ -7798,11 +7824,17 @@ async function startServer() {
         throw createForbiddenError('Missing or invalid cron secret.');
       }
 
-      console.log('[cron] Manual fallback trigger received. Starting keyword synchronization...');
+      const force =
+        req.query.force === 'true' ||
+        req.query.force === '1';
+      console.log(
+        `[cron] Manual fallback trigger received. Starting keyword synchronization (force=${force}).`,
+      );
       const now = new Date();
       const runKey = getGlobalTrackingRunKey(now);
 
       const userSummary = await runAndPersistAllUserTrackingSchedules(runKey, {
+        force,
         trigger: 'manual',
       });
 
@@ -7810,6 +7842,7 @@ async function startServer() {
         status: 'success',
         timestamp: now.toISOString(),
         runKey,
+        force,
         userSummary,
       });
     } catch (error: any) {

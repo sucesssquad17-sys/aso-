@@ -297,10 +297,38 @@ export function getGlobalTrackingRunKey(
   return `${parts.year}-${parts.month}-${parts.day}T${time}`;
 }
 
+function parseTrackingTimeParts(time: string) {
+  const match = /^(\d{2}):(\d{2})$/.exec(time.trim());
+  if (!match) {
+    return null;
+  }
+
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) {
+    return null;
+  }
+
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null;
+  }
+
+  return { hour, minute };
+}
+
 export function getGlobalTrackingScheduledMinutes(
   time = DEFAULT_GLOBAL_TRACKING_TIME,
 ) {
-  const [hour, minute] = time.split(':').map(Number);
+  const parsed = parseTrackingTimeParts(time);
+  if (!parsed) {
+    const fallback = parseTrackingTimeParts(DEFAULT_GLOBAL_TRACKING_TIME);
+    if (!fallback) {
+      throw new Error('DEFAULT_GLOBAL_TRACKING_TIME is invalid.');
+    }
+    return fallback.hour * 60 + fallback.minute;
+  }
+
+  const { hour, minute } = parsed;
   return hour * 60 + minute;
 }
 
