@@ -14,6 +14,10 @@ import crypto from 'crypto';
 import * as gplayModule from 'google-play-scraper';
 import store from 'app-store-scraper';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import {
+  ProxyAgent as UndiciProxyAgent,
+  type Dispatcher as UndiciDispatcher,
+} from 'undici';
 import NodeCache from 'node-cache';
 import { Resend } from 'resend';
 import { getAuth } from 'firebase-admin/auth';
@@ -290,12 +294,14 @@ const gplay = resolveGooglePlayScraper(gplayModule);
 
 let proxyAgent: HttpsProxyAgent<string> | undefined = undefined;
 let proxyUrlString: string | undefined = undefined;
+let playStoreFetchDispatcher: UndiciDispatcher | undefined = undefined;
 if (process.env.PROXY_HOST && process.env.PROXY_PORT) {
   const auth = process.env.PROXY_USERNAME && process.env.PROXY_PASSWORD 
     ? `${process.env.PROXY_USERNAME}:${process.env.PROXY_PASSWORD}@` 
     : '';
   proxyUrlString = `http://${auth}${process.env.PROXY_HOST}:${process.env.PROXY_PORT}`;
   proxyAgent = new HttpsProxyAgent(proxyUrlString);
+  playStoreFetchDispatcher = new UndiciProxyAgent(proxyUrlString);
   console.log(`[Proxy] Configured HttpsProxyAgent with host: ${process.env.PROXY_HOST}`);
 }
 
@@ -1595,7 +1601,10 @@ async function fetchPlayStoreHtml(urlPath: string, country: string, retries = 2)
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
           'Accept-Language': 'en-US,en;q=0.9',
         },
-      });
+        ...(playStoreFetchDispatcher
+          ? { dispatcher: playStoreFetchDispatcher }
+          : {}),
+      } as RequestInit & { dispatcher?: UndiciDispatcher });
 
       if (!response.ok && response.status !== 404) {
         throw new Error(`Google Play returned HTTP ${response.status}`);
@@ -1656,7 +1665,31 @@ async function getGooglePlayRankWithFallback(
 ) {
   if (googlePlayRequestOptions.agent) {
     log(`[tracking] Using proxy-first Google Play rank lookup for "${keyword}".`);
-    return await getGooglePlayRankViaProxySearch(keyword, appId, country, depth);
+    try {
+      const proxyRank = await getGooglePlayRankViaProxySearch(
+        keyword,
+        appId,
+        country,
+        depth,
+      );
+      if (proxyRank !== -1) {
+        return proxyRank;
+      }
+
+      log(
+        `[tracking] Proxy-first rank lookup returned not ranked for "${keyword}", retrying direct web lookup.`,
+      );
+    } catch (err) {
+      log(
+        `[tracking] Proxy-first rank lookup failed for "${keyword}", retrying direct web lookup.`,
+      );
+    }
+
+    const html = await fetchPlayStoreHtml(
+      `/store/search?c=apps&q=${encodeURIComponent(keyword)}`,
+      country,
+    );
+    return parsePlayStoreRankFromHtml(html, appId, depth);
   }
 
   try {
