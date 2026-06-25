@@ -1093,7 +1093,10 @@ function formatBillingCadence(product: { price?: unknown }) {
     payment_frequency_interval?: string;
   };
   const count = price.payment_frequency_count;
-  const interval = price.payment_frequency_interval;
+  const interval =
+    typeof price.payment_frequency_interval === 'string'
+      ? price.payment_frequency_interval.toLowerCase()
+      : price.payment_frequency_interval;
   if (!count || !interval) {
     return null;
   }
