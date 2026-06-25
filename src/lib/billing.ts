@@ -45,6 +45,17 @@ export type BillingStatus = {
   usage?: PlanUsage | null;
 };
 
+export type BillingPricingCatalog = Pick<
+  BillingStatus,
+  | "configured"
+  | "productConfigured"
+  | "availablePlans"
+  | "availableBillingIntervals"
+  | "availablePlanIntervals"
+  | "planPricing"
+  | "environment"
+>;
+
 export type BillingPlanDefinition = {
   id: BillingPlanId;
   name: string;
@@ -94,7 +105,7 @@ export const BILLING_PLANS: BillingPlanDefinition[] = [
   {
     id: "indie",
     name: "Indie",
-    priceLabel: "$19/mo",
+    priceLabel: "Live pricing",
     description: "For solo builders managing a growing app portfolio.",
     cta: "Choose Indie",
     features: [...getPlanLimitFeatureLines("indie")],
@@ -102,7 +113,7 @@ export const BILLING_PLANS: BillingPlanDefinition[] = [
   {
     id: "starter",
     name: "Starter",
-    priceLabel: "$49/mo",
+    priceLabel: "Live pricing",
     description: "For growing portfolios that need consistent weekly insight.",
     cta: "Choose Starter",
     badge: "Popular",
@@ -112,7 +123,7 @@ export const BILLING_PLANS: BillingPlanDefinition[] = [
   {
     id: "pro",
     name: "Pro",
-    priceLabel: "$99/mo",
+    priceLabel: "Live pricing",
     description: "For full-funnel ASO operations across multiple launches.",
     cta: "Choose Pro",
     features: [...getPlanLimitFeatureLines("pro")],
@@ -140,14 +151,14 @@ export const DEFAULT_PUBLIC_BILLING_PLAN_IDS: BillingPlanId[] = [
 ];
 
 export function getAvailableBillingIntervals(
-  billingStatus: BillingStatus | null,
+  billingStatus: BillingStatus | BillingPricingCatalog | null,
 ): BillingInterval[] {
   const intervals = billingStatus?.availableBillingIntervals?.filter(Boolean);
   return intervals && intervals.length > 0 ? intervals : ["monthly"];
 }
 
 export function getPlanBillingIntervals(
-  billingStatus: BillingStatus | null,
+  billingStatus: BillingStatus | BillingPricingCatalog | null,
   planId: BillingPlanId,
 ): BillingInterval[] {
   if (planId === "free" || planId === "agency") {
@@ -159,7 +170,7 @@ export function getPlanBillingIntervals(
 }
 
 export function getPlanPriceLabel(
-  billingStatus: BillingStatus | null,
+  billingStatus: BillingStatus | BillingPricingCatalog | null,
   plan: BillingPlanDefinition,
   interval: BillingInterval,
 ): string | null {
@@ -172,17 +183,5 @@ export function getPlanPriceLabel(
     return configuredLabel;
   }
 
-  // Fallback: for yearly, calculate from monthly price (10 months = 2 months free)
-  if (interval === "yearly") {
-    const monthlyLabel = billingStatus?.planPricing?.[plan.id]?.["monthly"]?.priceLabel || plan.priceLabel;
-    const match = monthlyLabel?.match(/(\d+)/);
-    const monthlyAmount = match?.[1];
-    if (monthlyAmount) {
-      const yearly = parseInt(monthlyAmount, 10) * 10;
-      return `$${yearly}/yr`;
-    }
-    return null;
-  }
-
-  return plan.priceLabel;
+  return null;
 }
