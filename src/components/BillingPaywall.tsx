@@ -480,7 +480,7 @@ export function BillingPaywall({
                     <div className="mt-3 flex items-end gap-2">
                       <span className="text-4xl font-black text-app-text">
                         {getPlanPriceLabel(billingStatus, plan, selectedInterval) ||
-                          "Contact us"}
+                          (plan.contactOnly ? "Contact us" : "Loading")}
                       </span>
                     </div>
                     <p className="mt-2 text-[11px] font-bold uppercase tracking-[0.16em] text-app-text-muted">

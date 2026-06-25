@@ -831,8 +831,14 @@ function buildAlertMessage(
     case 'leave_top_n':
       return `"${keyword}" left Top ${condition.value} in ${region} and is now ${currentRank === -1 || currentRank === null ? 'out of range' : `#${currentRank}`}.`;
     case 'improve_by':
+      if (previousRank === -1 || previousRank === null) {
+        return `"${keyword}" started ranking in ${region} at #${currentRank}.`;
+      }
       return `"${keyword}" improved by ${Math.abs((previousRank ?? 0) - (currentRank ?? 0))} spots in ${region} to #${currentRank}.`;
     case 'drop_by':
+      if (currentRank === -1 || currentRank === null) {
+        return `"${keyword}" dropped out of range in ${region}${previousRank && previousRank !== -1 ? ` from #${previousRank}` : ''}.`;
+      }
       return `"${keyword}" dropped by ${Math.abs((currentRank ?? 0) - (previousRank ?? 0))} spots in ${region} to ${currentRank === -1 || currentRank === null ? 'out of range' : `#${currentRank}`}.`;
     case 'starts_ranking':
       return `"${keyword}" started ranking in ${region} at #${currentRank}.`;
@@ -865,13 +871,17 @@ function shouldTriggerAlertCondition(
         (previousRank ?? Infinity) <= (condition.value ?? 0) &&
         (!currentRanked || currentRank > (condition.value ?? 0));
     case 'improve_by':
-      return previousRanked &&
-        currentRanked &&
-        (previousRank ?? 0) - currentRank >= (condition.value ?? 0);
+      return currentRanked &&
+        (
+          !previousRanked ||
+          (previousRank ?? 0) - currentRank >= (condition.value ?? 0)
+        );
     case 'drop_by':
       return previousRanked &&
-        currentRanked &&
-        currentRank - (previousRank ?? 0) >= (condition.value ?? 0);
+        (
+          !currentRanked ||
+          currentRank - (previousRank ?? 0) >= (condition.value ?? 0)
+        );
     case 'starts_ranking':
       return !previousRanked && currentRanked;
     case 'stops_ranking':
@@ -1172,12 +1182,17 @@ async function sendEmailAlertEvents(
     await Promise.all(
       events.map(async (event) => {
         try {
-          await resend.emails.send({
+          const result = await resend.emails.send({
             from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
             to: recipient,
             subject: getAlertEmailSubject(event),
             html: buildAlertEmailHtml(event),
           });
+          if (result.error) {
+            console.warn(`[email] Failed to deliver alert email ${event.id}`, result.error);
+            return;
+          }
+          log(`[email] Delivered alert email ${event.id} to ${recipient}.`);
         } catch (error) {
           console.warn(`[email] Failed to deliver alert email ${event.id}`, error);
         }
@@ -1233,12 +1248,17 @@ async function sendCronFailureEmail(input: {
   }
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
       to: CRON_FAILURE_EMAIL_RECIPIENTS,
       subject: `Cron job failed: ${input.runKey}`,
       html: buildCronFailureEmailHtml(input),
     });
+    if (result.error) {
+      console.warn('[email] Failed to deliver cron failure email.', result.error);
+      return;
+    }
+    log(`[email] Delivered cron failure email for ${input.runKey}.`);
   } catch (error) {
     log(`[email] Failed to deliver cron failure email: ${error instanceof Error ? error.message : String(error)}`);
   }

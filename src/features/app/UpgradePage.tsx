@@ -87,6 +87,14 @@ function formatIntervalLabel(interval?: BillingInterval | null) {
   return interval === "yearly" ? "Yearly" : "Monthly";
 }
 
+function stripBillingCadence(priceLabel: string) {
+  return priceLabel.replace(/\/(?:mo|yr)$/i, "");
+}
+
+function getBillingCadence(priceLabel: string | null) {
+  return priceLabel?.match(/\/(?:mo|yr)$/i)?.[0] || "";
+}
+
 const FEATURE_ICONS: Record<string, React.ElementType> = {
   "App Store & Google Play tracking": Globe,
   "Keyword rank tracking": TrendingUp,
@@ -562,7 +570,7 @@ export function UpgradePage({
                     <p className="mt-1 text-xs text-app-text-muted dark:text-app-text-muted">
                       {selectedCapacityPlan.contactOnly
                         ? "Custom terms"
-                        : `${selectedCapacityPriceLabel || selectedCapacityPlan.priceLabel} · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
+                        : `${selectedCapacityPriceLabel || "Price loading"} · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
                     </p>
                   </div>
                 ) : null}
@@ -608,7 +616,7 @@ export function UpgradePage({
                             >
                               {plan.contactOnly
                                 ? "Custom terms"
-                                : `${planPriceLabel || plan.priceLabel} · ${formatIntervalLabel(selectedInterval).toLowerCase()}`}
+                                : `${planPriceLabel || "Price loading"} · ${formatIntervalLabel(selectedInterval).toLowerCase()}`}
                             </p>
                           </div>
                           <div
@@ -747,6 +755,7 @@ export function UpgradePage({
           {PUBLIC_BILLING_PLANS.map((plan) => {
             const isHighlight = plan.highlight;
             const priceLabel = getPlanPriceLabel(billingStatus, plan, selectedInterval);
+            const priceCadence = getBillingCadence(priceLabel);
             const featureLines = getPlanLimitFeatureLines(plan.id as BillingPlanId);
             const PlanIcon = PLAN_ICONS[plan.id] || CheckCircle2;
 
@@ -785,11 +794,15 @@ export function UpgradePage({
                 {/* Price */}
                 <div className="mt-4 sm:mt-5">
                   <div className="text-[1.8rem] font-black leading-none tracking-tight text-slate-900 dark:text-app-text sm:text-[2.25rem]">
-                    {(priceLabel || "Custom").replace("/mo", "")}
+                    {priceLabel
+                      ? stripBillingCadence(priceLabel)
+                      : plan.contactOnly
+                        ? "Custom"
+                        : "Loading"}
                   </div>
                   <div className="mt-1 min-h-[1rem] text-[10px] font-medium text-app-text-muted dark:text-app-text-muted sm:mt-2 sm:min-h-[1.25rem] sm:text-[11px]">
                     {!plan.contactOnly &&
-                      `/mo · ${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
+                      `${priceCadence ? `${priceCadence} · ` : ""}${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
                     {plan.contactOnly && "custom terms"}
                   </div>
                 </div>

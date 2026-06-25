@@ -136,6 +136,7 @@ const discoveryCache = new NodeCache({ stdTTL: 43200, useClones: false });
 const chartCache = new NodeCache({ stdTTL: 900, useClones: false });
 const upstreamFailureCache = new NodeCache({ useClones: false });
 const dodoWebhookEventCache = new NodeCache({ stdTTL: 60 * 60 * 24, useClones: false });
+const billingPricingCache = new NodeCache({ stdTTL: 15 * 60, useClones: false });
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'updates@rankanalyzerpro.com';
 const CRON_FAILURE_EMAIL_RECIPIENTS = (process.env.CRON_FAILURE_EMAIL || '')
@@ -253,6 +254,26 @@ type BillingInterval = 'monthly' | 'yearly';
 type BillingSubscriptionStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired';
 type BillingAccessState = 'selection_required' | 'activating' | 'active';
 type PaidBillingPlanId = Exclude<BillingPlanId, 'free' | 'agency'>;
+type BillingPlanPrice = {
+  productId: string;
+  priceLabel: string | null;
+  currency: string | null;
+  amount: number | null;
+  productName: string | null;
+};
+type BillingPlanPricing = Record<
+  PaidBillingPlanId,
+  Partial<Record<BillingInterval, BillingPlanPrice>>
+>;
+type BillingPricingCatalog = {
+  configured: boolean;
+  productConfigured: boolean;
+  availablePlans: BillingPlanId[];
+  availableBillingIntervals: BillingInterval[];
+  availablePlanIntervals: Record<PaidBillingPlanId, BillingInterval[]>;
+  planPricing: BillingPlanPricing;
+  environment: 'test' | 'live';
+};
 type CompetitorGroupRecord = {
   groupId: string;
   store: StoreType;
@@ -1087,31 +1108,19 @@ function formatBillingCadence(product: { price?: unknown }) {
   return ` every ${count} ${interval}${count === 1 ? '' : 's'}`;
 }
 
-async function loadConfiguredBillingPlanPricing(client: NonNullable<ReturnType<typeof getDodoClient>>) {
-  const productIds = getConfiguredDodoProductIdsByPlan();
-  const planPricing = {
-    indie: {} as Partial<Record<BillingInterval, {
-      productId: string;
-      priceLabel: string | null;
-      currency: string | null;
-      amount: number | null;
-      productName: string | null;
-    }>>,
-    starter: {} as Partial<Record<BillingInterval, {
-      productId: string;
-      priceLabel: string | null;
-      currency: string | null;
-      amount: number | null;
-      productName: string | null;
-    }>>,
-    pro: {} as Partial<Record<BillingInterval, {
-      productId: string;
-      priceLabel: string | null;
-      currency: string | null;
-      amount: number | null;
-      productName: string | null;
-    }>>,
+function createEmptyBillingPlanPricing(): BillingPlanPricing {
+  return {
+    indie: {},
+    starter: {},
+    pro: {},
   };
+}
+
+async function loadConfiguredBillingPlanPricing(
+  client: NonNullable<ReturnType<typeof getDodoClient>>,
+): Promise<BillingPlanPricing> {
+  const productIds = getConfiguredDodoProductIdsByPlan();
+  const planPricing = createEmptyBillingPlanPricing();
 
   await Promise.all(
     (Object.entries(productIds) as Array<[keyof typeof productIds, (typeof productIds)[keyof typeof productIds]]>).flatMap(
@@ -1152,6 +1161,36 @@ async function loadConfiguredBillingPlanPricing(client: NonNullable<ReturnType<t
   );
 
   return planPricing;
+}
+
+async function loadBillingPricingCatalog(): Promise<BillingPricingCatalog> {
+  const cachedCatalog = billingPricingCache.get<BillingPricingCatalog>('catalog');
+  if (cachedCatalog) {
+    return cachedCatalog;
+  }
+
+  const client = getDodoClient();
+  const environment = normalizeDodoEnvironment(
+    process.env.DODO_ENVIRONMENT || process.env.DODO_PAYMENTS_ENVIRONMENT,
+  );
+  const availablePlans = getConfiguredBillingPlans();
+  const planPricing = client
+    ? await loadConfiguredBillingPlanPricing(client)
+    : createEmptyBillingPlanPricing();
+  const catalog: BillingPricingCatalog = {
+    configured: Boolean(getDodoApiKey()),
+    productConfigured: availablePlans.some(
+      (planId) => planId === 'indie' || planId === 'starter' || planId === 'pro',
+    ),
+    availablePlans,
+    availableBillingIntervals: getConfiguredBillingIntervals(),
+    availablePlanIntervals: getConfiguredBillingPlanIntervals(),
+    planPricing,
+    environment: environment === 'live_mode' ? 'live' : 'test',
+  };
+
+  billingPricingCache.set('catalog', catalog);
+  return catalog;
 }
 
 function readDodoWebhookHeaders(req: express.Request): DodoWebhookHeaders {
@@ -3441,8 +3480,14 @@ function buildAlertMessage(
     case 'leave_top_n':
       return `"${keyword}" left Top ${condition.value} in ${region} and is now ${currentRank === -1 || currentRank === null ? 'out of range' : `#${currentRank}`}.`;
     case 'improve_by':
+      if (previousRank === -1 || previousRank === null) {
+        return `"${keyword}" started ranking in ${region} at #${currentRank}.`;
+      }
       return `"${keyword}" improved by ${Math.abs((previousRank ?? 0) - (currentRank ?? 0))} spots in ${region} to #${currentRank}.`;
     case 'drop_by':
+      if (currentRank === -1 || currentRank === null) {
+        return `"${keyword}" dropped out of range in ${region}${previousRank && previousRank !== -1 ? ` from #${previousRank}` : ''}.`;
+      }
       return `"${keyword}" dropped by ${Math.abs((currentRank ?? 0) - (previousRank ?? 0))} spots in ${region} to ${currentRank === -1 || currentRank === null ? 'out of range' : `#${currentRank}`}.`;
     case 'starts_ranking':
       return `"${keyword}" started ranking in ${region} at #${currentRank}.`;
@@ -3475,13 +3520,17 @@ function shouldTriggerAlertCondition(
         (previousRank ?? Infinity) <= (condition.value ?? 0) &&
         (!currentRanked || currentRank > (condition.value ?? 0));
     case 'improve_by':
-      return previousRanked &&
-        currentRanked &&
-        (previousRank ?? 0) - currentRank >= (condition.value ?? 0);
+      return currentRanked &&
+        (
+          !previousRanked ||
+          (previousRank ?? 0) - currentRank >= (condition.value ?? 0)
+        );
     case 'drop_by':
       return previousRanked &&
-        currentRanked &&
-        currentRank - (previousRank ?? 0) >= (condition.value ?? 0);
+        (
+          !currentRanked ||
+          currentRank - (previousRank ?? 0) >= (condition.value ?? 0)
+        );
     case 'starts_ranking':
       return !previousRanked && currentRanked;
     case 'stops_ranking':
@@ -3905,12 +3954,17 @@ async function sendEmailAlertEvents(
   await Promise.all(
     events.map(async (event) => {
       try {
-        await resend.emails.send({
+        const result = await resend.emails.send({
           from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
           to: recipient,
           subject: getAlertEmailSubject(event),
           html: buildAlertEmailHtml(event),
         });
+        if (result.error) {
+          console.warn(`[email] Failed to deliver alert email ${event.id}`, result.error);
+          return;
+        }
+        console.info(`[email] Delivered alert email ${event.id} to ${recipient}.`);
       } catch (error) {
         console.warn(`[email] Failed to deliver alert email ${event.id}`, error);
       }
@@ -3963,12 +4017,17 @@ async function sendCronFailureEmail(input: {
   }
 
   try {
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
       to: CRON_FAILURE_EMAIL_RECIPIENTS,
       subject: `Cron job failed: ${input.runKey}`,
       html: buildCronFailureEmailHtml(input),
     });
+    if (result.error) {
+      console.warn('[email] Failed to deliver cron failure email.', result.error);
+      return;
+    }
+    console.info(`[email] Delivered cron failure email for ${input.runKey}.`);
   } catch (error) {
     console.warn('[email] Failed to deliver cron failure email.', error);
   }
@@ -6969,29 +7028,32 @@ async function startServer() {
   const strictRateLimit = createRateLimiter('public-strict', 30, 60 * 1000);
   const discoverRateLimit = createRateLimiter('public-discover', 20, 60 * 1000);
   const authEventRateLimit = createRateLimiter('public-auth-events', 120, 60 * 1000);
+  const publicBillingRateLimit = createRateLimiter('public-billing', 120, 60 * 1000);
   const authedLightRateLimit = createRateLimiter('authed-light', 120, 60 * 1000);
   const authedRefreshRateLimit = createRateLimiter('authed-refresh', 20, 60 * 1000);
   const authedCheckoutRateLimit = createRateLimiter('authed-checkout', 6, 15 * 60 * 1000);
   const authedPortalRateLimit = createRateLimiter('authed-portal', 12, 15 * 60 * 1000);
   const authedNotificationTestRateLimit = createRateLimiter('authed-push-test', 5, 10 * 60 * 1000);
 
+  app.get('/api/billing/pricing', publicBillingRateLimit, async (_req, res) => {
+    try {
+      res.json(await loadBillingPricingCatalog());
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to load billing pricing.');
+    }
+  });
+
   app.get('/api/billing/status', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
       const adminDb = getFirebaseAdminDb();
-      const client = getDodoClient();
       if (!adminDb) {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
 
       const snapshot = await adminDb.collection('users').doc(decodedToken.uid).get();
       const userData = snapshot.data() as UserTrackingDocument | undefined;
-      const environment = normalizeDodoEnvironment(
-        process.env.DODO_ENVIRONMENT || process.env.DODO_PAYMENTS_ENVIRONMENT,
-      );
-      const configuredPlans = getConfiguredBillingPlans();
-      const availableBillingIntervals = getConfiguredBillingIntervals();
-      const availablePlanIntervals = getConfiguredBillingPlanIntervals();
+      const pricingCatalog = await loadBillingPricingCatalog();
       const normalizedUserState = normalizeUserTrackingDocument(userData);
       const effectiveSubscriptionTier = getEffectiveBillingPlanId(userData);
       const accessState = deriveBillingAccessState(userData);
@@ -7005,27 +7067,11 @@ async function startServer() {
         accessState === 'active' && planLimits
           ? getNormalizedPlanUsage(normalizedUserState, planLimits)
           : null;
-      const planPricing = client
-        ? await loadConfiguredBillingPlanPricing(client)
-        : {
-            indie: {},
-            starter: {},
-            pro: {},
-          };
-      const productConfigured = configuredPlans.some(
-        (planId) => planId === 'indie' || planId === 'starter' || planId === 'pro',
-      );
 
       res.json({
-        configured: Boolean(getDodoApiKey()),
-        productConfigured,
-        customerPortalAvailable: Boolean(getDodoApiKey() && userData?.dodoCustomerId),
+        ...pricingCatalog,
+        customerPortalAvailable: Boolean(pricingCatalog.configured && userData?.dodoCustomerId),
         accessState,
-        availablePlans: configuredPlans,
-        availableBillingIntervals,
-        availablePlanIntervals,
-        planPricing,
-        environment: environment === 'live_mode' ? 'live' : 'test',
         isPremium,
         billingReviewRequired: Boolean(userData?.billingReviewRequired),
         billingReviewReason: userData?.billingReviewReason || null,

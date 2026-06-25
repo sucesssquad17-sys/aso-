@@ -13,7 +13,12 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
-import { PUBLIC_BILLING_PLANS, PRICING_INCLUDED_CAPABILITIES } from "../lib/billing";
+import {
+  PUBLIC_BILLING_PLANS,
+  PRICING_INCLUDED_CAPABILITIES,
+  getPlanPriceLabel,
+  type BillingPricingCatalog,
+} from "../lib/billing";
 import type { ThemeMode } from "../lib/theme";
 import BrandMark from "./BrandMark";
 import ThemeToggle from "./ThemeToggle";
@@ -103,6 +108,19 @@ function SectionEyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
+function splitPriceLabel(priceLabel: string | null, fallback: string) {
+  const normalized = priceLabel?.trim();
+  if (!normalized) {
+    return { amount: fallback, cadence: "" };
+  }
+
+  const cadence = normalized.match(/\/[a-z]+$/i)?.[0] || "";
+  return {
+    amount: cadence ? normalized.slice(0, -cadence.length) : normalized,
+    cadence,
+  };
+}
+
 export default function LandingPage({
   onGetStarted,
   onOpenPrivacy,
@@ -112,11 +130,34 @@ export default function LandingPage({
 }: LandingPageProps) {
   const [openFaqIndices, setOpenFaqIndices] = React.useState<number[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [pricingCatalog, setPricingCatalog] =
+    React.useState<BillingPricingCatalog | null>(null);
 
   const pricingCards = PUBLIC_BILLING_PLANS.map((plan) => ({
     ...plan,
     badge: plan.badge === "Popular" ? "Most Popular" : plan.badge,
   }));
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/billing/pricing")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: BillingPricingCatalog | null) => {
+        if (!cancelled && data) {
+          setPricingCatalog(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPricingCatalog(null);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const scrollToSection = React.useCallback((sectionId: string) => {
     if (typeof document === "undefined") return;
@@ -357,60 +398,70 @@ export default function LandingPage({
           </div>
 
           <div className="mx-auto mt-8 grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {pricingCards.map((plan) => (
-              <div
-                key={plan.name}
-                className={`flex h-full flex-col rounded-[1.5rem] border p-5 ${
-                  plan.highlight
-                    ? "border-cyan-400/30 bg-app-surface-muted/82 shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_22px_60px_rgba(2,6,23,0.42)]"
-                    : "border-app-border/80 bg-app-surface-muted/58"
-                }`}
-              >
-                <div className="flex min-h-[3rem] items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-bold text-app-text">{plan.name}</div>
-                    <div className="mt-2 text-2xl font-black tracking-tight text-app-text">
-                      {plan.priceLabel.replace("/mo", "")}
+            {pricingCards.map((plan) => {
+              const priceLabel = getPlanPriceLabel(pricingCatalog, plan, "monthly");
+              const displayPrice = splitPriceLabel(
+                priceLabel,
+                plan.contactOnly ? "Custom" : "Loading",
+              );
+
+              return (
+                <div
+                  key={plan.name}
+                  className={`flex h-full flex-col rounded-[1.5rem] border p-5 ${
+                    plan.highlight
+                      ? "border-cyan-400/30 bg-app-surface-muted/82 shadow-[0_0_0_1px_rgba(34,211,238,0.08),0_22px_60px_rgba(2,6,23,0.42)]"
+                      : "border-app-border/80 bg-app-surface-muted/58"
+                  }`}
+                >
+                  <div className="flex min-h-[3rem] items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-bold text-app-text">{plan.name}</div>
+                      <div className="mt-2 text-2xl font-black tracking-tight text-app-text">
+                        {displayPrice.amount}
+                      </div>
+                      {displayPrice.cadence && !plan.contactOnly ? (
+                        <div className="mt-0.5 text-xs text-app-text-muted">
+                          {displayPrice.cadence}
+                        </div>
+                      ) : null}
                     </div>
-                    {!plan.contactOnly ? (
-                      <div className="mt-0.5 text-xs text-app-text-muted">/mo</div>
+                    {plan.badge ? (
+                      <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">
+                        {plan.badge}
+                      </span>
                     ) : null}
                   </div>
-                  {plan.badge ? (
-                    <span className="rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-cyan-300">
-                      {plan.badge}
-                    </span>
-                  ) : null}
-                </div>
 
-                <p className="mt-3 text-xs leading-6 text-app-text-muted">{plan.description}</p>
+                  <p className="mt-3 text-xs leading-6 text-app-text-muted">{plan.description}</p>
 
-                <div className="mt-5 flex-1 space-y-2.5">
-                  {plan.features.map((point) => (
-                    <div
-                      key={point}
-                      className="flex items-start gap-2.5 text-[13px] text-app-text-muted"
+                  <div className="mt-5 flex-1 space-y-2.5">
+                    {plan.features.map((point) => (
+                      <div
+                        key={point}
+                        className="flex items-start gap-2.5 text-[13px] text-app-text-muted"
+                      >
+                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-300" />
+                        <span>{point}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 flex flex-col justify-end">
+                    <button
+                      onClick={onGetStarted}
+                      className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
+                        plan.highlight
+                          ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
+                          : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
+                      }`}
                     >
-                      <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-300" />
-                      <span>{point}</span>
-                    </div>
-                  ))}
+                      {plan.cta}
+                    </button>
+                  </div>
                 </div>
-
-                <div className="mt-6 flex flex-col justify-end">
-                  <button
-                    onClick={onGetStarted}
-                    className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
-                      plan.highlight
-                        ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
-                        : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
-                    }`}
-                  >
-                    {plan.cta}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
 
