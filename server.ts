@@ -45,6 +45,7 @@ import {
   filterUnresolvedCompetitorTrackedKeywords,
   filterUnresolvedTrackedKeywords,
   getGlobalTrackingRunKey as getSharedGlobalTrackingRunKey,
+  getGlobalTrackingScheduledMinutes,
   getGlobalTrackingWatchdogDueAtIso as getSharedGlobalTrackingWatchdogDueAtIso,
   getZonedDateParts as getSharedZonedDateParts,
   initializeFirebaseAdminAppFromEnv,
@@ -143,6 +144,12 @@ const CRON_FAILURE_EMAIL_RECIPIENTS = (process.env.CRON_FAILURE_EMAIL || '')
   .split(',')
   .map((value) => value.trim().toLowerCase())
   .filter(Boolean);
+const ADMIN_EMAIL_ALLOWLIST = (process.env.ADMIN_EMAIL_ALLOWLIST || '')
+  .split(',')
+  .map((value) => value.trim().toLowerCase())
+  .filter(Boolean);
+const EMAIL_UNSUBSCRIBE_SECRET = process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim() || '';
+const ANNOUNCEMENT_EMAIL_CAMPAIGNS_COLLECTION = 'admin_email_campaigns';
 const ALERT_EMAIL_APP_URL = process.env.APP_URL?.trim() || 'https://rankanalyzerpro.com';
 const PLAY_STORE_FETCH_TIMEOUT_MS = 30000;
 const UPSTREAM_REQUEST_TIMEOUT_MS = 30000;
@@ -410,6 +417,10 @@ type UserTrackingDocument = {
   trackingSchedule?: TrackingSchedule;
   alertRules?: AlertRule[];
   notificationSettings?: NotificationSettings;
+  announcementEmailsEnabled?: boolean;
+  announcementEmailsUpdatedAt?: string;
+  lastAnnouncementEmailSentAt?: string;
+  lastAnnouncementEmailCampaignId?: string;
   billingProvider?: BillingProvider;
   billingEmail?: string;
   dodoCustomerId?: string;
@@ -439,6 +450,25 @@ type UserTrackingDocument = {
   serverUpdatedAt?: string;
   migratedFromLocalAt?: string;
   updatedAt?: string;
+};
+type AnnouncementAudience = 'all' | 'paid' | 'free';
+type AnnouncementCampaignStatus = 'draft' | 'sending' | 'sent' | 'failed';
+type AnnouncementEmailCampaignDocument = {
+  campaignId: string;
+  subject: string;
+  message: string;
+  audience: AnnouncementAudience;
+  buttonLabel?: string;
+  buttonUrl?: string;
+  status: AnnouncementCampaignStatus;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  sentAt?: string;
+  recipientCount?: number;
+  deliveredCount?: number;
+  failedCount?: number;
+  lastError?: string;
 };
 type NormalizedUserTrackingDocument = TrackingState & {
   bookmarks: AppBookmark[];
@@ -1653,6 +1683,58 @@ function readOptionalString(value: unknown, field: string, maxLength: number) {
   }
 
   return value;
+}
+
+function normalizeEmailAddress(value: unknown) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized || null;
+}
+
+function isValidEmailAddress(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function assertAdminEmailAccess(email: string | null | undefined) {
+  const normalizedEmail = normalizeEmailAddress(email);
+  if (!ADMIN_EMAIL_ALLOWLIST.length) {
+    throw createConfigurationError('ADMIN_EMAIL_ALLOWLIST is not configured on the server.');
+  }
+  if (!normalizedEmail || !ADMIN_EMAIL_ALLOWLIST.includes(normalizedEmail)) {
+    throw createForbiddenError('This endpoint is restricted to configured admin email addresses.');
+  }
+  return normalizedEmail;
+}
+
+function readAnnouncementAudience(value: unknown): AnnouncementAudience {
+  if (value === 'paid' || value === 'free') {
+    return value;
+  }
+  if (value === undefined || value === null || value === '' || value === 'all') {
+    return 'all';
+  }
+  throw createBadRequestError('A valid announcement audience is required.');
+}
+
+function readOptionalUrlString(value: unknown, field: string, maxLength: number) {
+  const trimmed = readOptionalString(value, field, maxLength).trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new Error('Invalid protocol.');
+    }
+  } catch (_error) {
+    throw createBadRequestError(`${field} must be a valid URL.`);
+  }
+
+  return trimmed;
 }
 
 function readOptionalBoolean(value: unknown) {
@@ -3686,7 +3768,7 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.push) {
+        if (rule.channels.inApp || rule.channels.push) {
           pushEvents.push(event);
         }
         if (rule.channels.email) {
@@ -4002,6 +4084,247 @@ function buildCronFailureEmailHtml(input: {
   `;
 }
 
+function buildTestEmailHtml(input: {
+  requestedBy: string;
+  message: string;
+  sentAt: string;
+}) {
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
+      <h2 style="margin: 0 0 12px; font-size: 22px;">Test email delivered</h2>
+      <p style="margin: 0 0 18px; color: #334155;">${escapeAlertEmailHtml(input.message)}</p>
+      <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; padding: 18px;">
+        <p style="margin: 0 0 8px;"><strong>Environment:</strong> ${escapeAlertEmailHtml(process.env.NODE_ENV || 'development')}</p>
+        <p style="margin: 0 0 8px;"><strong>Requested by:</strong> ${escapeAlertEmailHtml(input.requestedBy)}</p>
+        <p style="margin: 0;"><strong>Sent:</strong> ${escapeAlertEmailHtml(formatAlertEmailTimestamp(input.sentAt))}</p>
+      </div>
+      <a href="${escapeAlertEmailHtml(ALERT_EMAIL_APP_URL)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
+        Open Workspace
+      </a>
+    </div>
+  `;
+}
+
+function getAnnouncementEmailCampaignsCollection(adminDb: Firestore) {
+  return adminDb.collection(ANNOUNCEMENT_EMAIL_CAMPAIGNS_COLLECTION);
+}
+
+function buildAnnouncementUnsubscribeToken(userId: string, email: string) {
+  if (!EMAIL_UNSUBSCRIBE_SECRET) {
+    throw createConfigurationError('EMAIL_UNSUBSCRIBE_SECRET is not configured on the server.');
+  }
+  return crypto
+    .createHmac('sha256', EMAIL_UNSUBSCRIBE_SECRET)
+    .update(`${userId}:${email}`)
+    .digest('hex');
+}
+
+function verifyAnnouncementUnsubscribeToken(userId: string, email: string, token: string) {
+  if (!EMAIL_UNSUBSCRIBE_SECRET) {
+    throw createConfigurationError('EMAIL_UNSUBSCRIBE_SECRET is not configured on the server.');
+  }
+  const expectedToken = buildAnnouncementUnsubscribeToken(userId, email);
+  const providedBuffer = Buffer.from(token, 'hex');
+  const expectedBuffer = Buffer.from(expectedToken, 'hex');
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
+function getAnnouncementUnsubscribeUrl(input: {
+  campaignId: string;
+  userId: string;
+  email: string;
+}) {
+  const unsubscribeUrl = new URL('/api/email/unsubscribe', ALERT_EMAIL_APP_URL);
+  unsubscribeUrl.searchParams.set('campaignId', input.campaignId);
+  unsubscribeUrl.searchParams.set('uid', input.userId);
+  unsubscribeUrl.searchParams.set('email', input.email);
+  unsubscribeUrl.searchParams.set(
+    'token',
+    buildAnnouncementUnsubscribeToken(input.userId, input.email),
+  );
+  return unsubscribeUrl.toString();
+}
+
+function buildAnnouncementEmailHtml(
+  campaign: AnnouncementEmailCampaignDocument,
+  unsubscribeUrl: string,
+) {
+  const bodyHtml = escapeAlertEmailHtml(campaign.message).replace(/\r?\n/g, '<br />');
+  const hasButton = Boolean(campaign.buttonLabel && campaign.buttonUrl);
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
+      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeAlertEmailHtml(campaign.subject)}</h2>
+      <div style="margin: 0 0 18px; color: #334155; font-size: 15px; line-height: 1.7;">${bodyHtml}</div>
+      ${hasButton
+        ? `<a href="${escapeAlertEmailHtml(campaign.buttonUrl as string)}" style="display: inline-block; margin-top: 4px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">${escapeAlertEmailHtml(campaign.buttonLabel as string)}</a>`
+        : ''}
+      <div style="margin-top: 28px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 13px; line-height: 1.6;">
+        <p style="margin: 0 0 8px;">You are receiving this announcement because your account has product email updates enabled.</p>
+        <p style="margin: 0;"><a href="${escapeAlertEmailHtml(unsubscribeUrl)}" style="color: #0f766e; text-decoration: underline;">Unsubscribe from announcement emails</a></p>
+      </div>
+    </div>
+  `;
+}
+
+async function resolveAnnouncementRecipientEmail(
+  authClient: FirebaseAdminAuth,
+  userDocRef: DocumentReference<DocumentData>,
+  userData: UserTrackingDocument | undefined,
+) {
+  const billingEmail = normalizeEmailAddress(userData?.billingEmail);
+  if (billingEmail && isValidEmailAddress(billingEmail)) {
+    return billingEmail;
+  }
+
+  try {
+    const userRecord = await authClient.getUser(userDocRef.id);
+    const authEmail = normalizeEmailAddress(userRecord.email);
+    return authEmail && isValidEmailAddress(authEmail) ? authEmail : null;
+  } catch (error) {
+    console.warn(`[email] Failed to resolve announcement recipient for user ${userDocRef.id}`, error);
+    return null;
+  }
+}
+
+async function loadAnnouncementCampaignRecipients(
+  adminDb: Firestore,
+  audience: AnnouncementAudience,
+) {
+  const authClient = getFirebaseAdminAuthClient();
+  if (!authClient) {
+    throw createConfigurationError('Firebase Admin auth is not configured on the server.');
+  }
+
+  const snapshot = await adminDb.collection('users').get();
+  const recipients = await mapWithConcurrency(snapshot.docs, 10, async (userDoc) => {
+    const userData = userDoc.data() as UserTrackingDocument | undefined;
+    if (
+      userData?.accountStatus === 'deleted' ||
+      userData?.accountStatus === 'deleting' ||
+      userData?.announcementEmailsEnabled === false
+    ) {
+      return null;
+    }
+
+    const isPaid = hasActiveBillingEntitlement(userData);
+    if (audience === 'paid' && !isPaid) {
+      return null;
+    }
+    if (audience === 'free' && isPaid) {
+      return null;
+    }
+
+    const email = await resolveAnnouncementRecipientEmail(authClient, userDoc.ref, userData);
+    if (!email) {
+      return null;
+    }
+
+    return {
+      userDocRef: userDoc.ref,
+      email,
+    };
+  });
+
+  return recipients.filter(
+    (
+      entry,
+    ): entry is {
+      userDocRef: DocumentReference<DocumentData>;
+      email: string;
+    } => Boolean(entry),
+  );
+}
+
+async function sendAnnouncementCampaign(
+  adminDb: Firestore,
+  campaignDocRef: DocumentReference<DocumentData>,
+  campaign: AnnouncementEmailCampaignDocument,
+) {
+  if (!resend) {
+    throw createConfigurationError('Resend is not configured on the server.');
+  }
+  if (!EMAIL_UNSUBSCRIBE_SECRET) {
+    throw createConfigurationError('EMAIL_UNSUBSCRIBE_SECRET is not configured on the server.');
+  }
+
+  const sendingAt = new Date().toISOString();
+  const sendingPayload: DocumentData = {
+    status: 'sending',
+    updatedAt: sendingAt,
+    lastError: FieldValue.delete(),
+  };
+  await campaignDocRef.set(sendingPayload, { merge: true });
+
+  const recipients = await loadAnnouncementCampaignRecipients(adminDb, campaign.audience);
+  let deliveredCount = 0;
+  let failedCount = 0;
+  const failureMessages: string[] = [];
+
+  await mapWithConcurrency(recipients, 5, async (recipient) => {
+    try {
+      const result = await resend.emails.send({
+        from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+        to: recipient.email,
+        subject: campaign.subject,
+        html: buildAnnouncementEmailHtml(
+          campaign,
+          getAnnouncementUnsubscribeUrl({
+            campaignId: campaign.campaignId,
+            userId: recipient.userDocRef.id,
+            email: recipient.email,
+          }),
+        ),
+      });
+      if (result.error) {
+        throw new Error(result.error.message || 'Resend rejected the message.');
+      }
+
+      deliveredCount += 1;
+      await recipient.userDocRef.set({
+        lastAnnouncementEmailSentAt: sendingAt,
+        lastAnnouncementEmailCampaignId: campaign.campaignId,
+        updatedAt: new Date().toISOString(),
+      } satisfies Partial<UserTrackingDocument>, { merge: true });
+    } catch (error) {
+      failedCount += 1;
+      if (failureMessages.length < 10) {
+        failureMessages.push(
+          `${recipient.email}: ${error instanceof Error ? error.message : 'Unknown delivery failure.'}`,
+        );
+      }
+    }
+  });
+
+  const completedAt = new Date().toISOString();
+  const nextStatus: AnnouncementCampaignStatus =
+    failedCount > 0 && deliveredCount === 0 ? 'failed' : 'sent';
+  const completionPayload: DocumentData = {
+    status: nextStatus,
+    sentAt: completedAt,
+    recipientCount: recipients.length,
+    deliveredCount,
+    failedCount,
+    updatedAt: completedAt,
+    ...(failureMessages.length
+      ? { lastError: failureMessages.join(' | ').slice(0, 1800) }
+      : { lastError: FieldValue.delete() }),
+  };
+  await campaignDocRef.set(completionPayload, { merge: true });
+
+  return {
+    campaignId: campaign.campaignId,
+    status: nextStatus,
+    recipientCount: recipients.length,
+    deliveredCount,
+    failedCount,
+    sentAt: completedAt,
+  };
+}
+
 async function sendCronFailureEmail(input: {
   runKey: string;
   trigger: 'automatic' | 'manual' | 'watchdog' | 'recovery';
@@ -4137,7 +4460,7 @@ async function evaluateAndDispatchAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.push) {
+        if (rule.channels.inApp || rule.channels.push) {
           pushEvents.push(event);
         }
         if (rule.channels.email) {
@@ -5743,16 +6066,19 @@ function sanitizeCompetitorAsoDiffRecord(
       typeof candidate.currentSnapshotId === 'string'
         ? candidate.currentSnapshotId
         : '',
-    changedFields: Array.isArray(candidate.changedFields)
-      ? candidate.changedFields.filter(
-          (field): field is CompetitorAsoFieldName =>
-            field === 'title' ||
-            field === 'description' ||
-            field === 'icon' ||
-            field === 'category' ||
-            field === 'screenshots',
-        )
-      : changes.map((change) => change.field),
+    changedFields: (() => {
+      const fields = Array.isArray(candidate.changedFields)
+        ? candidate.changedFields.filter(
+            (field): field is CompetitorAsoFieldName =>
+              field === 'title' ||
+              field === 'description' ||
+              field === 'icon' ||
+              field === 'category' ||
+              field === 'screenshots',
+          )
+        : [];
+      return fields.length ? fields : changes.map((change) => change.field);
+    })(),
     changes,
   };
 }
@@ -5765,14 +6091,15 @@ function buildCompetitorAsoSummary(diffs: CompetitorAsoDiffRecord[]) {
     category: 0,
     screenshots: 0,
   };
-  const appCounts = new Map<string, number>();
+  const appCounts = new Map<string, { label: string; count: number }>();
   const countryCounts = new Map<string, number>();
 
   diffs.forEach((diff) => {
-    appCounts.set(
-      diff.appTitle,
-      (appCounts.get(diff.appTitle) || 0) + 1,
-    );
+    const currentAppCount = appCounts.get(diff.appId);
+    appCounts.set(diff.appId, {
+      label: diff.appTitle,
+      count: (currentAppCount?.count || 0) + 1,
+    });
     countryCounts.set(
       diff.country,
       (countryCounts.get(diff.country) || 0) + 1,
@@ -5787,6 +6114,10 @@ function buildCompetitorAsoSummary(diffs: CompetitorAsoDiffRecord[]) {
       .map(([key, count]) => ({ key, count }))
       .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
       .slice(0, 8);
+  const appBuckets = Array.from(appCounts.values())
+    .map(({ label, count }) => ({ key: label, count }))
+    .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
+    .slice(0, 8);
 
   return {
     totalDiffs: diffs.length,
@@ -5794,7 +6125,7 @@ function buildCompetitorAsoSummary(diffs: CompetitorAsoDiffRecord[]) {
     changedCountries: countryCounts.size,
     latestDetectedAt: diffs[0]?.detectedAt,
     fieldCounts,
-    topApps: toBuckets(appCounts),
+    topApps: appBuckets,
     topCountries: toBuckets(countryCounts),
   };
 }
@@ -7037,6 +7368,8 @@ async function startServer() {
   const authedCheckoutRateLimit = createRateLimiter('authed-checkout', 6, 15 * 60 * 1000);
   const authedPortalRateLimit = createRateLimiter('authed-portal', 12, 15 * 60 * 1000);
   const authedNotificationTestRateLimit = createRateLimiter('authed-push-test', 5, 10 * 60 * 1000);
+  const authedEmailTestRateLimit = createRateLimiter('authed-email-test', 5, 10 * 60 * 1000);
+  const authedAnnouncementEmailRateLimit = createRateLimiter('authed-announcement-email', 6, 10 * 60 * 1000);
 
   app.get('/api/billing/pricing', publicBillingRateLimit, async (_req, res) => {
     try {
@@ -7331,6 +7664,34 @@ async function startServer() {
     }
   });
 
+  app.put('/api/account/email-preferences', authedLightRateLimit, async (req, res) => {
+    try {
+      const decodedToken = await verifyFirebaseRequest(req);
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      if (typeof req.body?.announcementEmailsEnabled !== 'boolean') {
+        throw createBadRequestError('announcementEmailsEnabled must be a boolean.');
+      }
+
+      const updatedAt = new Date().toISOString();
+      await adminDb.collection('users').doc(decodedToken.uid).set({
+        announcementEmailsEnabled: req.body.announcementEmailsEnabled,
+        announcementEmailsUpdatedAt: updatedAt,
+        updatedAt,
+      } satisfies Partial<UserTrackingDocument>, { merge: true });
+
+      res.json({
+        announcementEmailsEnabled: req.body.announcementEmailsEnabled,
+        updatedAt,
+      });
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to save email preferences.');
+    }
+  });
+
   app.put('/api/user-state', authedLightRateLimit, async (req, res) => {
     try {
       const decodedToken = await verifyFirebaseRequest(req);
@@ -7451,6 +7812,8 @@ async function startServer() {
       await userDocRef.set({
         notificationSettings: {
           ...currentNotificationSettingsSafe,
+          pushEnabled: true,
+          permission: 'granted',
           lastTokenId: tokenId,
           tokenUpdatedAt: registeredAt,
         },
@@ -7459,7 +7822,7 @@ async function startServer() {
         merge: true,
       });
 
-      res.json({ ok: true, success: true });
+      res.json({ ok: true, success: true, tokenId });
     } catch (error) {
       return sendApiError(res, error, 'Failed to register notification token.');
     }
@@ -7527,6 +7890,195 @@ async function startServer() {
       res.json(result);
     } catch (error) {
       return sendApiError(res, error, 'Failed to send test notification.');
+    }
+  });
+
+  app.post('/api/admin/email/test', authedEmailTestRateLimit, async (req, res) => {
+    try {
+      const decodedToken = await verifyFirebaseRequest(req);
+      const requestedBy = assertAdminEmailAccess(decodedToken.email);
+      if (!resend) {
+        throw createConfigurationError('Resend is not configured on the server.');
+      }
+
+      const requestedRecipient = normalizeEmailAddress(readOptionalString(req.body?.to, 'to', 320));
+      const recipient = requestedRecipient || requestedBy;
+      if (!isValidEmailAddress(recipient)) {
+        throw createBadRequestError('A valid recipient email address is required.');
+      }
+
+      const subjectInput = readOptionalString(req.body?.subject, 'subject', 200).trim();
+      const messageInput = readOptionalString(req.body?.message, 'message', 2000).trim();
+      const subject = subjectInput || 'Rank Analyzer Pro test email';
+      const message = messageInput || 'Email delivery is working for this environment.';
+      const sentAt = new Date().toISOString();
+
+      const result = await resend.emails.send({
+        from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+        to: recipient,
+        subject,
+        html: buildTestEmailHtml({
+          requestedBy,
+          message,
+          sentAt,
+        }),
+      });
+      if (result.error) {
+        throw new ApiError('Failed to deliver test email.', {
+          status: 502,
+          code: 'UPSTREAM_UNAVAILABLE',
+          retryable: true,
+        });
+      }
+
+      res.json({
+        ok: true,
+        to: recipient,
+        subject,
+        sentAt,
+        id: result.data?.id || null,
+      });
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to send test email.');
+    }
+  });
+
+  app.get('/api/admin/email/campaigns', authedAnnouncementEmailRateLimit, async (req, res) => {
+    try {
+      const decodedToken = await verifyFirebaseRequest(req);
+      assertAdminEmailAccess(decodedToken.email);
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const snapshot = await getAnnouncementEmailCampaignsCollection(adminDb)
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get();
+      const campaigns = snapshot.docs.map(
+        (docSnapshot) => docSnapshot.data() as AnnouncementEmailCampaignDocument,
+      );
+      res.json({ campaigns });
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to load announcement campaigns.');
+    }
+  });
+
+  app.post('/api/admin/email/campaigns', authedAnnouncementEmailRateLimit, async (req, res) => {
+    try {
+      const decodedToken = await verifyFirebaseRequest(req);
+      const createdBy = assertAdminEmailAccess(decodedToken.email);
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const subject = readRequiredString(req.body?.subject, 'subject', 200);
+      const message = readRequiredString(req.body?.message, 'message', 6000);
+      const audience = readAnnouncementAudience(req.body?.audience);
+      const buttonLabel = readOptionalString(req.body?.buttonLabel, 'buttonLabel', 120).trim();
+      const buttonUrl = readOptionalUrlString(req.body?.buttonUrl, 'buttonUrl', 1000);
+      if ((buttonLabel && !buttonUrl) || (!buttonLabel && buttonUrl)) {
+        throw createBadRequestError('buttonLabel and buttonUrl must be provided together.');
+      }
+
+      const campaignId = crypto.randomUUID();
+      const createdAt = new Date().toISOString();
+      const campaign: AnnouncementEmailCampaignDocument = {
+        campaignId,
+        subject,
+        message,
+        audience,
+        ...(buttonLabel && buttonUrl ? { buttonLabel, buttonUrl } : {}),
+        status: 'draft',
+        createdAt,
+        updatedAt: createdAt,
+        createdBy,
+      };
+
+      await getAnnouncementEmailCampaignsCollection(adminDb).doc(campaignId).set(campaign);
+      res.status(201).json(campaign);
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to create announcement campaign.');
+    }
+  });
+
+  app.post('/api/admin/email/campaigns/:campaignId/send', authedAnnouncementEmailRateLimit, async (req, res) => {
+    try {
+      const decodedToken = await verifyFirebaseRequest(req);
+      assertAdminEmailAccess(decodedToken.email);
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const campaignId = readRequiredString(req.params.campaignId, 'campaignId', 120);
+      const campaignDocRef = getAnnouncementEmailCampaignsCollection(adminDb).doc(campaignId);
+      const snapshot = await campaignDocRef.get();
+      if (!snapshot.exists) {
+        throw createBadRequestError('Announcement campaign was not found.');
+      }
+
+      const campaign = snapshot.data() as AnnouncementEmailCampaignDocument;
+      if (campaign.status === 'sending') {
+        throw createBadRequestError('Announcement campaign is already sending.');
+      }
+      if (campaign.status === 'sent') {
+        throw createBadRequestError('Announcement campaign has already been sent.');
+      }
+
+      const result = await sendAnnouncementCampaign(adminDb, campaignDocRef, campaign);
+      res.json(result);
+    } catch (error) {
+      return sendApiError(res, error, 'Failed to send announcement campaign.');
+    }
+  });
+
+  app.get('/api/email/unsubscribe', strictRateLimit, async (req, res) => {
+    const sendHtml = (status: number, title: string, message: string) => {
+      res.status(status).type('html').send(`
+        <html>
+          <body style="font-family: Arial, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 16px; color: #0f172a;">
+            <h1 style="font-size: 28px; margin-bottom: 12px;">${escapeAlertEmailHtml(title)}</h1>
+            <p style="font-size: 16px; line-height: 1.7; color: #334155;">${escapeAlertEmailHtml(message)}</p>
+          </body>
+        </html>
+      `);
+    };
+
+    try {
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const uid = readRequiredString(req.query.uid, 'uid', 200);
+      const email = normalizeEmailAddress(readRequiredString(req.query.email, 'email', 320));
+      const token = readRequiredString(req.query.token, 'token', 300);
+      const campaignId = readOptionalString(req.query.campaignId, 'campaignId', 120).trim();
+      if (!email || !isValidEmailAddress(email)) {
+        throw createBadRequestError('A valid email address is required.');
+      }
+      if (!verifyAnnouncementUnsubscribeToken(uid, email, token)) {
+        throw createForbiddenError('This unsubscribe link is invalid or has expired.');
+      }
+
+      const updatedAt = new Date().toISOString();
+      await adminDb.collection('users').doc(uid).set({
+        announcementEmailsEnabled: false,
+        announcementEmailsUpdatedAt: updatedAt,
+        ...(campaignId ? { lastAnnouncementEmailCampaignId: campaignId } : {}),
+        updatedAt,
+      } satisfies Partial<UserTrackingDocument>, { merge: true });
+
+      return sendHtml(200, 'You are unsubscribed', 'Announcement emails have been turned off for this account.');
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'The unsubscribe request could not be completed.';
+      return sendHtml(400, 'Unable to unsubscribe', message);
     }
   });
 

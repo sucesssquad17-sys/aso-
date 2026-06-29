@@ -82,8 +82,7 @@ function createConditionState(
 
 function getRuleChannels(rule: AlertRule) {
   const channels = [
-    rule.channels.inApp ? "In-app" : null,
-    rule.channels.push ? "Push" : null,
+    rule.channels.inApp || rule.channels.push ? "Notifications" : null,
     rule.channels.email ? "Email" : null,
   ].filter(Boolean);
   return channels.length ? channels.join(", ") : "No channels";
@@ -105,8 +104,7 @@ export function UnifiedAlertRuleManagerModal({
   >(createConditionState("keyword"));
   const [conditionThresholds, setConditionThresholds] =
     useState<Record<AlertConditionType, string>>(DEFAULT_THRESHOLDS);
-  const [inAppEnabled, setInAppEnabled] = useState(true);
-  const [pushEnabled, setPushEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(false);
 
   const mode = target?.mode || "keyword";
@@ -135,10 +133,9 @@ export function UnifiedAlertRuleManagerModal({
     setSelectedCountries(target.group.countries);
     setConditionStates(createConditionState(target.mode));
     setConditionThresholds(DEFAULT_THRESHOLDS);
-    setInAppEnabled(true);
-    setPushEnabled(notificationPermission === "granted");
+    setNotificationsEnabled(true);
     setEmailEnabled(false);
-  }, [notificationPermission, target]);
+  }, [target]);
 
   useEffect(() => {
     if (isOpen) {
@@ -163,28 +160,35 @@ export function UnifiedAlertRuleManagerModal({
       setSelectedCountries(rule.countries);
       setConditionStates(nextStates);
       setConditionThresholds(nextThresholds);
-      setInAppEnabled(rule.channels.inApp);
-      setPushEnabled(rule.channels.push && notificationPermission === "granted");
+      setNotificationsEnabled(rule.channels.inApp || rule.channels.push);
       setEmailEnabled(Boolean(rule.channels.email));
     },
-    [mode, notificationPermission],
+    [mode],
   );
 
-  const handlePushToggle = React.useCallback(
+  const handleNotificationsToggle = React.useCallback(
     async (nextChecked: boolean) => {
       if (!nextChecked) {
-        setPushEnabled(false);
+        setNotificationsEnabled(false);
         return;
       }
-      if (notificationPermission === "granted") {
-        setPushEnabled(true);
-        return;
+      setNotificationsEnabled(true);
+      if (notificationPermission !== "granted") {
+        await onRequestPushPermission();
       }
-      const permission = await onRequestPushPermission();
-      setPushEnabled(permission === "granted");
     },
     [notificationPermission, onRequestPushPermission],
   );
+
+  const pushEnabled = notificationsEnabled;
+
+  const notificationsHelperText =
+    notificationPermission === "granted"
+      ? "Workspace feed and browser notification."
+      : "Workspace feed. Browser notification will be enabled when permission is allowed.";
+
+  const pushPermissionWarning =
+    notificationsEnabled && notificationPermission !== "granted";
 
   const updateRule = React.useCallback(
     (nextRule: AlertRule, message: string) => {
@@ -248,13 +252,15 @@ export function UnifiedAlertRuleManagerModal({
       toast.error("Select at least one country for the alert rule.");
       return;
     }
-    if (!inAppEnabled && !pushEnabled && !emailEnabled) {
+    if (!notificationsEnabled && !emailEnabled) {
       toast.error("Enable at least one delivery channel.");
       return;
     }
-    if (pushEnabled && notificationPermission !== "granted") {
-      toast.error("Allow browser notifications to enable push alerts.");
-      return;
+    if (
+      notificationsEnabled &&
+      notificationPermission !== "granted"
+    ) {
+      toast.info("Notifications will appear in-app. Allow browser notifications later to also receive push alerts.");
     }
 
     const conditions = conditionTypes.reduce<AlertCondition[]>(
@@ -298,7 +304,7 @@ export function UnifiedAlertRuleManagerModal({
             scope: "keyword",
             countries: selectedCountries,
             channels: {
-              inApp: inAppEnabled,
+              inApp: notificationsEnabled,
               push: pushEnabled,
               email: emailEnabled,
             },
@@ -319,7 +325,7 @@ export function UnifiedAlertRuleManagerModal({
             scope: "competitor_aso",
             countries: selectedCountries,
             channels: {
-              inApp: inAppEnabled,
+              inApp: notificationsEnabled,
               push: pushEnabled,
               email: emailEnabled,
             },
@@ -346,9 +352,9 @@ export function UnifiedAlertRuleManagerModal({
     conditionTypes,
     editingRuleId,
     emailEnabled,
-    inAppEnabled,
     mode,
     notificationPermission,
+    notificationsEnabled,
     pushEnabled,
     resetBuilder,
     rules,
@@ -370,17 +376,19 @@ export function UnifiedAlertRuleManagerModal({
       : "Watch daily metadata changes across the competitor apps in this group.";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
-      <div className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-app-border/50 px-6 py-4">
-          <div>
+    <div className="unified-alert-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
+      <div className="unified-alert-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
+        <div className="unified-alert-modal-header flex items-center justify-between border-b border-app-border/50 px-6 py-4">
+          <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
               {eyebrow}
             </p>
-            <h3 className="mt-1 font-display text-xl font-bold text-app-text">
+            <h3 className="unified-alert-modal-title mt-1 font-display text-xl font-bold text-app-text">
               {title}
             </h3>
-            <p className="mt-2 text-sm text-app-text-muted">{description}</p>
+            <p className="unified-alert-modal-description mt-2 text-sm text-app-text-muted">
+              {description}
+            </p>
           </div>
           <button
             type="button"
@@ -392,9 +400,9 @@ export function UnifiedAlertRuleManagerModal({
           </button>
         </div>
 
-        <div className="grid max-h-[calc(92vh-98px)] gap-6 overflow-y-auto px-6 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)]">
+        <div className="unified-alert-modal-body grid max-h-[calc(92vh-98px)] gap-6 overflow-y-auto px-6 py-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.95fr)]">
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
+            <div className="unified-alert-presets flex flex-wrap gap-2">
               {presets.map((preset) => (
                 <button
                   key={preset.id}
@@ -408,7 +416,7 @@ export function UnifiedAlertRuleManagerModal({
               ))}
             </div>
 
-            <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
+            <div className="unified-alert-builder rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-app-text">
                   {editingRuleId ? "Edit rule" : "Create rule"}
@@ -429,7 +437,7 @@ export function UnifiedAlertRuleManagerModal({
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Countries
                   </p>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="unified-alert-country-grid flex flex-wrap gap-2">
                     {group.countries.map((country) => {
                       const isSelected = selectedCountries.includes(country);
                       return (
@@ -460,14 +468,14 @@ export function UnifiedAlertRuleManagerModal({
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     {mode === "keyword" ? "Conditions" : "Change types"}
                   </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="unified-alert-condition-grid grid gap-2 sm:grid-cols-2">
                     {conditionTypes.map((conditionType) => (
                       <label
                         key={conditionType}
-                        className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted"
+                        className="unified-alert-condition rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted"
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2">
+                          <div className="min-w-0 flex items-center gap-2">
                             <input
                               type="checkbox"
                               checked={conditionStates[conditionType]}
@@ -479,7 +487,9 @@ export function UnifiedAlertRuleManagerModal({
                               }
                               className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                             />
-                            <span>{ALERT_CONDITION_LABELS[conditionType]}</span>
+                            <span className="min-w-0 break-words">
+                              {ALERT_CONDITION_LABELS[conditionType]}
+                            </span>
                           </div>
                           {conditionNeedsThreshold(conditionType) ? (
                             <input
@@ -505,44 +515,31 @@ export function UnifiedAlertRuleManagerModal({
                   <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     Delivery
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
+                  <div className="unified-alert-delivery-grid grid gap-3 sm:grid-cols-2">
+                    <label className="unified-alert-delivery-card rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="font-semibold text-app-text">In-app</p>
+                          <p className="font-semibold text-app-text">Notifications</p>
                           <p className="mt-1 text-xs text-app-text-muted">
-                            Workspace feed.
+                            {notificationsHelperText}
                           </p>
                         </div>
                         <input
                           type="checkbox"
-                          checked={inAppEnabled}
-                          onChange={(event) =>
-                            setInAppEnabled(event.target.checked)
-                          }
-                          className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
-                        />
-                      </div>
-                    </label>
-                    <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="font-semibold text-app-text">Push</p>
-                          <p className="mt-1 text-xs text-app-text-muted">
-                            Browser notification.
-                          </p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={pushEnabled}
+                          checked={notificationsEnabled}
                           onChange={(event) => {
-                            void handlePushToggle(event.target.checked);
+                            void handleNotificationsToggle(event.target.checked);
                           }}
                           className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                         />
                       </div>
+                      {pushPermissionWarning ? (
+                        <p className="mt-2 text-[11px] text-app-text-muted">
+                          Browser push is currently off. Allow notification permission to include push delivery.
+                        </p>
+                      ) : null}
                     </label>
-                    <label className="rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
+                    <label className="unified-alert-delivery-card rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-semibold text-app-text">Email</p>
@@ -563,7 +560,7 @@ export function UnifiedAlertRuleManagerModal({
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-3">
+                <div className="unified-alert-builder-actions flex justify-end gap-3">
                   <button
                     type="button"
                     onClick={resetBuilder}
@@ -589,7 +586,7 @@ export function UnifiedAlertRuleManagerModal({
             </div>
           </div>
 
-          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
+          <div className="unified-alert-saved rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h4 className="text-sm font-semibold text-app-text">
@@ -628,16 +625,16 @@ export function UnifiedAlertRuleManagerModal({
                   return (
                     <div
                       key={rule.id}
-                      className={`rounded-2xl border p-4 transition-colors ${
+                      className={`unified-alert-rule-card rounded-2xl border p-4 transition-colors ${
                         isEnabled
                           ? "border-app-border/60 bg-app-surface/50"
                           : "border-amber-500/25 bg-amber-500/5"
                       }`}
                     >
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="unified-alert-rule-row flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold text-app-text">
+                            <p className="min-w-0 break-words text-sm font-semibold text-app-text">
                               {buildAlertRuleSummary(rule)}
                             </p>
                             <span
@@ -666,7 +663,7 @@ export function UnifiedAlertRuleManagerModal({
                           </p>
                         </div>
 
-                        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        <div className="unified-alert-rule-actions flex shrink-0 flex-wrap items-center justify-end gap-2">
                           <button
                             type="button"
                             onClick={() => toggleRuleEnabled(rule)}

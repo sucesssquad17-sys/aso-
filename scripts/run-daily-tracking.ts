@@ -1476,7 +1476,7 @@ async function evaluateAndDispatchAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.push) {
+        if (rule.channels.inApp || rule.channels.push) {
           pushEvents.push(event);
         }
         if (rule.channels.email) {
@@ -1575,7 +1575,7 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.push) {
+        if (rule.channels.inApp || rule.channels.push) {
           pushEvents.push(event);
         }
         if (rule.channels.email) {

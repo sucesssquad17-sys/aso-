@@ -4509,7 +4509,6 @@ function AuthenticatedApp({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder={`Search apps or paste a ${storeType === "android" ? "Play Store" : "App Store"} URL...`}
-                    autoFocus
                     className="input-field"
                     style={{
                       paddingLeft: "3rem",

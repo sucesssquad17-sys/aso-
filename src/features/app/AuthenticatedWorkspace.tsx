@@ -2741,6 +2741,19 @@ function isNotificationSecureContext() {
   return window.isSecureContext || isLocalNotificationHost(window.location.hostname);
 }
 
+async function getNotificationTokenId(token: string) {
+  if (typeof window === "undefined" || !window.crypto?.subtle) {
+    return null;
+  }
+  const digest = await window.crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(token),
+  );
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 function hasPersistedUserState(
   state: UserAppStateDocument | null,
 ): state is UserAppStateDocument {
@@ -4934,16 +4947,25 @@ function AuthenticatedApp({
       }
       return;
     }
-    if (notificationSettings.lastToken === fcmToken) {
-      setTokenRegistrationStatus("registered");
-      setTokenRegistrationError(null);
-      return;
-    }
     const registerToken = async () => {
       setTokenRegistrationStatus("registering");
       setTokenRegistrationError(null);
       try {
-        await fetchAuthedJson<{ ok: boolean }>("/api/notifications/token", {
+        const tokenId = await getNotificationTokenId(fcmToken);
+        if (
+          notificationSettings.lastToken === fcmToken ||
+          (tokenId &&
+            notificationSettings.lastTokenId === tokenId &&
+            notificationSettings.pushEnabled)
+        ) {
+          setTokenRegistrationStatus("registered");
+          setTokenRegistrationError(null);
+          return;
+        }
+        const result = await fetchAuthedJson<{
+          ok: boolean;
+          tokenId?: string;
+        }>("/api/notifications/token", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -4954,6 +4976,10 @@ function AuthenticatedApp({
             userAgent: navigator.userAgent,
           }),
         });
+        const registeredTokenId =
+          typeof result.tokenId === "string" && result.tokenId
+            ? result.tokenId
+            : tokenId;
         setNotificationSettings((prev) =>
           normalizeNotificationSettings(
             {
@@ -4961,6 +4987,7 @@ function AuthenticatedApp({
               permission: notificationPermission,
               pushEnabled: true,
               lastToken: fcmToken,
+              ...(registeredTokenId ? { lastTokenId: registeredTokenId } : {}),
               tokenUpdatedAt: new Date().toISOString(),
             },
             notificationPermission,
@@ -4987,6 +5014,8 @@ function AuthenticatedApp({
     isDemoMode,
     notificationPermission,
     notificationSettings.lastToken,
+    notificationSettings.lastTokenId,
+    notificationSettings.pushEnabled,
   ]);
   const startBillingCheckout = React.useCallback(async (
     planId: BillingPlanId = "starter",
@@ -10674,7 +10703,6 @@ function AuthenticatedApp({
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder={`Search apps or paste a ${storeType === "android" ? "Play Store" : "App Store"} URL...`}
-                      autoFocus
                       className="input-field !py-2.5 sm:!py-3.5 text-sm sm:text-base w-full"
                       style={{
                         paddingLeft: "2.75rem",
@@ -11542,26 +11570,27 @@ function AuthenticatedApp({
                         </span>
                       ) : null}
                       {currentPagePdfExport ? (
-                        <div className="relative">
+                        <div className="workspace-pdf-export-anchor relative">
                           <button
                             type="button"
                             onClick={() => setIsPdfExportOptionsOpen((prev) => !prev)}
                             disabled={isExporting}
-                            className="workspace-secondary-button inline-flex items-center gap-1.5 px-3 py-2 text-xs disabled:opacity-60"
+                            className="workspace-secondary-button workspace-pdf-export-trigger inline-flex items-center gap-1.5 px-3 py-2 text-xs disabled:opacity-60"
                           >
                             {isExporting ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Download className="h-4 w-4" />
                             )}
-                            Export PDF
+                            <span className="hidden sm:inline">Export PDF</span>
+                            <span className="sm:hidden">PDF</span>
                           </button>
                           {isPdfExportOptionsOpen ? (
-                            <div className="workspace-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-1rem)] max-w-sm rounded-2xl p-3 shadow-xl sm:p-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <div>
+                            <div className="workspace-popover workspace-pdf-export-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-1rem)] max-w-sm rounded-2xl p-3 shadow-xl sm:p-4">
+                              <div className="workspace-pdf-export-header flex items-center justify-between gap-3">
+                                <div className="min-w-0">
                                   <div className="workspace-chip-label">PDF Export</div>
-                                  <h3 className="mt-1 text-sm font-semibold text-app-text">
+                                  <h3 className="workspace-pdf-export-title mt-1 text-sm font-semibold text-app-text">
                                     Choose timeline and country
                                   </h3>
                                 </div>
@@ -11574,51 +11603,53 @@ function AuthenticatedApp({
                                   <X className="h-4 w-4" />
                                 </button>
                               </div>
-                              <div className="mt-4">
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
-                                  Timeline
+                              <div className="workspace-pdf-export-body mt-4 space-y-4">
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                                    Timeline
+                                  </div>
+                                  <div className="workspace-pdf-timeline-grid mt-2 grid grid-cols-2 gap-2">
+                                    {PDF_HISTORY_RANGE_OPTIONS.map((option) => (
+                                      <button
+                                        key={option.key}
+                                        type="button"
+                                        onClick={() => setPdfHistoryRange(option.key)}
+                                        className={cn(
+                                          "workspace-pdf-timeline-option rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
+                                          pdfHistoryRange === option.key
+                                            ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-200"
+                                            : "border-app-border/70 bg-app-surface/60 text-app-text-muted hover:text-app-text",
+                                        )}
+                                      >
+                                        {option.label}
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
-                                <div className="mt-2 grid grid-cols-2 gap-2">
-                                  {PDF_HISTORY_RANGE_OPTIONS.map((option) => (
-                                    <button
-                                      key={option.key}
-                                      type="button"
-                                      onClick={() => setPdfHistoryRange(option.key)}
-                                      className={cn(
-                                        "rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
-                                        pdfHistoryRange === option.key
-                                          ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-200"
-                                          : "border-app-border/70 bg-app-surface/60 text-app-text-muted hover:text-app-text",
-                                      )}
-                                    >
-                                      {option.label}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                              <div className="mt-4">
-                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
-                                  Country Scope
-                                </div>
-                                <div className="mt-2">
-                                  <CountrySearchSelect
-                                    value={pdfExportCountryScope}
-                                    onChange={setPdfExportCountryScope}
-                                    options={pdfExportCountryOptions}
-                                    includeAllOption={
-                                      pdfExportCountryOptions.length > 1
-                                        ? {
-                                            code: PDF_EXPORT_ALL_COUNTRIES_CODE,
-                                            name: "All tracked countries",
-                                          }
-                                        : undefined
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                                    Country Scope
+                                  </div>
+                                  <div className="workspace-pdf-export-country-select mt-2">
+                                    <CountrySearchSelect
+                                      value={pdfExportCountryScope}
+                                      onChange={setPdfExportCountryScope}
+                                      options={pdfExportCountryOptions}
+                                      includeAllOption={
+                                        pdfExportCountryOptions.length > 1
+                                          ? {
+                                              code: PDF_EXPORT_ALL_COUNTRIES_CODE,
+                                              name: "All tracked countries",
+                                            }
+                                          : undefined
                                     }
                                     ariaLabel="Select PDF export country scope"
                                     className="w-full"
-                                  />
+                                    />
+                                  </div>
                                 </div>
                               </div>
-                              <div className="mt-4 flex items-center justify-end gap-2">
+                              <div className="workspace-pdf-export-actions mt-4 flex items-center justify-end gap-2">
                                 <button
                                   type="button"
                                   onClick={() => setIsPdfExportOptionsOpen(false)}
@@ -11630,9 +11661,10 @@ function AuthenticatedApp({
                                   type="button"
                                   onClick={() => void exportToPDF()}
                                   disabled={isExporting}
-                                  className="rounded-xl bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-cyan-400 disabled:opacity-60"
+                                  className="workspace-pdf-download-button rounded-xl bg-cyan-500 px-3 py-2 text-xs font-semibold text-slate-950 transition-colors hover:bg-cyan-400 disabled:opacity-60"
                                 >
-                                  Download PDF
+                                  <span className="hidden sm:inline">Download PDF</span>
+                                  <span className="sm:hidden">Download</span>
                                 </button>
                               </div>
                             </div>
@@ -12216,12 +12248,17 @@ function AuthenticatedApp({
                       "all";
                     const asoAppFilter =
                       competitorAsoAppFilterByGroup[card.group.groupId] || "all";
-                    const groupAsoCountries = Array.from(
+                    const groupAsoTrackedCountries = Array.from(
                       new Set([
                         card.group.country,
                         ...card.trackedKeywords.map(
                           (trackedKeyword) => trackedKeyword.country,
                         ),
+                      ]),
+                    ).sort((a, b) => a.localeCompare(b));
+                    const groupAsoCountries = Array.from(
+                      new Set([
+                        ...groupAsoTrackedCountries,
                         ...groupAsoSnapshots.map((snapshot) => snapshot.country),
                         ...groupAsoDiffs.map((diff) => diff.country),
                       ]),
@@ -12239,18 +12276,23 @@ function AuthenticatedApp({
                         ) {
                           return false;
                         }
-                        if (asoAppFilter !== "all" && diff.appTitle !== asoAppFilter) {
+                        if (asoAppFilter !== "all" && diff.appId !== asoAppFilter) {
                           return false;
                         }
                         return true;
                       });
                     const groupAsoChangedApps = new Set(
-                      groupAsoDiffs.map((diff) => diff.appTitle),
+                      groupAsoDiffs.map((diff) => diff.appId),
                     );
                     const groupAsoChangedCountries = new Set(
                       groupAsoDiffs.map((diff) => diff.country),
                     );
                     const groupAsoSnapshotCount = groupAsoSnapshots.length;
+                    const groupAsoExpectedSnapshotCount =
+                      card.group.competitors.length * groupAsoTrackedCountries.length;
+                    const hasCompleteAsoBaseline =
+                      groupAsoExpectedSnapshotCount > 0 &&
+                      groupAsoSnapshotCount >= groupAsoExpectedSnapshotCount;
                     const groupAsoLatestSnapshotAt =
                       groupAsoSnapshots[0]?.capturedAt || null;
                     const groupAsoStatus =
@@ -12267,30 +12309,30 @@ function AuthenticatedApp({
                               title: "Baseline pending",
                               message:
                                 "The first daily ASO run still needs to capture the initial store snapshot.",
-                            }
-                          : groupAsoSnapshotCount === 1
+                          }
+                          : !hasCompleteAsoBaseline
                             ? {
                                 tone: "border-cyan-500/20 bg-cyan-500/10 text-cyan-100",
-                                title: "Waiting for first comparison",
+                                title: "Baseline in progress",
                                 message:
-                                  "The baseline snapshot is saved. The next daily ASO run will perform the first comparison.",
+                                  `Captured ${groupAsoSnapshotCount}/${groupAsoExpectedSnapshotCount || 1} ASO baseline snapshots. Comparison starts after all current targets have a baseline.`,
                               }
                             : {
                                 tone: "border-app-border/60 bg-app-surface/40 text-app-text-muted",
-                                title: "No changes detected",
+                                title: "Baseline captured",
                                 message:
-                                  "Monitoring is active and recent snapshots have not produced an ASO diff yet.",
+                                  "Monitoring is active. New rows appear when a later run detects store metadata changes.",
                               };
                     return (
                       <div
                         key={card.group.groupId}
-                      className="min-w-0 rounded-3xl border border-app-border/80 bg-app-surface-muted/75 shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10"
+                        className="competitor-group-card min-w-0 rounded-3xl border border-app-border/80 bg-app-surface-muted/75 shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10"
                       >
-                        <div className="border-b border-app-border/70 bg-app-surface-muted/35 px-5 py-5">
+                        <div className="competitor-group-header border-b border-app-border/70 bg-app-surface-muted/35 px-5 py-5">
                           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                             <div className="min-w-0">
                               <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                                <h3 className="max-w-full truncate text-base font-semibold text-app-text">
+                                <h3 className="competitor-group-title max-w-full truncate text-base font-semibold text-app-text">
                                   {getCompetitorGroupLabel(card.group)}
                                 </h3>
                                 <span className="hidden rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 sm:inline-flex">
@@ -12324,7 +12366,7 @@ function AuthenticatedApp({
                                   : "not started"}
                               </p>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="competitor-group-actions flex flex-wrap items-center gap-2">
                               <button
                                 type="button"
                                 onClick={() =>
@@ -12332,10 +12374,11 @@ function AuthenticatedApp({
                                     card.group.groupId,
                                   )
                                 }
-                                className="inline-flex items-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
+                                className="competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
                               >
                                 <Bell className="h-4 w-4" />
-                                ASO Alerts
+                                <span className="sm:hidden">ASO</span>
+                                <span className="hidden sm:inline">ASO Alerts</span>
                               </button>
                               <button
                                 type="button"
@@ -12344,7 +12387,7 @@ function AuthenticatedApp({
                                     card.group.groupId,
                                   )
                                 }
-                                className="inline-flex items-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
+                                className="competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
                               >
                                 <ChevronDown
                                   className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -12354,15 +12397,16 @@ function AuthenticatedApp({
                               <button
                                 type="button"
                                 onClick={() => removeCompetitorGroup(card.group.groupId)}
-                                className="rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition-colors hover:bg-red-500/20"
+                                className="competitor-group-action rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition-colors hover:bg-red-500/20"
                               >
-                                Remove Group
+                                <span className="sm:hidden">Remove</span>
+                                <span className="hidden sm:inline">Remove Group</span>
                               </button>
                             </div>
                           </div>
                         </div>
 
-                        <div className="space-y-4 p-5">
+                        <div className="competitor-group-body space-y-4 p-5">
                           {!isExpanded ? (
                             <div className="rounded-2xl border border-app-border/70 bg-app-surface-muted/55 px-4 py-4 text-sm text-app-text-muted shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
                               {1 + card.group.competitors.length} apps,{" "}
@@ -12371,21 +12415,21 @@ function AuthenticatedApp({
                             </div>
                           ) : (
                             <>
-                          <div className="rounded-2xl border border-app-border/75 bg-app-surface-muted/60 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
+                          <div className="competitor-group-section rounded-2xl border border-app-border/75 bg-app-surface-muted/60 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)]">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               Group Apps
                             </p>
-                            <div className="mt-3 grid gap-3 md:grid-cols-3">
+                            <div className="competitor-app-roster mt-3 grid gap-3 md:grid-cols-3">
                               {[card.group.ownApp, ...card.group.competitors].map((app) => (
                                 <div
                                   key={`${card.group.groupId}:${app.appKey}`}
-                                  className={`rounded-2xl border p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/70 bg-app-surface/70"}`}
+                                  className={`competitor-app-card rounded-2xl border p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/70 bg-app-surface/70"}`}
                                 >
                                   <div className="flex items-start gap-3">
                                     <img
                                       src={app.icon}
                                       alt={app.title}
-                                      className="h-11 w-11 rounded-xl border border-app-border/60 bg-app-surface-muted/80"
+                                      className="h-9 w-9 rounded-xl border border-app-border/60 bg-app-surface-muted/80 sm:h-11 sm:w-11"
                                     />
                                     <div className="min-w-0 flex-1">
                                       <p className="truncate text-sm font-semibold text-app-text">
@@ -12394,7 +12438,7 @@ function AuthenticatedApp({
                                       <p className="truncate text-xs text-app-text-muted">
                                         {app.developer}
                                       </p>
-                                      <p className="mt-1 text-[11px] uppercase tracking-[0.18em] text-app-text-muted">
+                                      <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-app-text-muted sm:text-[11px]">
                                         {app.role === "own" ? "Your app" : "Competitor"}
                                       </p>
                                     </div>
@@ -12404,10 +12448,11 @@ function AuthenticatedApp({
                                       href={app.url}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:text-cyan-100"
+                                      className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:text-cyan-100 sm:mt-3"
                                     >
                                       <ExternalLink className="h-3.5 w-3.5" />
-                                      Open Store
+                                      <span className="sm:hidden">Store</span>
+                                      <span className="hidden sm:inline">Open Store</span>
                                     </a>
                                   )}
                                 </div>
@@ -12415,19 +12460,19 @@ function AuthenticatedApp({
                             </div>
                           </div>
 
-                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                          <div className="competitor-group-section rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
                             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                                   Daily ASO Changes
                                 </p>
-                                <p className="mt-2 text-sm text-app-text-muted">
+                                <p className="mt-2 hidden text-sm text-app-text-muted sm:block">
                                   Review title, description, icon, category, and
                                   screenshot changes detected for this
                                   competitor set.
                                 </p>
                               </div>
-                              <div className="flex flex-wrap gap-2">
+                              <div className="competitor-aso-actions flex flex-wrap gap-2">
                                 <span className="rounded-full border border-app-border/60 bg-app-surface/60 px-3 py-1.5 text-xs font-semibold text-app-text">
                                   {groupAsoDiffs.length} changes logged
                                 </span>
@@ -12443,7 +12488,8 @@ function AuthenticatedApp({
                                   }
                                   className="rounded-full border border-cyan-500/25 bg-cyan-500/10 px-3 py-1.5 text-xs font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/20"
                                 >
-                                  Manage ASO Alerts
+                                  <span className="sm:hidden">Alerts</span>
+                                  <span className="hidden sm:inline">Manage ASO Alerts</span>
                                 </button>
                               </div>
                             </div>
@@ -12490,21 +12536,23 @@ function AuthenticatedApp({
                                       )}`
                                     : groupAsoSnapshotCount === 0
                                       ? "No baseline captured yet"
-                                      : groupAsoSnapshotCount === 1
-                                        ? "Comparison starts next run"
+                                      : !hasCompleteAsoBaseline
+                                        ? `${groupAsoSnapshotCount}/${groupAsoExpectedSnapshotCount || 1} baselines captured`
                                         : "No recent changes detected"}
                                 </div>
                               </div>
                             </div>
                             <div
-                              className={`mt-4 rounded-2xl border px-4 py-3 text-sm ${groupAsoStatus.tone}`}
+                              className={`competitor-aso-status mt-4 rounded-2xl border px-4 py-3 text-sm ${groupAsoDiffs.length === 0 ? "hidden sm:block" : ""} ${groupAsoStatus.tone}`}
                             >
                               <span className="font-semibold">
                                 {groupAsoStatus.title}.
                               </span>{" "}
                               {groupAsoStatus.message}
                             </div>
-                            <div className="mt-4 grid gap-3 xl:grid-cols-[220px_220px_minmax(0,1fr)]">
+                            <div
+                              className={`competitor-aso-filters mt-4 grid gap-3 xl:grid-cols-[220px_220px_minmax(0,1fr)] ${groupAsoDiffs.length === 0 ? "hidden sm:grid" : ""}`}
+                            >
                               <select
                                 value={asoAppFilter}
                                 onChange={(event) =>
@@ -12517,7 +12565,7 @@ function AuthenticatedApp({
                               >
                                 <option value="all">All competitor apps</option>
                                 {card.group.competitors.map((app) => (
-                                  <option key={app.appId} value={app.title}>
+                                  <option key={app.appId} value={app.appId}>
                                     {app.title}
                                   </option>
                                 ))}
@@ -12570,16 +12618,16 @@ function AuthenticatedApp({
                               </select>
                             </div>
                             {competitorAsoHistoryError ? (
-                              <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                              <div className="competitor-aso-empty mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
                                 {competitorAsoHistoryError}
                               </div>
                             ) : null}
                             {isLoadingCompetitorAsoHistory ? (
-                              <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
+                              <div className="competitor-aso-empty mt-4 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
                                 Loading competitor ASO history...
                               </div>
                             ) : filteredGroupAsoDiffs.length === 0 ? (
-                              <div className="mt-4 rounded-2xl border border-dashed border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
+                              <div className="competitor-aso-empty mt-4 rounded-2xl border border-dashed border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
                                 {groupAsoDiffs.length === 0
                                   ? groupAsoSnapshotCount === 0
                                     ? "Baseline not captured yet. The first ASO snapshot will appear after the next scheduled monitoring run."
@@ -12589,8 +12637,8 @@ function AuthenticatedApp({
                                   : "No ASO changes match the current filters."}
                               </div>
                             ) : (
-                              <div className="workspace-panel overflow-hidden mt-4 !p-0">
-                                <div className="grid grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                              <div className="workspace-panel mt-4 overflow-x-auto !p-0">
+                                <div className="grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                   <div>Detected</div>
                                   <div>App</div>
                                   <div>Country</div>
@@ -12601,7 +12649,7 @@ function AuthenticatedApp({
                                   {filteredGroupAsoDiffs.map((diff) => (
                                     <div
                                       key={diff.diffId}
-                                      className="grid grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/80 px-4 py-3 text-sm text-app-text-muted last:border-b-0"
+                                      className="grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/80 px-4 py-3 text-sm text-app-text-muted last:border-b-0"
                                     >
                                       <div className="text-xs text-app-text-muted">
                                         {formatTrackingChartDateTime(
@@ -12674,13 +12722,13 @@ function AuthenticatedApp({
                             )}
                           </div>
 
-                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                          <div className="competitor-group-section rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
                             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                                   Tracked Group Keywords
                                 </p>
-                                <p className="mt-2 text-sm text-app-text-muted">
+                                <p className="mt-2 hidden text-sm text-app-text-muted sm:block">
                                   Each keyword keeps one shared chart with rank
                                   lines for every app in this battle group.
                                 </p>
@@ -12713,7 +12761,7 @@ function AuthenticatedApp({
                                   return (
                                     <div
                                       key={keywordGroup.groupKey}
-                                      className="rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/25 bg-app-surface-muted/70 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                                      className="competitor-keyword-card rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/25 bg-app-surface-muted/70 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                                     >
                                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                         <div>
@@ -12733,7 +12781,7 @@ function AuthenticatedApp({
                                               : "pending"}
                                           </p>
                                         </div>
-                                        <div className="flex flex-wrap items-center gap-2">
+                                        <div className="competitor-keyword-actions flex flex-wrap items-center gap-2">
                                           {keywordCardState.showEditCountries && (
                                             <button
                                               type="button"
@@ -12745,12 +12793,13 @@ function AuthenticatedApp({
                                                   },
                                                 )
                                               }
-                                              className="inline-flex items-center gap-2 rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted hover:text-cyan-200"
+                                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted hover:text-cyan-200"
                                               aria-label={`Edit tracked countries for ${keywordGroup.keyword}`}
                                               title="Edit tracked countries"
                                             >
                                               <Globe className="h-3.5 w-3.5" />
-                                              Edit Countries
+                                              <span className="sm:hidden">Edit</span>
+                                              <span className="hidden sm:inline">Edit Countries</span>
                                             </button>
                                           )}
                                           {keywordCardState.showCountrySwitcher && (
@@ -12794,7 +12843,12 @@ function AuthenticatedApp({
                                             }
                                             className="rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted"
                                           >
-                                            {isExpanded ? "Hide Chart" : "Open Chart"}
+                                            <span className="sm:hidden">
+                                              {isExpanded ? "Hide" : "Chart"}
+                                            </span>
+                                            <span className="hidden sm:inline">
+                                              {isExpanded ? "Hide Chart" : "Open Chart"}
+                                            </span>
                                           </button>
                                           <button
                                             type="button"
@@ -12812,7 +12866,90 @@ function AuthenticatedApp({
                                           </button>
                                         </div>
                                       </div>
-                                      <div className="mt-3 grid gap-2 md:grid-cols-3">
+                                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        {keywordGroup.countryViews.map(
+                                          (countryView) => {
+                                            const countrySummaryAppView =
+                                              countryView.appHistoryViews.find(
+                                                (view) =>
+                                                  view.app.role === "own",
+                                              ) ||
+                                              countryView.appHistoryViews[0];
+                                            const countryRankDisplay =
+                                              getTrackedRankDisplay(
+                                                countrySummaryAppView
+                                                  ? {
+                                                      groupId:
+                                                        countryView.trackedKeyword.groupId,
+                                                      keyword:
+                                                        countryView.trackedKeyword.keyword,
+                                                      appId:
+                                                        countrySummaryAppView.app.appId,
+                                                      appTitle:
+                                                        countrySummaryAppView.app.title,
+                                                      store:
+                                                        countryView.trackedKeyword.store,
+                                                      country:
+                                                        countryView.trackedKeyword.country,
+                                                      lastRank:
+                                                        countrySummaryAppView.app.lastRank,
+                                                      lastChecked:
+                                                        countrySummaryAppView.app.lastChecked,
+                                                      lastCheckStatus:
+                                                        countrySummaryAppView.app.lastCheckStatus,
+                                                      lastError:
+                                                        countrySummaryAppView.app.lastError,
+                                                    }
+                                                  : {
+                                                      groupId:
+                                                        countryView.trackedKeyword.groupId,
+                                                      keyword:
+                                                        countryView.trackedKeyword.keyword,
+                                                      appId: "",
+                                                      appTitle: "",
+                                                      store:
+                                                        countryView.trackedKeyword.store,
+                                                      country:
+                                                        countryView.trackedKeyword.country,
+                                                      lastRank: -1,
+                                                      lastChecked: "",
+                                                      lastCheckStatus:
+                                                        undefined,
+                                                      lastError: undefined,
+                                                    },
+                                              );
+                                            const isSelectedCountry =
+                                              countryView.trackedKeyword.country ===
+                                              trackedKeyword.country;
+                                            return (
+                                              <span
+                                                key={`${keywordGroup.groupKey}:${countryView.trackedKeyword.country}:badge`}
+                                                className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] ${
+                                                  isSelectedCountry
+                                                    ? "border-cyan-400/30 bg-cyan-500/12 ring-1 ring-inset ring-cyan-300/10"
+                                                    : "border-app-border/60 bg-app-surface-muted/80"
+                                                }`}
+                                              >
+                                                <span className="truncate text-app-text-muted">
+                                                  {findCountryName(
+                                                    countryView.trackedKeyword.country,
+                                                  ) ||
+                                                    countryView.trackedKeyword.country.toUpperCase()}
+                                                </span>
+                                                <span className="text-app-text-muted">
+                                                  {countryView.trackedKeyword.country.toUpperCase()}
+                                                </span>
+                                                <span
+                                                  className={`font-bold ${countryRankDisplay.className}`}
+                                                >
+                                                  {countryRankDisplay.label}
+                                                </span>
+                                              </span>
+                                            );
+                                          },
+                                        )}
+                                      </div>
+                                      <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-3">
                                         {selectedCountryView.appHistoryViews.map(
                                           (view) => {
                                           const rankDisplay = getTrackedRankDisplay({
@@ -12831,7 +12968,7 @@ function AuthenticatedApp({
                                           return (
                                             <div
                                               key={`${trackedKeyword.trackedKeywordId}:${view.app.appKey}`}
-                                              className={`rounded-xl border px-3 py-3 ${view.app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
+                                              className={`rounded-xl border px-2 py-2 sm:px-3 sm:py-3 ${view.app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
                                             >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
@@ -12846,7 +12983,7 @@ function AuthenticatedApp({
                                                 </div>
                                                 <div className="text-right">
                                                   <p
-                                                    className={`text-lg font-display font-bold ${rankDisplay.className}`}
+                                                    className={`text-base font-display font-bold sm:text-lg ${rankDisplay.className}`}
                                                   >
                                                     {rankDisplay.label}
                                                   </p>
@@ -12871,8 +13008,26 @@ function AuthenticatedApp({
                                         })}
                                       </div>
                                       {isExpanded && (
-                                        <div className="mt-4 rounded-2xl border border-app-border/50 bg-app-surface/50 p-4">
-                                          <div className="h-72 w-full min-w-0">
+                                        <div className="competitor-rank-chart mt-4 rounded-2xl border border-app-border/50 bg-app-surface/50 p-3 sm:p-4">
+                                          <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                                                {findCountryName(
+                                                  trackedKeyword.country,
+                                                ) ||
+                                                  trackedKeyword.country.toUpperCase()}
+                                              </p>
+                                              <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-cyan-100/80">
+                                                {trackedKeyword.country.toUpperCase()}
+                                              </p>
+                                            </div>
+                                            <div className="text-right text-[11px] text-app-text-muted">
+                                              {trackedKeyword.lastCheckedAt
+                                                ? `Updated ${formatTrackingChartDateTime(trackedKeyword.lastCheckedAt)}`
+                                                : "Pending"}
+                                            </div>
+                                          </div>
+                                          <div className="workspace-mobile-chart h-56 w-full min-w-0 sm:h-72">
                                             {selectedCountryView.chartPoints.length >
                                             0 ? (
                                               <ResponsiveContainer
@@ -12959,6 +13114,7 @@ function AuthenticatedApp({
                                                   <Legend
                                                     wrapperStyle={{
                                                       fontSize: "12px",
+                                                      color: chartLegendTextColor,
                                                     }}
                                                   />
                                                   {selectedCountryView.appHistoryViews.map(
