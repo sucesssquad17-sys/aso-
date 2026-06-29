@@ -63,6 +63,8 @@ Optional:
 
 - `VITE_FIREBASE_VAPID_KEY` for browser push
 - `RESEND_API_KEY` and `RESEND_FROM_EMAIL` for email alerts
+- `ADMIN_EMAIL_ALLOWLIST` for protected test email sends
+- `EMAIL_UNSUBSCRIBE_SECRET` for announcement email unsubscribe links
 - `PROXY_HOST`, `PROXY_PORT`, `PROXY_USERNAME`, `PROXY_PASSWORD` for proxy fallback
 - `VITE_SENTRY_DSN`
 

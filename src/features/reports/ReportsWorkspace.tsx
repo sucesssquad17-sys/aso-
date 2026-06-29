@@ -13,7 +13,6 @@ import {
   CartesianGrid,
   Cell,
   Label,
-  Legend,
   Line,
   Pie,
   PieChart,
@@ -66,6 +65,7 @@ function PieDonutLabel({
 import {
   COUNTRY_OPTIONS as COUNTRIES,
   findCountryName,
+  normalizeCountryCode,
 } from "../../lib/countries";
 import type {
   PdfSummaryItem,
@@ -405,6 +405,30 @@ function ReportSection({
   );
 }
 
+function ReportLegendRow({
+  items,
+}: {
+  items: Array<{ label: string; color: string }>;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap gap-2 sm:mt-4">
+      {items.map((item) => (
+        <span
+          key={item.label}
+          className="inline-flex max-w-full items-center gap-2 rounded-full border border-app-border/60 bg-app-surface/45 px-2.5 py-1 text-[10px] font-semibold text-app-text sm:px-3 sm:py-1.5 sm:text-xs"
+        >
+          <span
+            className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
+            style={{ backgroundColor: item.color }}
+          />
+          <span className="line-clamp-1">{item.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CompactStatGrid({
   items,
   columnsClassName = "xl:grid-cols-5",
@@ -454,11 +478,9 @@ function MovementRowsList({
       ) : (
         <div className="space-y-3">
           {rows.map((row) => (
-            <button
+            <div
               key={row.id}
-              type="button"
-              onClick={() => onSelectKeyword(row.keyword)}
-              className="w-full overflow-hidden rounded-xl border border-app-border/70 bg-app-surface/45 px-3 py-3 text-left transition-colors hover:border-cyan-500/30 hover:bg-app-surface-muted/70 sm:rounded-2xl sm:px-4 sm:py-4"
+              className="w-full overflow-hidden rounded-xl border border-app-border/70 bg-app-surface/45 px-3 py-3 sm:rounded-2xl sm:px-4 sm:py-4"
             >
               <div className="flex flex-col gap-2.5 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="min-w-0">
@@ -486,6 +508,13 @@ function MovementRowsList({
                   <span className="text-xs text-app-text-muted">
                     {row.trendLabel}
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => onSelectKeyword(row.keyword)}
+                    className="inline-flex items-center justify-center rounded-full border border-cyan-500/20 bg-cyan-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200 transition-colors hover:border-cyan-500/35 hover:bg-cyan-500/15"
+                  >
+                    Drill in
+                  </button>
                 </div>
               </div>
               <div className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_108px_108px_132px] sm:mt-4 sm:gap-3">
@@ -517,10 +546,14 @@ function MovementRowsList({
                   </p>
                 </div>
                 <div className="h-20 min-w-0">
-                  <RankSparkline data={row.history} stroke={row.delta >= 0 ? "#34d399" : "#fb7185"} />
+                  <RankSparkline
+                    data={row.history}
+                    stroke={row.delta >= 0 ? "#34d399" : "#fb7185"}
+                    passive
+                  />
                 </div>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}
@@ -1305,6 +1338,19 @@ export default function ReportsWorkspace({
         : [],
     [competitorAsoLatestSnapshots, selectedCompetitorGroup],
   );
+  const selectedCompetitorAsoExpectedSnapshotCount = React.useMemo(() => {
+    if (!selectedCompetitorGroup) return 0;
+    const countries = new Set<string>([
+      normalizeCountryCode(selectedCompetitorGroup.country, "us"),
+    ]);
+    (
+      competitorTrackedKeywordsByGroupId.get(selectedCompetitorGroup.groupId) ||
+      []
+    ).forEach((record) => {
+      countries.add(normalizeCountryCode(record.country, selectedCompetitorGroup.country));
+    });
+    return selectedCompetitorGroup.competitors.length * countries.size;
+  }, [competitorTrackedKeywordsByGroupId, selectedCompetitorGroup]);
   const selectedCompetitorAsoStatus = React.useMemo(() => {
     if (!selectedCompetitorGroup) {
       return {
@@ -1332,33 +1378,35 @@ export default function ReportsWorkspace({
           "This group has not captured its first ASO baseline yet. The report will populate after monitoring starts and a later run detects a change.",
       };
     }
-    if (selectedCompetitorAsoSnapshots.length === 1) {
+    const hasCompleteBaseline =
+      selectedCompetitorAsoExpectedSnapshotCount > 0 &&
+      selectedCompetitorAsoSnapshots.length >= selectedCompetitorAsoExpectedSnapshotCount;
+    if (!hasCompleteBaseline) {
       return {
-        label: "Waiting for first comparison",
-        hint: `Baseline saved ${formatReportDateTime(
-          selectedCompetitorAsoSnapshots[0].capturedAt,
-        )}`,
+        label: "Baseline in progress",
+        hint: `Captured ${selectedCompetitorAsoSnapshots.length}/${selectedCompetitorAsoExpectedSnapshotCount || 1} ASO baseline snapshots`,
         emptyMessage:
-          "The first ASO baseline has been captured for this group. The next scheduled monitoring run will create the first comparison.",
+          "ASO baseline capture is still in progress for this group. Comparison starts after every current competitor and country has a baseline.",
       };
     }
     return {
-      label: "Monitoring active",
+      label: "Baseline captured",
       hint: `Last snapshot ${formatReportDateTime(
         selectedCompetitorAsoSnapshots[0].capturedAt,
       )}`,
       emptyMessage:
-        "No ASO changes have been logged for this group yet. Snapshots are being captured, and rows appear here only when metadata changes.",
+        "Monitoring is active. New rows appear when a later run detects store metadata changes.",
     };
   }, [
     selectedCompetitorAsoDiffs,
+    selectedCompetitorAsoExpectedSnapshotCount,
     selectedCompetitorAsoSnapshots,
     selectedCompetitorGroup,
   ]);
   const competitorAsoSummaryItems = React.useMemo(
     () => {
       const changedApps = new Set(
-        selectedCompetitorAsoDiffs.map((diff) => diff.appTitle),
+        selectedCompetitorAsoDiffs.map((diff) => diff.appId),
       );
       const changedCountries = new Set(
         selectedCompetitorAsoDiffs.map((diff) => diff.country),
@@ -1930,36 +1978,40 @@ export default function ReportsWorkspace({
                 description="Adjust the report filters or wait for more tracked rank history in this period."
               />
             ) : (
-              <div className="workspace-mobile-chart h-80 w-full min-w-0">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsLineChart data={myTrendData}>
-                    <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
-                    <XAxis
-                      dataKey="timestamp"
-                      tick={{ fill: "#94a3b8", fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <YAxis
-                      domain={myTrendDomain}
-                      tick={{ fill: "#94a3b8", fontSize: 12 }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip content={ChartTooltip} />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="averageRank"
-                      name="Average rank"
-                      stroke="#22d3ee"
-                      strokeWidth={2.5}
-                      dot={false}
-                      activeDot={{ r: 4, fill: "#22d3ee" }}
-                    />
-                  </RechartsLineChart>
-                </ResponsiveContainer>
-              </div>
+              <>
+                <div className="workspace-mobile-chart h-80 w-full min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <RechartsLineChart data={myTrendData}>
+                      <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
+                      <XAxis
+                        dataKey="timestamp"
+                        tick={{ fill: "#94a3b8", fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        domain={myTrendDomain}
+                        tick={{ fill: "#94a3b8", fontSize: 12 }}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip content={ChartTooltip} cursor={false} shared trigger="hover" />
+                      <Line
+                        type="monotone"
+                        dataKey="averageRank"
+                        name="Average rank"
+                        stroke="#22d3ee"
+                        strokeWidth={2.5}
+                        dot={false}
+                        activeDot={{ r: 4, fill: "#22d3ee" }}
+                      />
+                    </RechartsLineChart>
+                  </ResponsiveContainer>
+                </div>
+                <ReportLegendRow
+                  items={[{ label: "Average rank", color: "#22d3ee" }]}
+                />
+              </>
             )}
           </ReportSection>
 
@@ -2298,40 +2350,47 @@ export default function ReportsWorkspace({
                     description="This group needs more rank history in the selected period before a comparison trend can be plotted."
                   />
                 ) : (
-                  <div className="workspace-mobile-chart h-80 w-full min-w-0">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <RechartsLineChart data={competitorTrendData}>
-                        <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
-                        <XAxis
-                          dataKey="timestamp"
-                          tick={{ fill: "#94a3b8", fontSize: 12 }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <YAxis
-                          domain={competitorTrendDomain}
-                          tick={{ fill: "#94a3b8", fontSize: 12 }}
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip content={ChartTooltip} />
-                        <Legend />
-                        {competitorTrendMeta.map((meta) => (
-                          <Line
-                            key={meta.appKey}
-                            type="monotone"
-                            dataKey={meta.appKey}
-                            name={meta.title}
-                            stroke={meta.color}
-                            strokeWidth={2.25}
-                            dot={false}
-                            activeDot={{ r: 4, fill: meta.color }}
-                            connectNulls
+                  <>
+                    <div className="workspace-mobile-chart h-80 w-full min-w-0">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RechartsLineChart data={competitorTrendData}>
+                          <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
+                          <XAxis
+                            dataKey="timestamp"
+                            tick={{ fill: "#94a3b8", fontSize: 12 }}
+                            axisLine={false}
+                            tickLine={false}
                           />
-                        ))}
-                      </RechartsLineChart>
-                    </ResponsiveContainer>
-                  </div>
+                          <YAxis
+                            domain={competitorTrendDomain}
+                            tick={{ fill: "#94a3b8", fontSize: 12 }}
+                            axisLine={false}
+                            tickLine={false}
+                          />
+                          <Tooltip content={ChartTooltip} cursor={false} shared trigger="hover" />
+                          {competitorTrendMeta.map((meta) => (
+                            <Line
+                              key={meta.appKey}
+                              type="monotone"
+                              dataKey={meta.appKey}
+                              name={meta.title}
+                              stroke={meta.color}
+                              strokeWidth={2.25}
+                              dot={false}
+                              activeDot={{ r: 4, fill: meta.color }}
+                              connectNulls
+                            />
+                          ))}
+                        </RechartsLineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <ReportLegendRow
+                      items={competitorTrendMeta.map((meta) => ({
+                        label: meta.title,
+                        color: meta.color,
+                      }))}
+                    />
+                  </>
                 )}
               </ReportSection>
 

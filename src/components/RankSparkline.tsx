@@ -14,6 +14,7 @@ type RankSparklineProps = {
   stroke: string;
   className?: string;
   emptyLabel?: string;
+  passive?: boolean;
 };
 
 type TooltipProps = {
@@ -45,8 +46,13 @@ const RankSparkline = React.memo(function RankSparkline({
   stroke,
   className,
   emptyLabel = "No history yet",
+  passive = false,
 }: RankSparklineProps) {
   const gradientId = React.useId().replace(/:/g, "");
+  const stopInteraction = React.useCallback((event: React.SyntheticEvent) => {
+    if (!passive) return;
+    event.stopPropagation();
+  }, [passive]);
   const chartData = React.useMemo(() => {
     if (data.length === 0) return [];
     return data.map((point) => ({
@@ -82,6 +88,10 @@ const RankSparkline = React.memo(function RankSparkline({
   return (
     <div
       className={`h-full w-full overflow-hidden rounded-lg border border-slate-900/70 bg-app-surface/35 ${className || ""}`.trim()}
+      onClick={stopInteraction}
+      onMouseDown={stopInteraction}
+      onPointerDown={stopInteraction}
+      onTouchStart={stopInteraction}
     >
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
@@ -100,6 +110,7 @@ const RankSparkline = React.memo(function RankSparkline({
           />
           <Tooltip
             content={<RankSparklineTooltip />}
+            trigger="hover"
             cursor={{
               stroke: "rgba(103, 232, 249, 0.22)",
               strokeWidth: 1,
@@ -130,12 +141,16 @@ const RankSparkline = React.memo(function RankSparkline({
                   }
                 : false
             }
-            activeDot={{
-              r: 4,
-              fill: stroke,
-              stroke: "#020617",
-              strokeWidth: 1.5,
-            }}
+            activeDot={
+              passive
+                ? false
+                : {
+                    r: 4,
+                    fill: stroke,
+                    stroke: "#020617",
+                    strokeWidth: 1.5,
+                  }
+            }
             isAnimationActive={false}
           />
         </AreaChart>

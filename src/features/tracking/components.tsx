@@ -14,6 +14,7 @@ export function CountrySearchSelect({
   ariaLabel,
   includeAllOption,
   className,
+  dropdownMode = "overlay",
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -21,6 +22,7 @@ export function CountrySearchSelect({
   ariaLabel: string;
   includeAllOption?: CountryOption;
   className?: string;
+  dropdownMode?: "overlay" | "inline";
 }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -42,7 +44,9 @@ export function CountrySearchSelect({
     return selected ? selected.name : value.toUpperCase();
   }, [fullOptions, value]);
   return (
-    <div className={`relative ${className || ""}`}>
+    <div
+      className={`${dropdownMode === "overlay" ? "relative " : ""}${className || ""}`}
+    >
       <button
         type="button"
         aria-label={ariaLabel}
@@ -55,7 +59,13 @@ export function CountrySearchSelect({
         </span>
       </button>
       {isOpen && (
-        <div className="absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl">
+        <div
+          className={
+            dropdownMode === "inline"
+              ? "mt-2 w-full rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl"
+              : "absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl"
+          }
+        >
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
