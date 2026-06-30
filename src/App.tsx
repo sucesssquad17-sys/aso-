@@ -88,7 +88,8 @@ import { getAuthErrorMessage } from "./features/auth/utils";
 import { auth, db, messaging } from "./firebase";
 import {
   DISCOVERY_CACHE_TTL,
-  DISCOVERY_CACHE_VERSION,
+  getDiscoveryCacheKey,
+  hasDiscoveryCacheContent,
 } from "./lib/discoveryCache";
 import { loadArchivedHistoryCollections } from "./lib/firestoreHistoryArchive";
 import { logError, getFriendlyErrorMessage } from "./lib/errorHandler";
@@ -2550,17 +2551,16 @@ function AuthenticatedApp({
       if (!id) {
         return null;
       }
-      const cacheKey = `discover-${DISCOVERY_CACHE_VERSION}-${activeMode}-${currentStore}-${currentCountry}-${String(id)}`;
+      const cacheKey = getDiscoveryCacheKey({
+        mode: activeMode,
+        store: currentStore,
+        country: currentCountry,
+        appId: String(id),
+      });
       const cachedDiscovery = !options?.force
         ? CacheService.get<DiscoveryPayload>(cacheKey)
         : null;
-      if (
-        cachedDiscovery &&
-        ((Array.isArray(cachedDiscovery.rankings) &&
-          cachedDiscovery.rankings.length > 0) ||
-          (Array.isArray(cachedDiscovery.suggestions) &&
-            cachedDiscovery.suggestions.length > 0))
-      ) {
+      if (hasDiscoveryCacheContent(cachedDiscovery)) {
         return {
           ...cachedDiscovery,
           mode: cachedDiscovery.mode || activeMode,
@@ -2587,6 +2587,7 @@ function AuthenticatedApp({
             store: currentStore,
             country: currentCountry,
             mode: activeMode,
+            force: options?.force === true,
           }),
         },
         {
@@ -2633,8 +2634,6 @@ function AuthenticatedApp({
   ) => {
     const activeMode = options?.mode ?? discoveryMode;
     setIsDiscoveringKeywords(true);
-    setAutoRankings([]);
-    setKeywordSuggestions([]);
     try {
       const payload = await fetchDiscoveryForApp(
         app,
@@ -2689,16 +2688,22 @@ function AuthenticatedApp({
       setIsAnalyzingCompare(true);
       setCompareAnalysisError(null);
       try {
-        const results = await Promise.allSettled(
-          comparedApps.map(async (app) => {
-            const payload = await fetchDiscoveryForApp(
-              app,
-              storeType,
-              country,
-              { force: options?.force, mode: activeMode },
-            );
-            return { app, payload };
-          }),
+        const results = await mapWithConcurrency(
+          comparedApps,
+          2,
+          async (app) => {
+            try {
+              const payload = await fetchDiscoveryForApp(
+                app,
+                storeType,
+                country,
+                { force: options?.force, mode: activeMode },
+              );
+              return { status: "fulfilled" as const, value: { app, payload } };
+            } catch (error) {
+              return { status: "rejected" as const, reason: error };
+            }
+          },
         );
         const nextDiscoveries: Record<string, DiscoveryPayload> = {};
         const failures: string[] = [];
@@ -4626,22 +4631,12 @@ function AuthenticatedApp({
                 searchResults.length === 0 &&
                 !error &&
                 !selectedApp && (
-                  <div className="mt-4 empty-state">
-                    {" "}
-                    <div className="empty-state-icon">
-                      {" "}
-                      <Search
-                        className="w-7 h-7"
-                        style={{ color: "#475569" }}
-                      />{" "}
-                    </div>{" "}
-                    <h3 className="text-base font-semibold text-app-text-muted mb-1">
-                      No apps found
-                    </h3>{" "}
-                    <p className="text-sm text-app-text-muted">
-                      Try adjusting your search term or paste a direct store
-                      URL.
-                    </p>{" "}
+                  <div className="mt-4">
+                    <WorkspaceEmptyBlock
+                      icon={Search}
+                      title="No apps found"
+                      description="Try adjusting your search term or paste a direct store URL."
+                    />
                   </div>
                 )}{" "}
               {!isSearching && searchResults.length > 0 && !selectedApp && (
@@ -5873,7 +5868,8 @@ function AuthenticatedApp({
                           ? "Running deep keyword discovery. This can take a little longer..."
                           : "Discovering keywords. This can take a little longer..."}{" "}
                       </div>
-                    ) : autoRankings.length > 0 ? (
+                    ) : null}
+                    {autoRankings.length > 0 ? (
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                         {" "}
                         {autoRankings.map((r, i) => (

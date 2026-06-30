@@ -93,7 +93,7 @@ export const BILLING_PLAN_LIMITS: Record<BillingPlanId, PlanLimits> = {
   },
   pro: {
     trackedApps: 20,
-    competitorGroups: 15,
+    competitorGroups: 10,
     trackedKeywords: 1000,
   },
   agency: {

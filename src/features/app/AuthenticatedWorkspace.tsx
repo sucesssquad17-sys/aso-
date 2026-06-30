@@ -106,6 +106,10 @@ import { safeStorage } from "../../lib/storage";
 import { isPreferenceStorageAllowed } from "../../lib/cookieConsent";
 import type { ThemeMode } from "../../lib/theme";
 import {
+  getDiscoveryCacheKey,
+  hasDiscoveryCacheContent,
+} from "../../lib/discoveryCache";
+import {
   countPlanUsage,
   getCompetitorTrackedKeywordIdentityKey,
   getTrackedAppIdentityKeysForPlanUsage,
@@ -6844,17 +6848,16 @@ function AuthenticatedApp({
       if (!id) {
         return null;
       }
-      const cacheKey = `discover-${DISCOVERY_CACHE_VERSION}-${activeMode}-${currentStore}-${currentCountry}-${String(id)}`;
+      const cacheKey = getDiscoveryCacheKey({
+        mode: activeMode,
+        store: currentStore,
+        country: currentCountry,
+        appId: String(id),
+      });
       const cachedDiscovery = !options?.force
         ? CacheService.get<DiscoveryPayload>(cacheKey)
         : null;
-      if (
-        cachedDiscovery &&
-        ((Array.isArray(cachedDiscovery.rankings) &&
-          cachedDiscovery.rankings.length > 0) ||
-          (Array.isArray(cachedDiscovery.suggestions) &&
-            cachedDiscovery.suggestions.length > 0))
-      ) {
+      if (hasDiscoveryCacheContent(cachedDiscovery)) {
         return {
           ...cachedDiscovery,
           mode: cachedDiscovery.mode || activeMode,
@@ -6881,6 +6884,7 @@ function AuthenticatedApp({
             store: currentStore,
             country: currentCountry,
             mode: activeMode,
+            force: options?.force === true,
           }),
         },
         {
@@ -6951,8 +6955,6 @@ function AuthenticatedApp({
   ) => {
     const activeMode = options?.mode ?? discoveryMode;
     setIsDiscoveringKeywords(true);
-    setAutoRankings([]);
-    setKeywordSuggestions([]);
     try {
       const payload = await fetchDiscoveryForApp(
         app,
@@ -7014,20 +7016,23 @@ function AuthenticatedApp({
       setIsAnalyzingCompare(true);
       setCompareAnalysisError(null);
       try {
-        const results: PromiseSettledResult<{ app: AppDetails; payload: DiscoveryPayload | null }>[] = [];
-        for (const app of comparedApps) {
-          try {
-            const payload = await fetchDiscoveryForApp(
-              app,
-              storeType,
-              country,
-              { force: options?.force, mode: activeMode },
-            );
-            results.push({ status: "fulfilled", value: { app, payload } });
-          } catch (error) {
-            results.push({ status: "rejected", reason: error });
-          }
-        }
+        const results = await mapWithConcurrency(
+          comparedApps,
+          2,
+          async (app) => {
+            try {
+              const payload = await fetchDiscoveryForApp(
+                app,
+                storeType,
+                country,
+                { force: options?.force, mode: activeMode },
+              );
+              return { status: "fulfilled" as const, value: { app, payload } };
+            } catch (error) {
+              return { status: "rejected" as const, reason: error };
+            }
+          },
+        );
         const nextDiscoveries: Record<string, DiscoveryPayload> = {};
         const failures: string[] = [];
         results.forEach((result, index) => {
@@ -7681,44 +7686,61 @@ function AuthenticatedApp({
       toast.error("Add at least one competitor app.");
       return;
     }
-    const draftApps = [
-      createCompetitorGroupAppRecord(competitorDraftOwnApp, storeType, "own"),
-      ...competitorDraftApps.map((app) =>
-        createCompetitorGroupAppRecord(app, storeType, "competitor"),
-      ),
+    const draftTargets = [
+      {
+        appRecord: createCompetitorGroupAppRecord(
+          competitorDraftOwnApp,
+          storeType,
+          "own",
+        ),
+        appDetails: competitorDraftOwnApp,
+      },
+      ...competitorDraftApps.map((app) => ({
+        appRecord: createCompetitorGroupAppRecord(app, storeType, "competitor"),
+        appDetails: app,
+      })),
     ];
     setIsAnalyzingCompetitorGroup(true);
     setCompetitorGroupError(null);
     try {
-      const draftAppsToCheck = [competitorDraftOwnApp, ...competitorDraftApps];
-      const results: PromiseSettledResult<{ app: AppDetails; payload: DiscoveryPayload | null }>[] = [];
-      for (const app of draftAppsToCheck) {
-        if (!app) continue;
-        try {
-          const payload = await fetchDiscoveryForApp(app, storeType, country, {
-            force: true,
-            mode: competitorGroupMode,
-          });
-          results.push({ status: "fulfilled", value: { app, payload } });
-        } catch (error) {
-          results.push({ status: "rejected", reason: error });
-        }
-      }
+      const results = await mapWithConcurrency(
+        draftTargets,
+        2,
+        async ({ appDetails }) => {
+          try {
+            const payload = await fetchDiscoveryForApp(
+              appDetails,
+              storeType,
+              country,
+              {
+                force: true,
+                mode: competitorGroupMode,
+              },
+            );
+            return { status: "fulfilled" as const, value: payload };
+          } catch (error) {
+            return { status: "rejected" as const, reason: error };
+          }
+        },
+      );
       const nextDiscoveries: Record<string, DiscoveryPayload> = {};
       const failures: string[] = [];
       results.forEach((result, index) => {
-        const appRecord = draftApps[index];
-        if (result.status === "fulfilled" && result.value.payload) {
-          nextDiscoveries[appRecord.appKey] = result.value.payload;
+        const appRecord = draftTargets[index]?.appRecord;
+        if (!appRecord) {
+          return;
+        }
+        if (result.status === "fulfilled" && result.value) {
+          nextDiscoveries[appRecord.appKey] = result.value;
           return;
         }
         failures.push(appRecord.title);
       });
       const successfulCount = Object.keys(nextDiscoveries).length;
-      const ownAppKey = draftApps[0]?.appKey;
-      const successfulCompetitorCount = draftApps
+      const ownAppKey = draftTargets[0]?.appRecord.appKey;
+      const successfulCompetitorCount = draftTargets
         .slice(1)
-        .filter((app) => Boolean(nextDiscoveries[app.appKey])).length;
+        .filter((entry) => Boolean(nextDiscoveries[entry.appRecord.appKey])).length;
       if (
         !ownAppKey ||
         !nextDiscoveries[ownAppKey] ||
@@ -7734,7 +7756,9 @@ function AuthenticatedApp({
       }
       const snapshot = createCompetitorGroupSnapshot(
         "draft",
-        draftApps.filter((app) => Boolean(nextDiscoveries[app.appKey])),
+        draftTargets
+          .map((entry) => entry.appRecord)
+          .filter((app) => Boolean(nextDiscoveries[app.appKey])),
         nextDiscoveries,
         storeType,
         country,
@@ -7742,7 +7766,7 @@ function AuthenticatedApp({
       );
       setCompetitorDraftAnalysis(snapshot);
       if (failures.length > 0) {
-        const message = `Analyzed ${successfulCount}/${draftApps.length} apps. ${failures.join(", ")} could not be refreshed.`;
+        const message = `Analyzed ${successfulCount}/${draftTargets.length} apps. ${failures.join(", ")} could not be refreshed.`;
         setCompetitorGroupError(message);
         toast.info(message);
       } else {
@@ -8095,20 +8119,23 @@ function AuthenticatedApp({
       setIsAnalyzingCompetitorGroup(true);
       setCompetitorGroupError(null);
       try {
-        const results: PromiseSettledResult<{ app: CompetitorGroupAppRecord; payload: DiscoveryPayload | null }>[] = [];
-        for (const app of apps) {
-          try {
-            const payload = await fetchDiscoveryForApp(
-              toCompetitorGroupAppDetails(app),
-              group.store,
-              group.country,
-              { force: true, mode: group.mode },
-            );
-            results.push({ status: "fulfilled", value: { app, payload } });
-          } catch (error) {
-            results.push({ status: "rejected", reason: error });
-          }
-        }
+        const results = await mapWithConcurrency(
+          apps,
+          2,
+          async (app) => {
+            try {
+              const payload = await fetchDiscoveryForApp(
+                toCompetitorGroupAppDetails(app),
+                group.store,
+                group.country,
+                { force: true, mode: group.mode },
+              );
+              return { status: "fulfilled" as const, value: { app, payload } };
+            } catch (error) {
+              return { status: "rejected" as const, reason: error };
+            }
+          },
+        );
         const nextDiscoveries: Record<string, DiscoveryPayload> = {};
         const failures: string[] = [];
         results.forEach((result, index) => {
@@ -10813,22 +10840,12 @@ function AuthenticatedApp({
                 searchResults.length === 0 &&
                 !error &&
                 shouldShowSearchResults && (
-                  <div className="mt-4 empty-state">
-                    {" "}
-                    <div className="empty-state-icon">
-                      {" "}
-                      <Search
-                        className="w-7 h-7"
-                        style={{ color: "#475569" }}
-                      />{" "}
-                    </div>{" "}
-                    <h3 className="text-base font-semibold text-app-text-muted mb-1">
-                      No apps found
-                    </h3>{" "}
-                    <p className="text-sm text-app-text-muted">
-                      Try adjusting your search term or paste a direct store
-                      URL.
-                    </p>{" "}
+                  <div className="mt-4">
+                    <WorkspaceEmptyBlock
+                      icon={Search}
+                      title="No apps found"
+                      description="Try adjusting your search term or paste a direct store URL."
+                    />
                   </div>
                 )}{" "}
               {!isSearching && searchResults.length > 0 && shouldShowSearchResults && (
@@ -14637,7 +14654,8 @@ function AuthenticatedApp({
                           ? "Running deep keyword discovery. This can take a little longer..."
                           : "Discovering keywords. This can take a little longer..."}{" "}
                       </div>
-                    ) : autoRankings.length > 0 ? (
+                    ) : null}
+                    {autoRankings.length > 0 ? (
                       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
                         {" "}
                         {autoRankings.map((r, i) => (
