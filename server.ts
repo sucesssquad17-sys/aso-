@@ -129,7 +129,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Discovery cache reuses analyzed app results for up to 12 hours.
 const rankingCache = new NodeCache({ stdTTL: 14400 });
+const discoveryCandidateCache = new NodeCache({ stdTTL: 43200, useClones: false });
 const keywordSourceCache = new NodeCache({ stdTTL: 14400 });
+const keywordRefinementCache = new NodeCache({ stdTTL: 43200, useClones: false });
 const keywordMarketCache = new NodeCache({ stdTTL: 14400, useClones: false });
 const searchCache = new NodeCache({ stdTTL: 3600, useClones: false });
 const appDetailsCache = new NodeCache({ stdTTL: 86400, useClones: false });
@@ -6661,30 +6663,73 @@ async function mineCompetitorTerms(
   const ownTokens = new Set(titleTokens);
   const categoryHintTokens = new Set(deriveCategoryHints(context.category).flatMap((hint) => tokenize(hint)));
   const termAppHits = new Map<string, Set<string>>();
+  const seedList = Array.from(seeds).slice(0, profile.competitorSeedLimit);
 
   const seedResults: any[][] = await Promise.all(
-    Array.from(seeds)
-      .slice(0, profile.competitorSeedLimit)
-      .map(async (seed) => {
-        try {
-          return await searchStore(
-            seed,
-            storeType,
-            country,
-            profile.competitorResultsPerSeed,
-            {
-              useFailureCache: false,
-              preferDirectFirst: true,
-              proxyFallbackOnError: true,
-              proxyFallbackOnEmpty: true,
-            },
-          );
-        } catch (error) {
-          console.warn(`Competitor keyword mining failed for "${seed}"`, error);
-          return [];
-        }
-      }),
+    seedList.map(async (seed) => {
+      try {
+        const allowProxyFallbackOnEmpty = mode === 'deep';
+        return await searchStore(
+          seed,
+          storeType,
+          country,
+          profile.competitorResultsPerSeed,
+          {
+            useFailureCache: false,
+            preferDirectFirst: true,
+            proxyFallbackOnError: true,
+            proxyFallbackOnEmpty: allowProxyFallbackOnEmpty,
+          },
+        );
+      } catch (error) {
+        console.warn(`Competitor keyword mining failed for "${seed}"`, error);
+        return [];
+      }
+    }),
   );
+
+  if (mode === 'fast') {
+    const totalSeedResults = seedResults.reduce((sum, results) => sum + results.length, 0);
+    const sparseSeedIndexes = seedResults
+      .map((results, index) => ({ index, results }))
+      .filter(({ results }) => results.length === 0)
+      .map(({ index }) => index);
+    const shouldRetrySparseSeeds =
+      sparseSeedIndexes.length > 0 &&
+      (
+        totalSeedResults < Math.max(profile.competitorResultsPerSeed, 10) ||
+        sparseSeedIndexes.length >= Math.ceil(seedList.length / 2)
+      );
+
+    if (shouldRetrySparseSeeds) {
+      const fallbackResults = await Promise.all(
+        sparseSeedIndexes.map(async (seedIndex) => {
+          const seed = seedList[seedIndex];
+          try {
+            return await searchStore(
+              seed,
+              storeType,
+              country,
+              profile.competitorResultsPerSeed,
+              {
+                useFailureCache: false,
+                preferDirectFirst: true,
+                proxyFallbackOnError: true,
+                proxyFallbackOnEmpty: true,
+              },
+            );
+          } catch (error) {
+            console.warn(`Competitor keyword fallback mining failed for "${seed}"`, error);
+            return [];
+          }
+        }),
+      );
+
+      fallbackResults.forEach((results, resultIndex) => {
+        seedResults[sparseSeedIndexes[resultIndex]] = results;
+      });
+    }
+  }
 
   seedResults.forEach((results) => {
     results.forEach((app: any, index: number) => {
@@ -6926,6 +6971,14 @@ async function buildKeywordCandidates(
 }
 const genai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
+type DiscoveryMetricCandidate = {
+  id: number;
+  keyword: string;
+  features: ReturnType<typeof extractKeywordFeatures>;
+  baseline: ReturnType<typeof scoreKeywordMetrics>;
+  displayQuality: number;
+};
+
 function dedupeKeywords(keywords: string[]) {
   const seen = new Set<string>();
   return keywords.filter((keyword) => {
@@ -6936,8 +6989,37 @@ function dedupeKeywords(keywords: string[]) {
   });
 }
 
+function shouldUseGeminiKeywordRefinement(
+  context: { title: string; category?: string; developer?: string },
+  rawKeywords: string[],
+  mode: DiscoveryMode,
+) {
+  if (!genai || rawKeywords.length === 0) {
+    return false;
+  }
+
+  const normalizedCandidates = dedupeKeywords(
+    rawKeywords.filter(isDiscoveryKeywordCandidate),
+  );
+  const hasStrongTitleSignals =
+    collectTitleSegments(context.title).length >= (mode === 'deep' ? 3 : 2);
+  const hasCategorySignals = deriveCategoryHints(context.category).length > 0;
+  const hasDeveloperSignals = tokenize(context.developer).length > 0;
+  const phraseCandidateCount = normalizedCandidates.filter((keyword) => keyword.includes(' ')).length;
+  const candidateThreshold = mode === 'deep' ? 48 : 32;
+  const phraseThreshold = mode === 'deep' ? 14 : 10;
+
+  return (
+    normalizedCandidates.length < candidateThreshold ||
+    phraseCandidateCount < phraseThreshold ||
+    !hasStrongTitleSignals ||
+    !hasCategorySignals ||
+    (mode === 'deep' && !hasDeveloperSignals)
+  );
+}
+
 async function refineKeywordsWithGemini(
-  context: { title: string; description?: string; category?: string },
+  context: { title: string; description?: string; category?: string; developer?: string },
   rawKeywords: string[],
   mode: DiscoveryMode
 ): Promise<{
@@ -6948,17 +7030,44 @@ async function refineKeywordsWithGemini(
   fallbackAddedCount: number;
 }> {
   const limit = DISCOVERY_PROFILES[mode].keywordLimit;
-  let geminiKeywords: string[] = [];
+  const normalizedContext = {
+    title: normalizeKeyword(context.title),
+    description: normalizeKeyword(context.description || ''),
+    category: normalizeKeyword(context.category || ''),
+    developer: normalizeKeyword(context.developer || ''),
+    mode,
+    rawKeywords: dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate)),
+  };
+  const cacheKey = JSON.stringify({
+    cacheVersion: DISCOVERY_CACHE_VERSION,
+    type: 'keyword-refinement',
+    ...normalizedContext,
+  });
+  const cached = keywordRefinementCache.get<{
+    keywords: string[];
+    rawCount: number;
+    geminiCount: number;
+    sanitizedGeminiCount: number;
+    fallbackAddedCount: number;
+  }>(cacheKey);
+  if (cached) {
+    return cached;
+  }
 
-  if (genai && rawKeywords.length > 0) {
+  let geminiKeywords: string[] = [];
+  const shouldUseGemini = shouldUseGeminiKeywordRefinement(context, rawKeywords, mode);
+  const promptKeywords = normalizedContext.rawKeywords.slice(0, Math.max(limit, 24));
+
+  if (shouldUseGemini && promptKeywords.length > 0) {
     const prompt = `You are a creative and broad App Store Optimization (ASO) keyword expert.
 I am optimizing an app with the following metadata:
 Title: "${context.title}"
 Description: "${context.description ? context.description.slice(0, 800) : 'N/A'}"
 Category: "${context.category || 'N/A'}"
+Developer: "${context.developer || 'N/A'}"
 
 I have scraped the following potential keywords from competitors:
-${rawKeywords.join(', ')}
+${promptKeywords.join(', ')}
 
 Your task is to significantly expand and refine this list to discover a large variety of relevant keywords:
 1. Return real, human-searchable App Store / Google Play keywords with search intent.
@@ -7012,32 +7121,38 @@ Your task is to significantly expand and refine this list to discover a large va
     }
   }
 
-  console.log(
-    `[keyword-refine] raw=${rawKeywords.length} gemini=${geminiKeywords.length} sanitizedGemini=${sanitizedGeminiKeywords.length} fallbackAdded=${fallbackKeywords.length}`,
-  );
-
-  return {
+  const payload = {
     keywords: [...primaryKeywords, ...fallbackKeywords],
     rawCount: rawKeywords.length,
     geminiCount: geminiKeywords.length,
     sanitizedGeminiCount: sanitizedGeminiKeywords.length,
     fallbackAddedCount: fallbackKeywords.length,
   };
+
+  console.log(
+    `[keyword-refine] mode=${mode} usedGemini=${shouldUseGemini} raw=${rawKeywords.length} gemini=${geminiKeywords.length} sanitizedGemini=${sanitizedGeminiKeywords.length} fallbackAdded=${fallbackKeywords.length}`,
+  );
+
+  keywordRefinementCache.set(cacheKey, payload);
+  return payload;
 }
 
-async function discoverRankedKeywords(input: {
-  appId: string;
-  title: string;
-  description?: string;
-  category?: string;
-  developer?: string;
-  store: StoreType;
-  country: string;
-  mode: DiscoveryMode;
-}) {
-  const profile = DISCOVERY_PROFILES[input.mode];
+async function buildRankedDiscoveryCandidates(
+  input: {
+    appId: string;
+    title: string;
+    description?: string;
+    category?: string;
+    developer?: string;
+    store: StoreType;
+    country: string;
+    mode: DiscoveryMode;
+  },
+  profile: DiscoveryProfile,
+) {
   const cacheKey = JSON.stringify({
     cacheVersion: DISCOVERY_CACHE_VERSION,
+    type: 'discovery-candidates',
     appId: input.appId,
     title: normalizeKeyword(input.title),
     description: normalizeKeyword(input.description || ''),
@@ -7047,29 +7162,12 @@ async function discoverRankedKeywords(input: {
     store: input.store,
     country: input.country,
   });
-  const cached = discoveryCache.get<{
-    rankings: Array<{
-      keyword: string;
-      rank: number;
-      demand: number;
-      volume: number;
-      difficulty: number;
-      relevance: number;
-      confidence: 'low' | 'medium' | 'high';
-    }>;
-    suggestions?: Array<{
-      keyword: string;
-      demand: number;
-      volume: number;
-      difficulty: number;
-      relevance: number;
-      confidence: 'low' | 'medium' | 'high';
-    }>;
-    mode: DiscoveryMode;
-    checkedKeywords: number;
+  const cached = discoveryCandidateCache.get<{
+    rankedCandidates: DiscoveryMetricCandidate[];
+    rawCount: number;
+    geminiCount: number;
+    sanitizedGeminiCount: number;
     candidateCount: number;
-    searchDepth: number;
-    failedLookups: number;
   }>(cacheKey);
   if (cached) {
     return cached;
@@ -7085,9 +7183,14 @@ async function discoverRankedKeywords(input: {
   }, input.mode, profile);
 
   const refined = await refineKeywordsWithGemini(
-    { title: input.title, description: input.description, category: input.category },
+    {
+      title: input.title,
+      description: input.description,
+      category: input.category,
+      developer: input.developer,
+    },
     rawKeywords,
-    input.mode
+    input.mode,
   );
   const refinedKeywords = refined.keywords;
 
@@ -7100,14 +7203,14 @@ async function discoverRankedKeywords(input: {
   });
 
   const signalContext = await buildKeywordSignals(input, input.mode, profile);
-  const metricCandidates = uniqueKeywords.map((keyword, index) => {
+  const metricCandidates: DiscoveryMetricCandidate[] = uniqueKeywords.map((keyword, index) => {
     const features = extractKeywordFeatures(
       input,
       keyword,
       signalContext,
     );
     const baseline = scoreKeywordMetrics(features);
-    
+
     let displayQuality = 0;
     displayQuality += features.exactTitleMatch * 50;
     displayQuality += features.exactTitleSegment * 30;
@@ -7146,13 +7249,75 @@ async function discoverRankedKeywords(input: {
     })
     .slice(0, profile.keywordLimit);
 
+  const payload = {
+    rankedCandidates,
+    rawCount: refined.rawCount,
+    geminiCount: refined.geminiCount,
+    sanitizedGeminiCount: refined.sanitizedGeminiCount,
+    candidateCount: rankedCandidates.length,
+  };
+
   console.log(
     `[discovery-candidates] mode=${input.mode} raw=${refined.rawCount} gemini=${refined.geminiCount} sanitizedGemini=${refined.sanitizedGeminiCount} admitted=${rankedCandidates.length}`,
   );
 
-  const featuresByKeyword = new Map(
-    metricCandidates.map((candidate) => [normalizeKeyword(candidate.keyword), candidate.features]),
-  );
+  discoveryCandidateCache.set(cacheKey, payload);
+  return payload;
+}
+
+async function discoverRankedKeywords(input: {
+  appId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  developer?: string;
+  store: StoreType;
+  country: string;
+  mode: DiscoveryMode;
+  force?: boolean;
+}) {
+  const profile = DISCOVERY_PROFILES[input.mode];
+  const cacheKey = JSON.stringify({
+    cacheVersion: DISCOVERY_CACHE_VERSION,
+    appId: input.appId,
+    title: normalizeKeyword(input.title),
+    description: normalizeKeyword(input.description || ''),
+    category: normalizeKeyword(input.category || ''),
+    developer: normalizeKeyword(input.developer || ''),
+    mode: input.mode,
+    store: input.store,
+    country: input.country,
+  });
+  const cached = discoveryCache.get<{
+    rankings: Array<{
+      keyword: string;
+      rank: number;
+      demand: number;
+      volume: number;
+      difficulty: number;
+      relevance: number;
+      confidence: 'low' | 'medium' | 'high';
+    }>;
+    suggestions?: Array<{
+      keyword: string;
+      demand: number;
+      volume: number;
+      difficulty: number;
+      relevance: number;
+      confidence: 'low' | 'medium' | 'high';
+    }>;
+    mode: DiscoveryMode;
+    checkedKeywords: number;
+    candidateCount: number;
+    searchDepth: number;
+    failedLookups: number;
+  }>(cacheKey);
+  if (!input.force && cached) {
+    return cached;
+  }
+
+  const candidateSet = await buildRankedDiscoveryCandidates(input, profile);
+  const rankedCandidates = candidateSet.rankedCandidates;
   const validRankings: Array<{
     keyword: string;
     rank: number;
@@ -7290,7 +7455,7 @@ async function discoverRankedKeywords(input: {
   const payload = {
     mode: input.mode,
     checkedKeywords,
-    candidateCount: rankedCandidates.length,
+    candidateCount: candidateSet.candidateCount,
     searchDepth: profile.searchDepth,
     failedLookups,
     rankings,
@@ -8952,7 +9117,7 @@ async function startServer() {
         country: normalizeCountryCode(country, 'us'),
       }, 'deep', DISCOVERY_PROFILES.deep);
       const refined = await refineKeywordsWithGemini(
-        { title, description, category },
+        { title, description, category, developer },
         rawKeywords,
         'deep',
       );
@@ -8978,6 +9143,7 @@ async function startServer() {
       storeType = readStoreType(req.body?.store);
       const country = readOptionalString(req.body?.country, 'country', 12) || 'us';
       const discoveryMode: DiscoveryMode = req.body?.mode === 'fast' ? 'fast' : 'deep';
+      const force = req.body?.force === true;
       const data = await discoverRankedKeywords({
         appId,
         title,
@@ -8987,6 +9153,7 @@ async function startServer() {
         store: storeType as StoreType,
         country: normalizeCountryCode(country, 'us'),
         mode: discoveryMode,
+        force,
       });
 
       res.json(data);
