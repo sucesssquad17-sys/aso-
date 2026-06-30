@@ -94,31 +94,12 @@ export function isDiscoveryKeywordCandidate(input: unknown): input is string {
 export function hasStrongDiscoverySignal(
   features: DiscoveryAdmissionFeatures,
 ) {
-  const isCategoryOnlyGenericPhrase =
-    features.titleCoverage === 0 &&
-    features.appTitleCoverage === 0 &&
-    features.descriptionCoverage < 0.4 &&
-    features.semanticCoverage < 0.45 &&
-    features.categorySemanticCoverage >= 0.5 &&
-    features.genericCoverage >= 0.5;
-
-  if (isCategoryOnlyGenericPhrase) {
-    return false;
-  }
-
   return (
     features.exactTitleMatch > 0 ||
     features.exactTitleSegment > 0 ||
     features.orderedTitleCoverage >= 0.75 ||
     features.semanticCoverage >= 0.5 ||
-    (
-      features.categorySemanticCoverage >= 0.65 &&
-      (
-        features.semanticCoverage >= 0.35 ||
-        features.descriptionCoverage >= 0.35 ||
-        features.titleCoverage > 0
-      )
-    )
+    features.categorySemanticCoverage >= 0.5
   );
 }
 
@@ -129,40 +110,22 @@ export function shouldAdmitDiscoveryCandidate(
 ) {
   if (hasStrongDiscoverySignal(features)) return true;
 
-  const isCategoryOnlyGenericPhrase =
-    features.titleCoverage === 0 &&
-    features.appTitleCoverage === 0 &&
-    features.descriptionCoverage < 0.4 &&
-    features.semanticCoverage < 0.4 &&
-    features.categorySemanticCoverage >= 0.5 &&
-    features.genericCoverage >= 0.5;
-
-  if (isCategoryOnlyGenericPhrase) {
-    return false;
-  }
-
   const thresholds =
     mode === "deep"
       ? {
-          displayQuality: 14,
+          displayQuality: 10,
           semanticCoverage: 0.25,
-          categorySemanticCoverage: 0.5,
+          categorySemanticCoverage: 0.25,
         }
       : {
-          displayQuality: 22,
+          displayQuality: 20,
           semanticCoverage: 0.35,
-          categorySemanticCoverage: 0.6,
+          categorySemanticCoverage: 0.35,
         };
 
   return (
     displayQuality >= thresholds.displayQuality ||
     features.semanticCoverage >= thresholds.semanticCoverage ||
-    (
-      features.categorySemanticCoverage >= thresholds.categorySemanticCoverage &&
-      (
-        features.descriptionCoverage >= 0.35 ||
-        features.titleCoverage > 0
-      )
-    )
+    features.categorySemanticCoverage >= thresholds.categorySemanticCoverage
   );
 }

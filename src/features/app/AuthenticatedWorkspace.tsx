@@ -106,8 +106,10 @@ import { safeStorage } from "../../lib/storage";
 import { isPreferenceStorageAllowed } from "../../lib/cookieConsent";
 import type { ThemeMode } from "../../lib/theme";
 import {
+  getDiscoveryCacheLookupKeys,
   getDiscoveryCacheKey,
   hasDiscoveryCacheContent,
+  trimDiscoveryPayloadForMode,
 } from "../../lib/discoveryCache";
 import {
   countPlanUsage,
@@ -122,7 +124,6 @@ import {
   ApiRequestError,
   API_REQUEST_TIMEOUT_MS,
   DISCOVERY_CACHE_TTL,
-  DISCOVERY_CACHE_VERSION,
   DISCOVERY_DEEP_TIMEOUT_MS,
   DISCOVERY_FAST_TIMEOUT_MS,
   LEGAL_VERSION,
@@ -6848,20 +6849,32 @@ function AuthenticatedApp({
       if (!id) {
         return null;
       }
-      const cacheKey = getDiscoveryCacheKey({
+      const cacheInput = {
         mode: activeMode,
         store: currentStore,
         country: currentCountry,
         appId: String(id),
-      });
-      const cachedDiscovery = !options?.force
-        ? CacheService.get<DiscoveryPayload>(cacheKey)
-        : null;
-      if (hasDiscoveryCacheContent(cachedDiscovery)) {
-        return {
+        title: app.title || "App",
+        description: app.description || "",
+        category: app.category || "",
+        developer: app.developer || "",
+      } as const;
+      const cacheKey = getDiscoveryCacheKey(cacheInput);
+      const cacheLookupKeys = !options?.force
+        ? getDiscoveryCacheLookupKeys(cacheInput)
+        : [];
+      for (const lookupKey of cacheLookupKeys) {
+        const cachedDiscovery = CacheService.get<DiscoveryPayload>(lookupKey);
+        if (!hasDiscoveryCacheContent(cachedDiscovery)) {
+          continue;
+        }
+        const hydratedPayload = {
           ...cachedDiscovery,
           mode: cachedDiscovery.mode || activeMode,
         } satisfies DiscoveryPayload;
+        return lookupKey === cacheKey
+          ? hydratedPayload
+          : trimDiscoveryPayloadForMode(hydratedPayload, activeMode);
       }
       const data = await fetchAuthedJson<{
         rankings?: RankedKeyword[];
@@ -6906,6 +6919,13 @@ function AuthenticatedApp({
       };
       if (payload.rankings.length > 0 || payload.suggestions.length > 0) {
         CacheService.set(cacheKey, payload, DISCOVERY_CACHE_TTL);
+        if (activeMode === "deep") {
+          CacheService.set(
+            getDiscoveryCacheKey({ ...cacheInput, mode: "fast" }),
+            trimDiscoveryPayloadForMode(payload, "fast"),
+            DISCOVERY_CACHE_TTL,
+          );
+        }
       } else {
         CacheService.remove(cacheKey);
       }
@@ -14619,7 +14639,7 @@ function AuthenticatedApp({
                                     selectedApp,
                                     storeType,
                                     country,
-                                    { force: true, mode },
+                                    { mode },
                                   );
                                 }
                               }}

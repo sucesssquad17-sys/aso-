@@ -503,20 +503,6 @@ function classifyKeywordIntent(
     return "LOW_INTENT_JUNK";
   }
 
-  const categoryDominantGeneric =
-    features.tokenCount >= 2 &&
-    features.titleCoverage === 0 &&
-    features.appTitleCoverage === 0 &&
-    features.brandCoverage === 0 &&
-    features.descriptionCoverage < 0.34 &&
-    features.semanticCoverage < 0.45 &&
-    features.categorySemanticCoverage >= 0.5 &&
-    features.genericCoverage >= 0.5;
-
-  if (categoryDominantGeneric) {
-    return "LOW_INTENT_JUNK";
-  }
-
   if (features.isLongTail > 0) {
     return "LONG_TAIL";
   }
@@ -934,22 +920,6 @@ export function scoreKeywordMetrics(features: KeywordFeatureVector): MetricEstim
     demand = Math.min(demand, 24);
     difficulty = Math.min(difficulty, 26);
     relevance = Math.min(relevance, 34);
-  }
-
-  const isCategoryDominantGenericPhrase =
-    features.tokenCount >= 2 &&
-    features.titleCoverage === 0 &&
-    features.appTitleCoverage === 0 &&
-    features.brandCoverage === 0 &&
-    features.descriptionCoverage < 0.34 &&
-    features.semanticCoverage < 0.45 &&
-    features.categorySemanticCoverage >= 0.5 &&
-    features.genericCoverage >= 0.5;
-
-  if (isCategoryDominantGenericPhrase) {
-    demand = Math.min(demand, 22);
-    difficulty = Math.max(difficulty, 34);
-    relevance = Math.min(relevance, 24);
   }
 
   const confidenceScore = Math.round(
