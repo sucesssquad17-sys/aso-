@@ -106,56 +106,77 @@ export function PrivacyPolicyPage({
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
     >
-      <p>Effective date: May 26, 2026.</p>
-      <h2>Information We Store</h2>
+      <p>Effective date: June 30, 2026.</p>
+      <h2>Information We Collect</h2>
       <p>
-        We store your Firebase authentication identifier, bookmarks, tracked
-        keywords, rank history, tracking schedule, and legal acceptance metadata
-        in Firestore.
+        Rank Analyzer Pro stores account and workspace data needed to run the
+        app. This includes your Firebase user ID, email address or sign-in
+        provider details, bookmarks, tracked apps, competitor groups, tracked
+        keywords, rank history, report snapshots, alert rules, alert events,
+        notification settings, legal acceptance metadata, and account-level app
+        preferences.
       </p>
       <p>
-        We also use browser local storage for essential app behavior, and you
-        can choose whether to allow optional performance cache and preference
-        storage the first time you visit.
+        If you enable browser notifications, we also store device registration
+        tokens so notification delivery can work. If you use a paid plan or
+        trial, we also store billing status and related metadata such as plan,
+        interval, subscription state, Dodo customer or product identifiers, and
+        transaction references required to manage access.
+      </p>
+      <h2>Local Browser Storage</h2>
+      <p>
+        The app uses local browser storage for essential sign-in flow state,
+        theme, cookie consent, workspace preferences, and optional performance
+        cache behavior. Some discovery and app data may also be cached on the
+        server for performance and stability.
       </p>
       <h2>How We Use Data</h2>
       <p>
-        We use this data only to provide your saved analyzer workspace, sync it
-        across sessions, and support keyword tracking features tied to your
-        account.
+        We use your data to provide Analyze, Compare, Reports, Bookmarks,
+        Tracked Keywords, Competitor Group monitoring, export features, billing
+        access, account support, and notification delivery by in-app feed,
+        browser push, and email.
       </p>
-      <h2>Premium Features and Billing Data</h2>
       <p>
-        If premium plans, subscriptions, or paid features are added later, we
-        may also store plan status, subscription identifiers, billing metadata,
-        invoices, renewal state, and payment-related events needed to manage
-        access. We do not intend to store full card numbers in the app database.
+        We may also use service logs and operational metadata to debug failures,
+        protect the platform from abuse, enforce plan limits, and improve
+        performance, discovery quality, and delivery reliability.
       </p>
       <h2>Third-Party Services</h2>
       <p>
-        The application uses Firebase Authentication and Firestore. App search,
-        app detail, and ranking requests are also sent to the application server
-        to retrieve app-store data. If premium billing is added, payment
-        processing may also be handled by a third-party billing provider.
+        Rank Analyzer Pro uses Firebase Authentication, Firestore, and Firebase
+        Cloud Messaging; Dodo Payments for subscriptions, checkout, and billing
+        portal access; Resend for transactional or announcement email delivery;
+        Google Gemini for keyword refinement during discovery; and cloud-hosted
+        backend infrastructure including Cloud Run and Firebase Hosting.
+      </p>
+      <p>
+        App search, ranking, chart, and metadata features depend on third-party
+        store data sources and supporting network services, including Google
+        Play, iOS App Store data providers, and proxy infrastructure used to
+        complete some store lookups.
       </p>
       <h2>Data Retention</h2>
       <p>
-        Your saved workspace data remains associated with your account until you
-        delete it or delete the account. If premium billing is added, some
-        billing and transaction records may be retained for accounting, fraud
-        prevention, dispute handling, tax, or legal compliance.
+        Workspace data remains associated with your account until you delete the
+        relevant records or delete the account. Billing, legal acceptance,
+        fraud-prevention, notification, operational, and support-related records
+        may be retained for legitimate business, accounting, tax, security,
+        dispute, or legal compliance reasons.
       </p>
       <h2>Your Choices</h2>
       <p>
-        You can delete bookmarks and tracked keywords individually, clear
-        client-side cache, or delete your entire account from inside the app. If
-        premium access is added later, cancelling a subscription may stop future
-        renewals but may not immediately delete legally required billing
-        records.
+        You can manage or remove tracked data inside the app, control whether
+        optional storage is allowed, update notification settings, and delete
+        your account from the product. Paid subscriptions can be cancelled using
+        the billing portal when available. Deleting an account does not
+        automatically remove records we must retain for billing, fraud, or legal
+        compliance.
       </p>
+      <h2>No Sale of Payment Card Data</h2>
       <p>
-        Optional browser storage can also be declined on first visit by choosing
-        essential storage only.
+        We do not store full payment card numbers in the app database. Payment
+        processing is handled by the billing provider.
       </p>
       <h2>Contact</h2>
       <p>
@@ -184,60 +205,79 @@ export function TermsPage({
       themeMode={themeMode}
       onToggleTheme={onToggleTheme}
     >
-      <p>Effective date: May 26, 2026.</p>
-      <h2>Use of the Service</h2>
+      <p>Effective date: June 30, 2026.</p>
+      <h2>Service Scope</h2>
       <p>
-        You may use the service only for lawful business or research purposes
-        related to app search optimization and competitive analysis.
+        Rank Analyzer Pro provides app keyword research, app-store discovery,
+        competitor group analysis, reports, bookmarking, alerting, export, and
+        related monitoring tools for iOS and Google Play research workflows.
       </p>
       <h2>Account Responsibility</h2>
       <p>
-        You are responsible for maintaining access to your
-        Firebase-authenticated account and for activity that occurs under it.
+        You are responsible for activity under your account, the security of
+        your sign-in methods, and the accuracy of information you submit through
+        the service.
       </p>
-      <h2>Premium Plans and Paid Features</h2>
+      <h2>Subscriptions, Trials, and Billing</h2>
       <p>
-        Rank Analyzer Pro may later offer premium plans, subscriptions, credits,
-        or paid features. Access to premium functionality may depend on
-        successful payment, an active subscription, and compliance with these
-        terms.
+        Paid access, trials, and plan limits are governed by the pricing and
+        checkout terms shown at purchase. Subscription billing, renewals,
+        cancellations, and billing portal access may be handled through Dodo
+        Payments or another payment provider used by the service.
       </p>
-      <h2>Billing and Renewals</h2>
       <p>
-        If recurring billing is introduced, subscriptions may renew
-        automatically until cancelled, subject to the billing terms shown at
-        purchase. Fees, billing cycles, refunds, trials, and cancellation rules
-        may vary by plan and payment provider.
+        Plans may include limits on tracked apps, competitor groups, tracked
+        keywords, notification volume, or other operational usage. We may
+        enforce those limits inside the product.
       </p>
-      <h2>Data Accuracy</h2>
+      <h2>Cancellations and Refunds</h2>
       <p>
-        Ranking, keyword, and app-store data are provided on a best-effort basis
-        and may change or become unavailable without notice.
+        You may cancel a subscription through the billing portal when available
+        or by contacting{" "}
+        <a href="mailto:vantalumstudio@gmail.com">vantalumstudio@gmail.com</a>. Cancellation generally stops future renewals
+        but does not automatically create a refund for charges already incurred.
+        Refund decisions, if offered, are handled case by case and may depend on
+        payment-provider rules, trial use, abuse review, and applicable law.
       </p>
-      <h2>Prohibited Use</h2>
+      <h2>Data and Availability</h2>
+      <p>
+        Search rankings, keyword suggestions, discovery results, charts, alerts,
+        app metadata, and other outputs are provided on a best-effort basis.
+        They may be delayed, incomplete, estimated, unavailable, or changed by
+        upstream services without notice.
+      </p>
+      <h2>Acceptable Use</h2>
       <p>
         You must not misuse the service, interfere with its operation, attempt
-        unauthorized access, or use it in ways that violate store policies or
-        applicable law.
+        unauthorized access, bypass plan or rate limits, reverse engineer
+        protected systems, resell unauthorized access, send unlawful or abusive
+        content through notifications or email features, or use the service in
+        violation of store policies or applicable law.
       </p>
-      <h2>Suspension and Payment Issues</h2>
+      <h2>Suspension</h2>
       <p>
-        Premium access may be suspended, limited, or revoked for failed
-        payments, chargebacks, fraud concerns, abuse, policy violations, or
-        misuse of the service.
+        Access may be suspended, limited, or terminated for unpaid balances,
+        chargebacks, fraud concerns, abuse, excessive automated use, policy
+        violations, or behavior that creates operational or legal risk.
+      </p>
+      <h2>Intellectual Property</h2>
+      <p>
+        The service, its software, and its product content remain the property
+        of their respective owners. You retain rights to data you submit, but
+        you grant us the rights needed to host, process, and display it in order
+        to operate the service.
       </p>
       <h2>Termination</h2>
       <p>
         You may stop using the service at any time. You may also delete your
-        account from within the app, which removes your saved Firestore account
-        data. Deleting an account does not automatically waive or erase valid
-        payment obligations, outstanding charges, or records that must be
-        retained by law.
+        account from within the app. Termination or account deletion does not
+        automatically erase outstanding payment obligations or records that must
+        be retained for legal, billing, or security reasons.
       </p>
       <h2>Changes</h2>
       <p>
-        These terms may change. When they do, update the legal version and
-        require acceptance again if needed.
+        We may update these terms as the product evolves. Continued use after a
+        legal update may require renewed acceptance.
       </p>
       <h2>Contact</h2>
       <p>

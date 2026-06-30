@@ -514,7 +514,7 @@ export function UpgradePage({
                 <p className="text-xs font-medium leading-relaxed text-slate-600 dark:text-app-text-muted">
                   {isLoading
                     ? "Refreshing billing…"
-                    : billingError || "Contact support to activate billing access."}
+                    : billingError || "Contact support at vantalumstudio@gmail.com to activate billing access."}
                 </p>
               </div>
             )}

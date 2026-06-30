@@ -158,10 +158,10 @@ const ADMIN_EMAIL_ALLOWLIST = (process.env.ADMIN_EMAIL_ALLOWLIST || '')
 const EMAIL_UNSUBSCRIBE_SECRET = process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim() || '';
 const ANNOUNCEMENT_EMAIL_CAMPAIGNS_COLLECTION = 'admin_email_campaigns';
 const ALERT_EMAIL_APP_URL = process.env.APP_URL?.trim() || 'https://rankanalyzerpro.com';
-const PLAY_STORE_FETCH_TIMEOUT_MS = 30000;
-const UPSTREAM_REQUEST_TIMEOUT_MS = 30000;
+const PLAY_STORE_FETCH_TIMEOUT_MS = 60000;
+const UPSTREAM_REQUEST_TIMEOUT_MS = 60000;
 const UPSTREAM_FAILURE_CACHE_TTL_SECONDS = 15;
-const RANKING_FETCH_TIMEOUT_MS = 20000;
+const RANKING_FETCH_TIMEOUT_MS = 60000;
 const GLOBAL_TRACKING_WATCHDOG_DELAY_MINUTES = 60;
 const DAILY_TRACKING_LEASE_OWNER = `service:${process.pid}:${crypto.randomUUID()}`;
 const DODO_WEBHOOK_LEASE_TTL_MINUTES = 15;
@@ -8050,7 +8050,7 @@ async function startServer() {
         getBillingPlanRank(planId) < getBillingPlanRank(getEffectiveBillingPlanId(userData));
       if (isDowngradeAttempt) {
         throw createBadRequestError(
-          'Downgrades are not available from checkout. Use the billing portal or contact support.',
+          'Downgrades are not available from checkout. Use the billing portal or contact vantalumstudio@gmail.com.',
         );
       }
       const email = decodedToken.email?.trim().toLowerCase();

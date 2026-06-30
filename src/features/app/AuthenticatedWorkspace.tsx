@@ -195,6 +195,7 @@ import ReportsWorkspace from "../reports/ReportsWorkspace";
 import BrandMark from "../../components/BrandMark";
 import {
   DEFAULT_GLOBAL_TRACKING_TIME,
+  formatGlobalTrackingTimeForLocalDisplay,
   GLOBAL_TRACKING_TIMEZONE,
   TRACKING_CHART_TIMEZONE,
 } from "../../lib/trackingTime";
@@ -12668,7 +12669,7 @@ function AuthenticatedApp({
                             ) : null}
                             {isLoadingCompetitorAsoHistory ? (
                               <div className="competitor-aso-empty mt-4 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
-                                Loading competitor ASO history...
+                                Loading competitor ASO change history...
                               </div>
                             ) : filteredGroupAsoDiffs.length === 0 ? (
                               <div className="competitor-aso-empty mt-4 rounded-2xl border border-dashed border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
@@ -12676,7 +12677,7 @@ function AuthenticatedApp({
                                   ? groupAsoSnapshotCount === 0
                                     ? "Baseline not captured yet. The first ASO snapshot will appear after the next scheduled monitoring run."
                                     : groupAsoSnapshotCount === 1
-                                      ? "Baseline captured. The next scheduled monitoring run will create the first ASO comparison."
+                                      ? "Baseline captured. The next scheduled monitoring run will create the first ASO change alert entry."
                                       : "No ASO changes detected yet for this group. New rows appear only when store metadata changes."
                                   : "No ASO changes match the current filters."}
                               </div>
@@ -13533,7 +13534,12 @@ function AuthenticatedApp({
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="inline-flex items-center gap-2">
                       <BellRing className="w-4 h-4 text-cyan-400" />
-                      Daily tracking refreshes automatically once a day
+                      Daily tracking refresh at{" "}
+                      <span className="text-app-text">
+                        {formatGlobalTrackingTimeForLocalDisplay(new Date(), {
+                          includeTimeZoneName: true,
+                        })}
+                      </span>
                     </div>
                     <div className="text-app-text-muted">
                       Last refresh: {trackingSchedule.lastRunAt ? formatTrackingChartDateTime(trackingSchedule.lastRunAt) : "Not yet"}

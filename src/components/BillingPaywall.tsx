@@ -148,7 +148,7 @@ export function BillingPaywall({
     ? billingError
     : billingConnected
       ? "Secure checkout is ready. Pick a plan to unlock higher tracking limits, deeper competitor coverage, and daily monitoring."
-      : "Plan selection is available. Contact support for billing access.";
+      : "Plan selection is available. Contact support at vantalumstudio@gmail.com for billing access.";
 
   return (
     <div className="workspace-shell relative min-h-screen overflow-hidden font-sans text-app-text">
@@ -202,7 +202,7 @@ export function BillingPaywall({
                     value: billingConnected ? "Ready" : "Unavailable",
                     hint: billingConnected
                       ? "Checkout and portal available"
-                      : "Contact support for paid access",
+                      : "Contact vantalumstudio@gmail.com for paid access",
                   },
                 ].map((item) => (
                   <div
@@ -289,7 +289,7 @@ export function BillingPaywall({
                 },
                 {
                   label: "Billing access",
-                  value: billingConnected ? "Available" : "Contact support",
+                  value: billingConnected ? "Available" : "Email support",
                 },
                 {
                   label: "Billing Cycle",
@@ -545,7 +545,7 @@ export function BillingPaywall({
                           ) : null}
                           {!billingConnected && !isCurrentPlan && supportsSelectedInterval ? (
                             <p className="text-center text-xs text-app-text-muted">
-                              Contact support to activate this plan
+                              Contact vantalumstudio@gmail.com to activate this plan
                             </p>
                           ) : null}
                         </div>
