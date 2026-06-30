@@ -4012,8 +4012,15 @@ function AuthenticatedApp({
           <label
             className="flex items-start gap-3 rounded-2xl px-4 py-3 text-sm mt-6"
             style={{
-              background: "rgba(15,23,42,0.65)",
-              border: "1px solid rgba(51,65,85,0.45)",
+              background: themeMode === "light"
+                ? "rgba(255,255,255,0.9)"
+                : "rgba(15,23,42,0.65)",
+              border: themeMode === "light"
+                ? "1px solid rgba(148,163,184,0.32)"
+                : "1px solid rgba(51,65,85,0.45)",
+              boxShadow: themeMode === "light"
+                ? "0 12px 30px rgba(148,163,184,0.12), inset 0 1px 0 rgba(255,255,255,0.6)"
+                : undefined,
             }}
           >
             {" "}

@@ -4894,11 +4894,11 @@ function AuthenticatedApp({
     userStateHydrated,
   ]);
   useEffect(() => {
-    if (isDemoMode || !userStateHydrated) return;
+    if (isDemoMode) return;
     void loadBillingStatus();
-  }, [isDemoMode, loadBillingStatus, userStateHydrated]);
+  }, [isDemoMode, loadBillingStatus]);
   useEffect(() => {
-    if (isDemoMode || !userStateHydrated || typeof window === "undefined") {
+    if (isDemoMode || typeof window === "undefined") {
       return;
     }
 
@@ -4923,7 +4923,7 @@ function AuthenticatedApp({
     url.searchParams.delete("payment_id");
     url.searchParams.delete("subscription_id");
     window.history.replaceState({}, document.title, url.toString());
-  }, [isDemoMode, loadBillingStatus, userStateHydrated]);
+  }, [isDemoMode, loadBillingStatus]);
   const onboardingDismissStorageKey = React.useMemo(
     () => `aso-onboarding-dismissed:${currentUser.uid}`,
     [currentUser.uid],
@@ -10435,7 +10435,27 @@ function AuthenticatedApp({
   const chartAxisTickColor = isLightTheme ? "#61748b" : "#94a3b8";
   const chartAxisLabelColor = isLightTheme ? "#51657e" : "#64748b";
   const chartLegendTextColor = isLightTheme ? "#39506a" : "#cbd5e1";
-  if (!userStateHydrated) {
+  if (!isDemoMode && !hasLoadedBillingStatus) {
+    return (
+      <ErrorBoundary>
+        <div
+          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
+          style={{ background: "var(--bg-primary)" }}
+        >
+          <div className="bg-orb bg-orb-1" />
+          <div className="bg-orb bg-orb-2" />
+          <div className="bg-orb bg-orb-3" />
+          <div className="card-glow relative z-10 px-8 py-10 text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
+            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
+              Checking billing access
+            </p>
+          </div>
+        </div>
+      </ErrorBoundary>
+    );
+  }
+  if (!userStateHydrated && hasActiveBillingAccess) {
     return (
       <ErrorBoundary>
         <div
@@ -10454,26 +10474,6 @@ function AuthenticatedApp({
             </p>{" "}
           </div>{" "}
         </div>{" "}
-      </ErrorBoundary>
-    );
-  }
-  if (!isDemoMode && !hasLoadedBillingStatus) {
-    return (
-      <ErrorBoundary>
-        <div
-          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
-          style={{ background: "var(--bg-primary)" }}
-        >
-          <div className="bg-orb bg-orb-1" />
-          <div className="bg-orb bg-orb-2" />
-          <div className="bg-orb bg-orb-3" />
-          <div className="card-glow relative z-10 px-8 py-10 text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
-            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
-              Checking billing access
-            </p>
-          </div>
-        </div>
       </ErrorBoundary>
     );
   }
@@ -10583,8 +10583,15 @@ function AuthenticatedApp({
           <label
             className="flex items-start gap-3 rounded-2xl px-4 py-3 text-sm mt-6"
             style={{
-              background: "rgba(15,23,42,0.65)",
-              border: "1px solid rgba(51,65,85,0.45)",
+              background: isLightTheme
+                ? "rgba(255,255,255,0.9)"
+                : "rgba(15,23,42,0.65)",
+              border: isLightTheme
+                ? "1px solid rgba(148,163,184,0.32)"
+                : "1px solid rgba(51,65,85,0.45)",
+              boxShadow: isLightTheme
+                ? "0 12px 30px rgba(148,163,184,0.12), inset 0 1px 0 rgba(255,255,255,0.6)"
+                : undefined,
             }}
           >
             {" "}

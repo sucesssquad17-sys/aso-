@@ -212,7 +212,8 @@ export function UpgradePage({
     null;
   const isSelectionRequired = accessState === "selection_required";
   const isActivating = accessState === "activating";
-  const disablePlanSelection = isPollingActivation;
+  const isPendingActivation =
+    isActivating && Boolean(pendingPlan) && isPollingActivation && !activationTimedOut;
   const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
   const signedInAccount = currentUserEmail || currentUserLabel;
   const capacityPreviewPlans = PUBLIC_BILLING_PLANS;
@@ -274,21 +275,15 @@ export function UpgradePage({
     const currentCta =
       "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-600 bg-transparent px-4 py-3.5 sm:py-3 text-sm font-bold text-blue-600 dark:text-blue-400 cursor-default";
 
-    if (disablePlanSelection) {
+    if (isPendingPlan && isPendingActivation) {
       return (
         <button
           type="button"
           disabled
           className={plan.highlight ? highlightCta : normalCta}
         >
-          {isPendingPlan ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Activating trial
-            </>
-          ) : (
-            "Please wait"
-          )}
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Activating trial
         </button>
       );
     }
@@ -337,7 +332,11 @@ export function UpgradePage({
         {isStartingCheckout ? (
           <Loader2 className="h-4 w-4 animate-spin" />
         ) : null}
-        {isDowngrade ? "Unavailable" : plan.cta}
+        {isDowngrade
+          ? "Unavailable"
+          : isPendingPlan && activationTimedOut
+            ? "Try again"
+            : plan.cta}
       </button>
     );
   };

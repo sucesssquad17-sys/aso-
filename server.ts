@@ -2768,16 +2768,49 @@ function getEffectiveBillingPlanId(
   return resolvePlanIdFromProductId(data?.dodoProductId) || 'free';
 }
 
+const BILLING_ACTIVATION_STALE_AFTER_MS = 10 * 60 * 1000;
+
+function hasPendingBillingActivation(
+  data: Pick<
+    UserTrackingDocument,
+    'accountStatus' | 'pendingPlanId' | 'subscriptionStatus' | 'subscriptionUpdatedAt'
+  > | null | undefined,
+) {
+  if (isDeletedUserTrackingDocument(data)) {
+    return false;
+  }
+
+  if (!readPendingPlanId(data?.pendingPlanId)) {
+    return false;
+  }
+
+  const updatedAtMs =
+    typeof data?.subscriptionUpdatedAt === 'string'
+      ? Date.parse(data.subscriptionUpdatedAt)
+      : Number.NaN;
+  if (!Number.isFinite(updatedAtMs)) {
+    return false;
+  }
+
+  return Date.now() - updatedAtMs < BILLING_ACTIVATION_STALE_AFTER_MS;
+}
+
 function deriveBillingAccessState(
   data: Pick<
     UserTrackingDocument,
-    'accountStatus' | 'dodoProductId' | 'isPremium' | 'pendingPlanId' | 'subscriptionStatus' | 'subscriptionTier'
+    | 'accountStatus'
+    | 'dodoProductId'
+    | 'isPremium'
+    | 'pendingPlanId'
+    | 'subscriptionStatus'
+    | 'subscriptionTier'
+    | 'subscriptionUpdatedAt'
   > | null | undefined,
 ): BillingAccessState {
   if (hasActiveBillingEntitlement(data)) {
     return 'active';
   }
-  if (readPendingPlanId(data?.pendingPlanId)) {
+  if (hasPendingBillingActivation(data)) {
     return 'activating';
   }
   return 'selection_required';
@@ -3712,7 +3745,7 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
   }
 
   const createdEvents: AlertEvent[] = [];
-  const pushEvents: AlertEvent[] = [];
+  const browserPushEvents: AlertEvent[] = [];
   const emailEvents: AlertEvent[] = [];
 
   for (const rule of asoRules) {
@@ -3768,8 +3801,8 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.inApp || rule.channels.push) {
-          pushEvents.push(event);
+        if (rule.channels.push) {
+          browserPushEvents.push(event);
         }
         if (rule.channels.email) {
           emailEvents.push(event);
@@ -3778,8 +3811,8 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
     }
   }
 
-  if (pushEvents.length) {
-    await sendPushAlertEvents(userDocRef, notificationSettings, pushEvents);
+  if (browserPushEvents.length) {
+    await sendPushAlertEvents(userDocRef, notificationSettings, browserPushEvents);
   }
   if (emailEvents.length) {
     await sendEmailAlertEvents(userDocRef, emailEvents);
@@ -4003,6 +4036,16 @@ function buildAlertEmailHtml(event: AlertEvent) {
 async function resolveAlertEmailRecipient(
   userDocRef: DocumentReference<DocumentData>,
 ) {
+  try {
+    const userSnapshot = await userDocRef.get();
+    const billingEmail = normalizeEmailAddress(userSnapshot.data()?.billingEmail);
+    if (billingEmail && isValidEmailAddress(billingEmail)) {
+      return billingEmail;
+    }
+  } catch (error) {
+    console.warn(`[email] Failed to read billing email for user ${userDocRef.id}`, error);
+  }
+
   const authClient = getFirebaseAdminAuthClient();
   if (!authClient) {
     console.info('[email] Skipping alert email because Firebase Admin Auth is not configured.');
@@ -4229,7 +4272,7 @@ async function loadAnnouncementCampaignRecipients(
     };
   });
 
-  return recipients.filter(
+  const validRecipients = recipients.filter(
     (
       entry,
     ): entry is {
@@ -4237,6 +4280,16 @@ async function loadAnnouncementCampaignRecipients(
       email: string;
     } => Boolean(entry),
   );
+  const recipientsByEmail = new Map<string, {
+    userDocRef: DocumentReference<DocumentData>;
+    email: string;
+  }>();
+  for (const recipient of validRecipients) {
+    if (!recipientsByEmail.has(recipient.email)) {
+      recipientsByEmail.set(recipient.email, recipient);
+    }
+  }
+  return Array.from(recipientsByEmail.values());
 }
 
 async function sendAnnouncementCampaign(
@@ -4385,7 +4438,7 @@ async function evaluateAndDispatchAlertRules(
     ...rule,
     baselineKeys: Array.isArray(rule.baselineKeys) ? [...rule.baselineKeys] : [],
   }));
-  const pushEvents: AlertEvent[] = [];
+  const browserPushEvents: AlertEvent[] = [];
   const emailEvents: AlertEvent[] = [];
   const createdEvents: AlertEvent[] = [];
 
@@ -4460,8 +4513,8 @@ async function evaluateAndDispatchAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.inApp || rule.channels.push) {
-          pushEvents.push(event);
+        if (rule.channels.push) {
+          browserPushEvents.push(event);
         }
         if (rule.channels.email) {
           emailEvents.push(event);
@@ -4476,8 +4529,8 @@ async function evaluateAndDispatchAlertRules(
     }
   }
 
-  if (pushEvents.length) {
-    await sendPushAlertEvents(userDocRef, notificationSettings, pushEvents);
+  if (browserPushEvents.length) {
+    await sendPushAlertEvents(userDocRef, notificationSettings, browserPushEvents);
   }
   if (emailEvents.length) {
     await sendEmailAlertEvents(userDocRef, emailEvents);
@@ -7388,15 +7441,50 @@ async function startServer() {
       }
 
       const snapshot = await adminDb.collection('users').doc(decodedToken.uid).get();
-      const userData = snapshot.data() as UserTrackingDocument | undefined;
+      let userData = snapshot.data() as UserTrackingDocument | undefined;
       const pricingCatalog = await loadBillingPricingCatalog();
       const normalizedUserState = normalizeUserTrackingDocument(userData);
       const effectiveSubscriptionTier = getEffectiveBillingPlanId(userData);
-      const accessState = deriveBillingAccessState(userData);
+      let accessState = deriveBillingAccessState(userData);
       const isPremium = hasActiveBillingEntitlement(userData);
-      const pendingPlanId = readPendingPlanId(userData?.pendingPlanId);
-      const pendingInterval =
+      let pendingPlanId = readPendingPlanId(userData?.pendingPlanId);
+      let pendingInterval =
         userData?.pendingInterval === 'yearly' ? 'yearly' : userData?.pendingInterval === 'monthly' ? 'monthly' : null;
+      if (
+        pendingPlanId &&
+        accessState !== 'activating' &&
+        !isPremium
+      ) {
+        const clearedAt = new Date().toISOString();
+        const stalePendingCleanup: DocumentData = {
+          pendingPlanId: FieldValue.delete(),
+          pendingInterval: FieldValue.delete(),
+          ...(userData?.subscriptionStatus === 'pending'
+            ? { subscriptionStatus: FieldValue.delete() }
+            : {}),
+          updatedAt: clearedAt,
+        };
+        await adminDb.collection('users').doc(decodedToken.uid).set(
+          stalePendingCleanup,
+          { merge: true },
+        );
+
+        userData = userData
+          ? {
+              ...userData,
+              pendingPlanId: undefined,
+              pendingInterval: undefined,
+              subscriptionStatus:
+                userData.subscriptionStatus === 'pending'
+                  ? undefined
+                  : userData.subscriptionStatus,
+              updatedAt: clearedAt,
+            }
+          : userData;
+        pendingPlanId = null;
+        pendingInterval = null;
+        accessState = 'selection_required';
+      }
       const planLimits =
         accessState === 'active' ? getResolvedPlanLimits(userData) : null;
       const usage =
