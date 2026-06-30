@@ -44,7 +44,7 @@ const heroHighlights = [
     icon: Bell,
   },
   {
-    title: "Competitor comparison",
+    title: "Competitor groups",
     copy: "Create battle groups and see where rivals overlap with your best search terms.",
     icon: Layers,
   },

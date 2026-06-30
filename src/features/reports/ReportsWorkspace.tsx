@@ -2282,7 +2282,7 @@ export default function ReportsWorkspace({
                     </p>
                   </div>
                   <div className="text-xs text-app-text-muted">
-                    Detailed ASO history and alert setup stays in Competitors.
+                    Detailed ASO change history and alert setup stays in Competitors.
                   </div>
                 </div>
                 <CompactStatGrid
