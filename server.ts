@@ -6852,12 +6852,15 @@ async function buildKeywordSignals(
 }> {
   const candidates = new Map<string, number>();
   const titleSegments = collectTitleSegments(context.title);
+  const ownTitleTokens = new Set(tokenize(context.title));
+  const categoryHintTokens = new Set(deriveCategoryHints(context.category).flatMap((hint) => tokenize(hint)));
 
   titleSegments.forEach((segment, index) => addWeightedTerm(candidates, segment, 40 - (index * 4)));
   addTokenWeights(candidates, context.title, 16, 20);
   addTokenWeights(candidates, context.description, 2, 5);
+  addDescriptionIntentTerms(candidates, context.description, ownTitleTokens, categoryHintTokens);
 
-  deriveCategoryHints(context.category).forEach((hint) => addWeightedTerm(candidates, hint, 12));
+  deriveCategoryHints(context.category).forEach((hint) => addWeightedTerm(candidates, hint, 8));
   tokenize(context.developer).forEach((token) => addWeightedTerm(candidates, token, 2));
 
   const competitorSource = await mineCompetitorTerms(context, mode, profile);
@@ -6871,7 +6874,7 @@ async function buildKeywordSignals(
     candidateWeights: candidates,
     competitorWeights,
     competitorBrandTokens: new Set(competitorSource.competitorBrandTokens),
-    ownTitleTokens: new Set(tokenize(context.title)),
+    ownTitleTokens,
   };
 }
 
@@ -6972,6 +6975,88 @@ async function buildKeywordMarketSamples(
   }
 
   return samples;
+}
+
+function addDescriptionIntentTerms(
+  target: Map<string, number>,
+  description: string | undefined,
+  ownTitleTokens: Set<string>,
+  categoryHintTokens: Set<string>,
+) {
+  const tokens = tokenize(description);
+  if (tokens.length === 0) {
+    return;
+  }
+
+  const unigramCounts = new Map<string, number>();
+  const bigramCounts = new Map<string, number>();
+
+  tokens.forEach((token) => {
+    unigramCounts.set(token, (unigramCounts.get(token) || 0) + 1);
+  });
+
+  for (let index = 0; index < tokens.length - 1; index += 1) {
+    const left = tokens[index];
+    const right = tokens[index + 1];
+    if (left === right) {
+      continue;
+    }
+    const bigram = `${left} ${right}`;
+    bigramCounts.set(bigram, (bigramCounts.get(bigram) || 0) + 1);
+  }
+
+  unigramCounts.forEach((count, token) => {
+    if (count < 2) {
+      return;
+    }
+    if (ownTitleTokens.has(token) || categoryHintTokens.has(token) || HIGH_VOLUME_TERMS.has(token)) {
+      return;
+    }
+    addWeightedTerm(target, token, 4 + (count * 2));
+  });
+
+  bigramCounts.forEach((count, bigram) => {
+    const parts = bigram.split(' ');
+    const genericPartCount = parts.filter((part) =>
+      categoryHintTokens.has(part) || HIGH_VOLUME_TERMS.has(part)
+    ).length;
+
+    if (genericPartCount === parts.length) {
+      return;
+    }
+
+    const nonBrandSpecificCount = parts.filter((part) =>
+      !ownTitleTokens.has(part) &&
+      !categoryHintTokens.has(part) &&
+      !HIGH_VOLUME_TERMS.has(part)
+    ).length;
+
+    if (count < 2 && nonBrandSpecificCount === 0) {
+      return;
+    }
+
+    let weight = 6 + (count * 3);
+    if (genericPartCount === 0) {
+      weight += 4;
+    }
+    if (nonBrandSpecificCount > 0) {
+      weight += nonBrandSpecificCount * 2;
+    }
+
+    addWeightedTerm(target, bigram, weight);
+  });
+}
+
+function isLowIntentGenericDiscoveryPhrase(features: ReturnType<typeof extractKeywordFeatures>) {
+  return (
+    features.tokenCount >= 2 &&
+    features.titleCoverage === 0 &&
+    features.appTitleCoverage === 0 &&
+    features.descriptionCoverage < 0.34 &&
+    features.semanticCoverage < 0.34 &&
+    features.categorySemanticCoverage >= 0.5 &&
+    features.genericCoverage >= 0.5
+  );
 }
 
 function selectMetricEnrichmentKeywords(
@@ -7312,6 +7397,7 @@ async function buildRankedDiscoveryCandidates(
         candidate.displayQuality,
       ),
     )
+    .filter((candidate) => !isLowIntentGenericDiscoveryPhrase(candidate.features))
     .sort((a, b) => {
       if (b.baseline.relevance !== a.baseline.relevance) return b.baseline.relevance - a.baseline.relevance;
       if (a.baseline.difficulty !== b.baseline.difficulty) return a.baseline.difficulty - b.baseline.difficulty;
