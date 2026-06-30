@@ -6629,10 +6629,18 @@ async function mineCompetitorTerms(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
-) {
+): Promise<{
+  terms: { term: string; weight: number }[];
+  competitorBrandTokens: string[];
+}> {
   const storeType = context.store;
   const country = context.country || 'us';
-  if (!storeType) return [];
+  if (!storeType) {
+    return {
+      terms: [],
+      competitorBrandTokens: [],
+    };
+  }
 
   const cacheKey = JSON.stringify({
     cacheVersion: DISCOVERY_CACHE_VERSION,
@@ -6642,7 +6650,10 @@ async function mineCompetitorTerms(
     store: storeType,
     country,
   });
-  const cached = keywordSourceCache.get<{ term: string; weight: number }[]>(cacheKey);
+  const cached = keywordSourceCache.get<{
+    terms: { term: string; weight: number }[];
+    competitorBrandTokens: string[];
+  }>(cacheKey);
   if (cached) return cached;
 
   const seeds = new Set<string>();
@@ -6731,6 +6742,7 @@ async function mineCompetitorTerms(
     }
   }
 
+  const competitorBrandTokens = new Set<string>();
   seedResults.forEach((results) => {
     results.forEach((app: any, index: number) => {
       const rankWeight = Math.max(2, 10 - index);
@@ -6739,27 +6751,47 @@ async function mineCompetitorTerms(
       const title = String(app.title || '');
       const seenTermsForApp = new Set<string>();
       const titleSegmentsForApp = collectTitleSegments(title);
+      const titleTokensForApp = tokenize(title);
+      const leadToken = titleTokensForApp[0];
+      const suppressBrandLead = Boolean(
+        leadToken &&
+          !ownTokens.has(leadToken) &&
+          !categoryHintTokens.has(leadToken) &&
+          !HIGH_VOLUME_TERMS.has(leadToken) &&
+          leadToken.length > 2,
+      );
+      const weightedTitle =
+        suppressBrandLead && titleTokensForApp.length > 1
+          ? titleTokensForApp.slice(1).join(' ')
+          : title;
+
+      if (suppressBrandLead && leadToken) {
+        competitorBrandTokens.add(leadToken);
+      }
+
       titleSegmentsForApp.forEach((segment, segmentIndex) => {
+        if (suppressBrandLead && leadToken && segment.startsWith(`${leadToken} `)) {
+          return;
+        }
         const segmentWeight = segmentIndex === 0 ? rankWeight * 3 : rankWeight * 2;
         addWeightedTerm(competitorTerms, segment, segmentWeight);
         seenTermsForApp.add(normalizeKeyword(segment));
       });
 
-      const titleTokensForApp = tokenize(title);
-      if (titleTokensForApp[0]) {
+      if (!suppressBrandLead && titleTokensForApp[0]) {
         addWeightedTerm(competitorTerms, titleTokensForApp[0], rankWeight + 3);
         seenTermsForApp.add(titleTokensForApp[0]);
       }
-      if (titleTokensForApp[0] && titleTokensForApp[1]) {
+      if (!suppressBrandLead && titleTokensForApp[0] && titleTokensForApp[1]) {
         const leadBigram = `${titleTokensForApp[0]} ${titleTokensForApp[1]}`;
         addWeightedTerm(competitorTerms, leadBigram, rankWeight + 4);
         seenTermsForApp.add(leadBigram);
       }
 
-      addTokenWeights(competitorTerms, title, rankWeight + 1, rankWeight + 3);
+      addTokenWeights(competitorTerms, weightedTitle, rankWeight + 1, rankWeight + 3);
       addTokenWeights(competitorTerms, category, rankWeight + 2, 0);
 
-      tokenize(title).forEach((token) => {
+      tokenize(weightedTitle).forEach((token) => {
         if (categoryHintTokens.has(token)) {
           addWeightedTerm(competitorTerms, token, rankWeight + 3);
         }
@@ -6799,15 +6831,25 @@ async function mineCompetitorTerms(
     .slice(0, profile.competitorTermLimit)
     .map(([term, weight]) => ({ term, weight }));
 
-  keywordSourceCache.set(cacheKey, mined);
-  return mined;
+  const payload = {
+    terms: mined,
+    competitorBrandTokens: Array.from(competitorBrandTokens).sort((a, b) => a.localeCompare(b)),
+  };
+
+  keywordSourceCache.set(cacheKey, payload);
+  return payload;
 }
 
 async function buildKeywordSignals(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
-) {
+): Promise<{
+  candidateWeights: Map<string, number>;
+  competitorWeights: Map<string, number>;
+  competitorBrandTokens: Set<string>;
+  ownTitleTokens: Set<string>;
+}> {
   const candidates = new Map<string, number>();
   const titleSegments = collectTitleSegments(context.title);
 
@@ -6818,9 +6860,9 @@ async function buildKeywordSignals(
   deriveCategoryHints(context.category).forEach((hint) => addWeightedTerm(candidates, hint, 12));
   tokenize(context.developer).forEach((token) => addWeightedTerm(candidates, token, 2));
 
-  const competitorTerms = await mineCompetitorTerms(context, mode, profile);
+  const competitorSource = await mineCompetitorTerms(context, mode, profile);
   const competitorWeights = new Map<string, number>();
-  competitorTerms.forEach(({ term, weight }) => {
+  competitorSource.terms.forEach(({ term, weight }) => {
     competitorWeights.set(term, weight);
     addWeightedTerm(candidates, term, Math.max(4, Math.round(weight / 2)));
   });
@@ -6828,6 +6870,7 @@ async function buildKeywordSignals(
   return {
     candidateWeights: candidates,
     competitorWeights,
+    competitorBrandTokens: new Set(competitorSource.competitorBrandTokens),
     ownTitleTokens: new Set(tokenize(context.title)),
   };
 }
@@ -6959,15 +7002,21 @@ async function buildKeywordCandidates(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
-) {
-  const { candidateWeights, ownTitleTokens } = await buildKeywordSignals(
+): Promise<{
+  keywords: string[];
+  competitorBrandTokens: string[];
+}> {
+  const { candidateWeights, competitorBrandTokens, ownTitleTokens } = await buildKeywordSignals(
     context,
     mode,
     profile,
   );
 
-  return getSortedCandidateTerms(candidateWeights, ownTitleTokens)
-    .map(([term]) => term);
+  return {
+    keywords: getSortedCandidateTerms(candidateWeights, ownTitleTokens)
+      .map(([term]) => term),
+    competitorBrandTokens: Array.from(competitorBrandTokens).sort((a, b) => a.localeCompare(b)),
+  };
 }
 const genai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 
@@ -6987,6 +7036,14 @@ function dedupeKeywords(keywords: string[]) {
     seen.add(normalized);
     return true;
   });
+}
+
+function keywordContainsExcludedBrandToken(keyword: string, excludedBrandTokens: Set<string>) {
+  if (excludedBrandTokens.size === 0) {
+    return false;
+  }
+
+  return tokenize(keyword).some((token) => excludedBrandTokens.has(token));
 }
 
 function shouldUseGeminiKeywordRefinement(
@@ -7021,7 +7078,8 @@ function shouldUseGeminiKeywordRefinement(
 async function refineKeywordsWithGemini(
   context: { title: string; description?: string; category?: string; developer?: string },
   rawKeywords: string[],
-  mode: DiscoveryMode
+  mode: DiscoveryMode,
+  excludedBrandTokens?: string[],
 ): Promise<{
   keywords: string[];
   rawCount: number;
@@ -7035,6 +7093,7 @@ async function refineKeywordsWithGemini(
     description: normalizeKeyword(context.description || ''),
     category: normalizeKeyword(context.category || ''),
     developer: normalizeKeyword(context.developer || ''),
+    excludedBrandTokens: (excludedBrandTokens || []).slice().sort((a, b) => a.localeCompare(b)),
     mode,
     rawKeywords: dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate)),
   };
@@ -7057,6 +7116,7 @@ async function refineKeywordsWithGemini(
   let geminiKeywords: string[] = [];
   const shouldUseGemini = shouldUseGeminiKeywordRefinement(context, rawKeywords, mode);
   const promptKeywords = normalizedContext.rawKeywords.slice(0, Math.max(limit, 24));
+  const excludedBrandTokenSet = new Set(normalizedContext.excludedBrandTokens);
 
   if (shouldUseGemini && promptKeywords.length > 0) {
     const prompt = `You are a creative and broad App Store Optimization (ASO) keyword expert.
@@ -7069,13 +7129,17 @@ Developer: "${context.developer || 'N/A'}"
 I have scraped the following potential keywords from competitors:
 ${promptKeywords.join(', ')}
 
+Avoid competitor app brand names or trademarked rival app titles in the output. Do not return branded competitor phrases such as:
+${normalizedContext.excludedBrandTokens.length > 0 ? normalizedContext.excludedBrandTokens.join(', ') : 'N/A'}
+
 Your task is to significantly expand and refine this list to discover a large variety of relevant keywords:
 1. Return real, human-searchable App Store / Google Play keywords with search intent.
 2. Expand on the provided list by generating synonyms, adjacent intents, feature phrases, problem/benefit phrases, and long-tail variations up to 8 words.
 3. Do not be overly strict—if a keyword might be searched by a real user looking for this type of app, include it!
 4. Include a mix of head terms, mid-tail terms, and long-tail phrases. Broader exploratory terms are welcome.
 5. Avoid obvious junk like changelog phrases, release notes, or bug-fix wording.
-6. Return EXACTLY a JSON array of up to ${limit * 3} strings. NEVER use markdown formatting.`;
+6. Exclude competitor brands and trademarked rival app names unless the keyword is the app's own brand.
+7. Return EXACTLY a JSON array of up to ${limit * 3} strings. NEVER use markdown formatting.`;
 
     try {
       const response = await genai.models.generateContent({
@@ -7105,13 +7169,18 @@ Your task is to significantly expand and refine this list to discover a large va
   }
 
   const sanitizedGeminiKeywords = dedupeKeywords(
-    geminiKeywords.filter(isDiscoveryKeywordCandidate),
+    geminiKeywords
+      .filter(isDiscoveryKeywordCandidate)
+      .filter((keyword) => !keywordContainsExcludedBrandToken(keyword, excludedBrandTokenSet)),
   );
   const primaryKeywords = sanitizedGeminiKeywords.slice(0, limit);
   const seen = new Set(primaryKeywords.map((keyword) => normalizeKeyword(keyword)));
   const fallbackKeywords: string[] = [];
 
   for (const keyword of dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate))) {
+    if (keywordContainsExcludedBrandToken(keyword, excludedBrandTokenSet)) {
+      continue;
+    }
     const normalized = normalizeKeyword(keyword);
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
@@ -7173,7 +7242,7 @@ async function buildRankedDiscoveryCandidates(
     return cached;
   }
 
-  const rawKeywords = await buildKeywordCandidates({
+  const candidateSource = await buildKeywordCandidates({
     title: input.title,
     description: input.description,
     category: input.category,
@@ -7181,6 +7250,7 @@ async function buildRankedDiscoveryCandidates(
     store: input.store,
     country: input.country,
   }, input.mode, profile);
+  const rawKeywords = candidateSource.keywords;
 
   const refined = await refineKeywordsWithGemini(
     {
@@ -7191,6 +7261,7 @@ async function buildRankedDiscoveryCandidates(
     },
     rawKeywords,
     input.mode,
+    candidateSource.competitorBrandTokens,
   );
   const refinedKeywords = refined.keywords;
 
@@ -9108,7 +9179,7 @@ async function startServer() {
       const developer = readOptionalString(req.body?.developer, 'developer', 200);
       const storeType = readStoreType(req.body?.store);
       const country = readOptionalString(req.body?.country, 'country', 12) || 'us';
-      const rawKeywords = await buildKeywordCandidates({
+      const candidateSource = await buildKeywordCandidates({
         title,
         description,
         category,
@@ -9116,10 +9187,12 @@ async function startServer() {
         store: storeType as StoreType,
         country: normalizeCountryCode(country, 'us'),
       }, 'deep', DISCOVERY_PROFILES.deep);
+      const rawKeywords = candidateSource.keywords;
       const refined = await refineKeywordsWithGemini(
         { title, description, category, developer },
         rawKeywords,
         'deep',
+        candidateSource.competitorBrandTokens,
       );
 
       res.json({ keywords: refined.keywords });
