@@ -7222,9 +7222,11 @@ Your task is to significantly expand and refine this list to discover a large va
 2. Expand on the provided list by generating synonyms, adjacent intents, feature phrases, problem/benefit phrases, and long-tail variations up to 8 words.
 3. Do not be overly strict—if a keyword might be searched by a real user looking for this type of app, include it!
 4. Include a mix of head terms, mid-tail terms, and long-tail phrases. Broader exploratory terms are welcome.
-5. Avoid obvious junk like changelog phrases, release notes, or bug-fix wording.
-6. Exclude competitor brands and trademarked rival app names unless the keyword is the app's own brand.
-7. Return EXACTLY a JSON array of up to ${limit * 3} strings. NEVER use markdown formatting.`;
+5. Prefer concrete user intents, app features, audiences, and use cases grounded in the app metadata.
+6. Avoid filling the list with broad umbrella category phrases or near-duplicate generic variants such as "social media", "social platform", "social sharing", "social network", "photo app", or "fitness app" unless they are clearly part of the app's core title intent.
+7. Avoid obvious junk like changelog phrases, release notes, or bug-fix wording.
+8. Exclude competitor brands and trademarked rival app names unless the keyword is the app's own brand.
+9. Return EXACTLY a JSON array of up to ${limit * 3} strings. NEVER use markdown formatting.`;
 
     try {
       const response = await genai.models.generateContent({
@@ -7488,6 +7490,10 @@ async function discoverRankedKeywords(input: {
       exactTitleMatch: number;
       exactTitleSegment: number;
       orderedTitleCoverage: number;
+      titleCoverage: number;
+      appTitleCoverage: number;
+      descriptionCoverage: number;
+      genericCoverage: number;
       semanticCoverage: number;
       categorySemanticCoverage: number;
     };
@@ -7546,6 +7552,10 @@ async function discoverRankedKeywords(input: {
               exactTitleMatch: features?.exactTitleMatch || 0,
               exactTitleSegment: features?.exactTitleSegment || 0,
               orderedTitleCoverage: features?.orderedTitleCoverage || 0,
+              titleCoverage: features?.titleCoverage || 0,
+              appTitleCoverage: features?.appTitleCoverage || 0,
+              descriptionCoverage: features?.descriptionCoverage || 0,
+              genericCoverage: features?.genericCoverage || 0,
               semanticCoverage: features?.semanticCoverage || 0,
               categorySemanticCoverage: features?.categorySemanticCoverage || 0,
             },
