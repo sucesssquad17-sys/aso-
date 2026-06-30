@@ -7115,6 +7115,64 @@ async function buildKeywordCandidates(
   };
 }
 const genai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+const GEMINI_DISCOVERY_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'] as const;
+const GEMINI_DISCOVERY_RETRY_DELAYS_MS = [600, 1500] as const;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateGeminiKeywordList(prompt: string) {
+  if (!genai) {
+    return null;
+  }
+
+  let lastError: unknown = null;
+
+  for (const model of GEMINI_DISCOVERY_MODELS) {
+    for (let attempt = 0; attempt <= GEMINI_DISCOVERY_RETRY_DELAYS_MS.length; attempt += 1) {
+      try {
+        const response = await genai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            responseMimeType: 'application/json',
+            responseSchema: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+        });
+
+        const text = response.text;
+        if (!text) {
+          return [];
+        }
+
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed)) {
+          return [];
+        }
+
+        return parsed.filter(
+          (keyword): keyword is string => typeof keyword === 'string',
+        );
+      } catch (error) {
+        lastError = error;
+        const retryable = isUnavailableLikeError(error) || isTimeoutLikeError(error);
+        const delayMs = GEMINI_DISCOVERY_RETRY_DELAYS_MS[attempt];
+        if (retryable && typeof delayMs === 'number') {
+          await sleep(delayMs);
+          continue;
+        }
+        break;
+      }
+    }
+  }
+
+  console.warn('Gemini keyword refinement unavailable after retries. Using fallback keywords.', lastError);
+  return null;
+}
 
 type DiscoveryMetricCandidate = {
   id: number;
@@ -7200,6 +7258,8 @@ async function refineKeywordsWithGemini(
   fallbackAddedCount: number;
 }> {
   const limit = DISCOVERY_PROFILES[mode].keywordLimit;
+  const refinementPoolLimit = limit * 3;
+  const geminiOutputLimit = limit * 5;
   const normalizedContext = {
     title: normalizeKeyword(context.title),
     description: normalizeKeyword(context.description || ''),
@@ -7248,37 +7308,16 @@ Your task is to significantly expand and refine this list to discover a large va
 1. Return real, human-searchable App Store / Google Play keywords with search intent.
 2. Expand on the provided list by generating synonyms, adjacent intents, feature phrases, problem/benefit phrases, and long-tail variations up to 8 words.
 3. Do not be overly strict—if a keyword might be searched by a real user looking for this type of app, include it!
-4. Include a mix of head terms, mid-tail terms, and long-tail phrases. Broader exploratory terms are welcome.
-5. Prefer concrete user intents, app features, audiences, and use cases grounded in the app metadata.
-6. Avoid filling the list with broad umbrella category phrases or near-duplicate generic variants such as "social media", "social platform", "social sharing", "social network", "photo app", or "fitness app" unless they are clearly part of the app's core title intent.
-7. Avoid obvious junk like changelog phrases, release notes, or bug-fix wording.
-8. Exclude competitor brands and trademarked rival app names unless the keyword is the app's own brand.
-9. Return EXACTLY a JSON array of up to ${limit * 3} strings. NEVER use markdown formatting.`;
+4. Include a mix of head terms, mid-tail terms, long-tail phrases, adjacent category intents, feature intents, audience intents, and problem/benefit phrases.
+5. Prefer concrete user intents, app features, audiences, and use cases grounded in the app metadata, but also include broader exploratory discovery terms when they are still relevant.
+6. Avoid obvious junk like changelog phrases, release notes, bug-fix wording, or nonsense keyword stuffing.
+7. Exclude competitor brands and trademarked rival app names unless the keyword is the app's own brand.
+8. Return EXACTLY a JSON array of up to ${geminiOutputLimit} strings. NEVER use markdown formatting.`;
 
     try {
-      const response = await genai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            items: { type: Type.STRING },
-          },
-        },
-      });
-
-      const text = response.text;
-      if (text) {
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed)) {
-          geminiKeywords = parsed.filter(
-            (keyword): keyword is string => typeof keyword === 'string',
-          );
-        }
-      }
+      geminiKeywords = (await generateGeminiKeywordList(prompt)) || [];
     } catch (err) {
-      console.error('Gemini keyword refinement failed:', err);
+      console.warn('Gemini keyword refinement failed unexpectedly. Using fallback keywords.', err);
     }
   }
 
@@ -7287,7 +7326,7 @@ Your task is to significantly expand and refine this list to discover a large va
       .filter(isDiscoveryKeywordCandidate)
       .filter((keyword) => !keywordContainsExcludedBrandToken(keyword, excludedBrandTokenSet)),
   );
-  const primaryKeywords = sanitizedGeminiKeywords.slice(0, limit);
+  const primaryKeywords = sanitizedGeminiKeywords.slice(0, refinementPoolLimit);
   const seen = new Set(primaryKeywords.map((keyword) => normalizeKeyword(keyword)));
   const fallbackKeywords: string[] = [];
 
@@ -7299,7 +7338,7 @@ Your task is to significantly expand and refine this list to discover a large va
     if (!normalized || seen.has(normalized)) continue;
     seen.add(normalized);
     fallbackKeywords.push(keyword);
-    if (primaryKeywords.length + fallbackKeywords.length >= limit) {
+    if (primaryKeywords.length + fallbackKeywords.length >= refinementPoolLimit) {
       break;
     }
   }
