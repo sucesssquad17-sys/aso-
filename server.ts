@@ -63,7 +63,12 @@ import {
   DEFAULT_GLOBAL_TRACKING_TIME,
   GLOBAL_TRACKING_TIMEZONE,
 } from './src/lib/trackingTime';
-import { DISCOVERY_CACHE_VERSION } from './src/lib/discoveryCache';
+import {
+  DISCOVERY_CANDIDATE_CACHE_TTL,
+  DISCOVERY_CACHE_VERSION,
+  getDiscoveryCandidateCacheKey,
+  getDiscoveryRankedResultCacheKey,
+} from './src/lib/discoveryCache';
 import {
   DAILY_TRACKING_LEASE_TTL_MINUTES,
   getDailyTrackingFinalStatus,
@@ -127,15 +132,15 @@ if (process.env.NODE_ENV !== 'production') {
   process.env.DISABLE_HMR = 'true';
 }
 
-// Discovery cache reuses analyzed app results for up to 12 hours.
+// Discovery rank results stay fresh for 30 minutes; candidate/refinement caches stay warm for 12 hours.
 const rankingCache = new NodeCache({ stdTTL: 14400 });
-const discoveryCandidateCache = new NodeCache({ stdTTL: 43200, useClones: false });
-const keywordSourceCache = new NodeCache({ stdTTL: 14400 });
-const keywordRefinementCache = new NodeCache({ stdTTL: 43200, useClones: false });
+const discoveryCandidateCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000, useClones: false });
+const keywordSourceCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000 });
+const keywordRefinementCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000, useClones: false });
 const keywordMarketCache = new NodeCache({ stdTTL: 14400, useClones: false });
 const searchCache = new NodeCache({ stdTTL: 3600, useClones: false });
 const appDetailsCache = new NodeCache({ stdTTL: 86400, useClones: false });
-const discoveryCache = new NodeCache({ stdTTL: 43200, useClones: false });
+const discoveryCache = new NodeCache({ stdTTL: 30 * 60, useClones: false });
 const chartCache = new NodeCache({ stdTTL: 900, useClones: false });
 const upstreamFailureCache = new NodeCache({ useClones: false });
 const dodoWebhookEventCache = new NodeCache({ stdTTL: 60 * 60 * 24, useClones: false });
@@ -4297,7 +4302,6 @@ async function loadAnnouncementCampaignRecipients(
 async function sendAnnouncementCampaign(
   adminDb: Firestore,
   campaignDocRef: DocumentReference<DocumentData>,
-  campaign: AnnouncementEmailCampaignDocument,
 ) {
   if (!resend) {
     throw createConfigurationError('Resend is not configured on the server.');
@@ -4307,14 +4311,29 @@ async function sendAnnouncementCampaign(
   }
 
   const sendingAt = new Date().toISOString();
-  const sendingPayload: DocumentData = {
-    status: 'sending',
-    updatedAt: sendingAt,
-    lastError: FieldValue.delete(),
-  };
-  await campaignDocRef.set(sendingPayload, { merge: true });
+  const claimedCampaign = await adminDb.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(campaignDocRef);
+    if (!snapshot.exists) {
+      throw createBadRequestError('Announcement campaign was not found.');
+    }
+    const latestCampaign = snapshot.data() as AnnouncementEmailCampaignDocument;
+    if (latestCampaign.status === 'sending') {
+      throw createBadRequestError('Announcement campaign is already sending.');
+    }
+    if (latestCampaign.status === 'sent') {
+      throw createBadRequestError('Announcement campaign has already been sent.');
+    }
 
-  const recipients = await loadAnnouncementCampaignRecipients(adminDb, campaign.audience);
+    transaction.set(campaignDocRef, {
+      status: 'sending',
+      updatedAt: sendingAt,
+      lastError: FieldValue.delete(),
+    } satisfies DocumentData, { merge: true });
+
+    return latestCampaign;
+  });
+
+  const recipients = await loadAnnouncementCampaignRecipients(adminDb, claimedCampaign.audience);
   let deliveredCount = 0;
   let failedCount = 0;
   const failureMessages: string[] = [];
@@ -4324,11 +4343,11 @@ async function sendAnnouncementCampaign(
       const result = await resend.emails.send({
         from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
         to: recipient.email,
-        subject: campaign.subject,
+        subject: claimedCampaign.subject,
         html: buildAnnouncementEmailHtml(
-          campaign,
+          claimedCampaign,
           getAnnouncementUnsubscribeUrl({
-            campaignId: campaign.campaignId,
+            campaignId: claimedCampaign.campaignId,
             userId: recipient.userDocRef.id,
             email: recipient.email,
           }),
@@ -4341,7 +4360,7 @@ async function sendAnnouncementCampaign(
       deliveredCount += 1;
       await recipient.userDocRef.set({
         lastAnnouncementEmailSentAt: sendingAt,
-        lastAnnouncementEmailCampaignId: campaign.campaignId,
+        lastAnnouncementEmailCampaignId: claimedCampaign.campaignId,
         updatedAt: new Date().toISOString(),
       } satisfies Partial<UserTrackingDocument>, { merge: true });
     } catch (error) {
@@ -4371,7 +4390,7 @@ async function sendAnnouncementCampaign(
   await campaignDocRef.set(completionPayload, { merge: true });
 
   return {
-    campaignId: campaign.campaignId,
+    campaignId: claimedCampaign.campaignId,
     status: nextStatus,
     recipientCount: recipients.length,
     deliveredCount,
@@ -6629,6 +6648,7 @@ async function mineCompetitorTerms(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
+  options?: { force?: boolean },
 ): Promise<{
   terms: { term: string; weight: number }[];
   competitorBrandTokens: string[];
@@ -6654,7 +6674,7 @@ async function mineCompetitorTerms(
     terms: { term: string; weight: number }[];
     competitorBrandTokens: string[];
   }>(cacheKey);
-  if (cached) return cached;
+  if (!options?.force && cached) return cached;
 
   const seeds = new Set<string>();
   const titleSegments = collectTitleSegments(context.title);
@@ -6844,6 +6864,7 @@ async function buildKeywordSignals(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
+  options?: { force?: boolean },
 ): Promise<{
   candidateWeights: Map<string, number>;
   competitorWeights: Map<string, number>;
@@ -6863,7 +6884,7 @@ async function buildKeywordSignals(
   deriveCategoryHints(context.category).forEach((hint) => addWeightedTerm(candidates, hint, 8));
   tokenize(context.developer).forEach((token) => addWeightedTerm(candidates, token, 2));
 
-  const competitorSource = await mineCompetitorTerms(context, mode, profile);
+  const competitorSource = await mineCompetitorTerms(context, mode, profile, options);
   const competitorWeights = new Map<string, number>();
   competitorSource.terms.forEach(({ term, weight }) => {
     competitorWeights.set(term, weight);
@@ -7047,18 +7068,6 @@ function addDescriptionIntentTerms(
   });
 }
 
-function isLowIntentGenericDiscoveryPhrase(features: ReturnType<typeof extractKeywordFeatures>) {
-  return (
-    features.tokenCount >= 2 &&
-    features.titleCoverage === 0 &&
-    features.appTitleCoverage === 0 &&
-    features.descriptionCoverage < 0.34 &&
-    features.semanticCoverage < 0.34 &&
-    features.categorySemanticCoverage >= 0.5 &&
-    features.genericCoverage >= 0.5
-  );
-}
-
 function selectMetricEnrichmentKeywords(
   candidates: Array<{
     keyword: string;
@@ -7087,6 +7096,7 @@ async function buildKeywordCandidates(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
+  options?: { force?: boolean },
 ): Promise<{
   keywords: string[];
   competitorBrandTokens: string[];
@@ -7095,6 +7105,7 @@ async function buildKeywordCandidates(
     context,
     mode,
     profile,
+    options,
   );
 
   return {
@@ -7111,6 +7122,50 @@ type DiscoveryMetricCandidate = {
   features: ReturnType<typeof extractKeywordFeatures>;
   baseline: ReturnType<typeof scoreKeywordMetrics>;
   displayQuality: number;
+};
+
+type DiscoveryFeatureQuality = {
+  exactTitleMatch: number;
+  exactTitleSegment: number;
+  orderedTitleCoverage: number;
+  titleCoverage: number;
+  appTitleCoverage: number;
+  descriptionCoverage: number;
+  genericCoverage: number;
+  semanticCoverage: number;
+  categorySemanticCoverage: number;
+};
+
+type DiscoveryCheckedCandidateOutcome = {
+  keyword: string;
+  rank: number;
+  demand: number;
+  volume: number;
+  difficulty: number;
+  relevance: number;
+  confidence: 'low' | 'medium' | 'high';
+  displayQuality: number;
+  featureQuality: DiscoveryFeatureQuality;
+};
+
+type DiscoveryCandidateCacheEntry = {
+  completeness: DiscoveryMode;
+  rankedCandidates: DiscoveryMetricCandidate[];
+  rawCount: number;
+  geminiCount: number;
+  sanitizedGeminiCount: number;
+  candidateCount: number;
+};
+
+type DiscoveryResultCacheEntry = {
+  completeness: DiscoveryMode;
+  rankedCandidates: DiscoveryMetricCandidate[];
+  checkedOutcomes: DiscoveryCheckedCandidateOutcome[];
+  checkedKeywords: number;
+  candidateCount: number;
+  searchDepth: number;
+  failedLookups: number;
+  loadedAt: string;
 };
 
 function dedupeKeywords(keywords: string[]) {
@@ -7131,40 +7186,12 @@ function keywordContainsExcludedBrandToken(keyword: string, excludedBrandTokens:
   return tokenize(keyword).some((token) => excludedBrandTokens.has(token));
 }
 
-function shouldUseGeminiKeywordRefinement(
-  context: { title: string; category?: string; developer?: string },
-  rawKeywords: string[],
-  mode: DiscoveryMode,
-) {
-  if (!genai || rawKeywords.length === 0) {
-    return false;
-  }
-
-  const normalizedCandidates = dedupeKeywords(
-    rawKeywords.filter(isDiscoveryKeywordCandidate),
-  );
-  const hasStrongTitleSignals =
-    collectTitleSegments(context.title).length >= (mode === 'deep' ? 3 : 2);
-  const hasCategorySignals = deriveCategoryHints(context.category).length > 0;
-  const hasDeveloperSignals = tokenize(context.developer).length > 0;
-  const phraseCandidateCount = normalizedCandidates.filter((keyword) => keyword.includes(' ')).length;
-  const candidateThreshold = mode === 'deep' ? 48 : 32;
-  const phraseThreshold = mode === 'deep' ? 14 : 10;
-
-  return (
-    normalizedCandidates.length < candidateThreshold ||
-    phraseCandidateCount < phraseThreshold ||
-    !hasStrongTitleSignals ||
-    !hasCategorySignals ||
-    (mode === 'deep' && !hasDeveloperSignals)
-  );
-}
-
 async function refineKeywordsWithGemini(
   context: { title: string; description?: string; category?: string; developer?: string },
   rawKeywords: string[],
   mode: DiscoveryMode,
   excludedBrandTokens?: string[],
+  options?: { force?: boolean },
 ): Promise<{
   keywords: string[];
   rawCount: number;
@@ -7194,13 +7221,13 @@ async function refineKeywordsWithGemini(
     sanitizedGeminiCount: number;
     fallbackAddedCount: number;
   }>(cacheKey);
-  if (cached) {
+  if (!options?.force && cached) {
     return cached;
   }
 
   let geminiKeywords: string[] = [];
-  const shouldUseGemini = shouldUseGeminiKeywordRefinement(context, rawKeywords, mode);
-  const promptKeywords = normalizedContext.rawKeywords.slice(0, Math.max(limit, 24));
+  const shouldUseGemini = Boolean(genai && normalizedContext.rawKeywords.length > 0);
+  const promptKeywords = normalizedContext.rawKeywords;
   const excludedBrandTokenSet = new Set(normalizedContext.excludedBrandTokens);
 
   if (shouldUseGemini && promptKeywords.length > 0) {
@@ -7293,6 +7320,150 @@ Your task is to significantly expand and refine this list to discover a large va
   return payload;
 }
 
+function getDiscoveryCacheIdentity(input: {
+  appId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  developer?: string;
+  store: StoreType;
+  country: string;
+}) {
+  return {
+    appId: String(input.appId),
+    title: input.title,
+    description: input.description || '',
+    category: input.category || '',
+    developer: input.developer || '',
+    store: input.store,
+    country: input.country,
+  };
+}
+
+function trimDiscoveryCandidateCacheEntry(
+  entry: DiscoveryCandidateCacheEntry,
+  mode: DiscoveryMode,
+): DiscoveryCandidateCacheEntry {
+  if (mode === 'deep') {
+    return entry;
+  }
+
+  const fastProfile = DISCOVERY_PROFILES.fast;
+
+  return {
+    ...entry,
+    completeness: 'fast',
+    rankedCandidates: entry.rankedCandidates.slice(0, fastProfile.keywordLimit),
+    candidateCount: Math.min(entry.candidateCount, fastProfile.keywordLimit),
+  };
+}
+
+function toDiscoveryFeatureQuality(
+  features: ReturnType<typeof extractKeywordFeatures>,
+): DiscoveryFeatureQuality {
+  return {
+    exactTitleMatch: features?.exactTitleMatch || 0,
+    exactTitleSegment: features?.exactTitleSegment || 0,
+    orderedTitleCoverage: features?.orderedTitleCoverage || 0,
+    titleCoverage: features?.titleCoverage || 0,
+    appTitleCoverage: features?.appTitleCoverage || 0,
+    descriptionCoverage: features?.descriptionCoverage || 0,
+    genericCoverage: features?.genericCoverage || 0,
+    semanticCoverage: features?.semanticCoverage || 0,
+    categorySemanticCoverage: features?.categorySemanticCoverage || 0,
+  };
+}
+
+function buildDiscoveryPayloadFromCacheEntry(
+  entry: DiscoveryResultCacheEntry,
+  mode: DiscoveryMode,
+) {
+  const profile = DISCOVERY_PROFILES[mode];
+  const candidatePool = entry.rankedCandidates.slice(0, profile.keywordLimit);
+  const outcomeByKeyword = new Map(
+    entry.checkedOutcomes.map((outcome) => [normalizeKeyword(outcome.keyword), outcome]),
+  );
+  const validRankings = candidatePool
+    .map((candidate) => outcomeByKeyword.get(normalizeKeyword(candidate.keyword)))
+    .filter(
+      (outcome): outcome is DiscoveryCheckedCandidateOutcome =>
+        Boolean(outcome) && outcome.rank > 0 && outcome.rank <= profile.searchDepth,
+    );
+
+  const rankings = validRankings
+    .filter((candidate) =>
+      shouldAdmitDiscoveryCandidate(
+        mode,
+        candidate.featureQuality,
+        candidate.displayQuality,
+      ),
+    )
+    .sort((a, b) => {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      return b.relevance - a.relevance;
+    })
+    .map(({ keyword, rank, demand, volume, difficulty, relevance, confidence }) => ({
+      keyword,
+      rank,
+      demand,
+      volume,
+      difficulty,
+      relevance,
+      confidence,
+    }))
+    .slice(0, profile.finalRankingLimit);
+
+  const rankedKeywordSet = new Set(rankings.map((ranking) => normalizeKeyword(ranking.keyword)));
+  const suggestions = candidatePool
+    .filter((candidate) => !rankedKeywordSet.has(normalizeKeyword(candidate.keyword)))
+    .slice(0, profile.finalRankingLimit)
+    .map(({ keyword, baseline }) => ({
+      keyword,
+      demand: baseline.demand,
+      volume: baseline.volume,
+      difficulty: baseline.difficulty,
+      relevance: baseline.relevance,
+      confidence: baseline.confidence,
+    }));
+
+  return {
+    mode,
+    checkedKeywords: Math.min(entry.checkedKeywords, candidatePool.length),
+    candidateCount: candidatePool.length,
+    searchDepth: profile.searchDepth,
+    failedLookups: entry.failedLookups,
+    rankings,
+    suggestions,
+  };
+}
+
+function getReusableDiscoveryOutcome(
+  cachedEntry: DiscoveryResultCacheEntry | undefined,
+  keyword: string,
+  requestedSearchDepth: number,
+) {
+  if (!cachedEntry) {
+    return null;
+  }
+
+  const existing = cachedEntry.checkedOutcomes.find(
+    (outcome) => normalizeKeyword(outcome.keyword) === normalizeKeyword(keyword),
+  );
+  if (!existing) {
+    return null;
+  }
+
+  if (cachedEntry.searchDepth >= requestedSearchDepth) {
+    return existing;
+  }
+
+  if (existing.rank > 0 && existing.rank <= cachedEntry.searchDepth) {
+    return existing;
+  }
+
+  return null;
+}
+
 async function buildRankedDiscoveryCandidates(
   input: {
     appId: string;
@@ -7305,28 +7476,13 @@ async function buildRankedDiscoveryCandidates(
     mode: DiscoveryMode;
   },
   profile: DiscoveryProfile,
+  options?: { force?: boolean },
 ) {
-  const cacheKey = JSON.stringify({
-    cacheVersion: DISCOVERY_CACHE_VERSION,
-    type: 'discovery-candidates',
-    appId: input.appId,
-    title: normalizeKeyword(input.title),
-    description: normalizeKeyword(input.description || ''),
-    category: normalizeKeyword(input.category || ''),
-    developer: normalizeKeyword(input.developer || ''),
-    mode: input.mode,
-    store: input.store,
-    country: input.country,
-  });
-  const cached = discoveryCandidateCache.get<{
-    rankedCandidates: DiscoveryMetricCandidate[];
-    rawCount: number;
-    geminiCount: number;
-    sanitizedGeminiCount: number;
-    candidateCount: number;
-  }>(cacheKey);
-  if (cached) {
-    return cached;
+  const cacheIdentity = getDiscoveryCacheIdentity(input);
+  const cacheKey = getDiscoveryCandidateCacheKey(cacheIdentity);
+  const cached = discoveryCandidateCache.get<DiscoveryCandidateCacheEntry>(cacheKey);
+  if (!options?.force && cached && (cached.completeness === 'deep' || input.mode === 'fast')) {
+    return trimDiscoveryCandidateCacheEntry(cached, input.mode);
   }
 
   const candidateSource = await buildKeywordCandidates({
@@ -7336,7 +7492,7 @@ async function buildRankedDiscoveryCandidates(
     developer: input.developer,
     store: input.store,
     country: input.country,
-  }, input.mode, profile);
+  }, input.mode, profile, options);
   const rawKeywords = candidateSource.keywords;
 
   const refined = await refineKeywordsWithGemini(
@@ -7349,6 +7505,7 @@ async function buildRankedDiscoveryCandidates(
     rawKeywords,
     input.mode,
     candidateSource.competitorBrandTokens,
+    options,
   );
   const refinedKeywords = refined.keywords;
 
@@ -7360,7 +7517,7 @@ async function buildRankedDiscoveryCandidates(
     return true;
   });
 
-  const signalContext = await buildKeywordSignals(input, input.mode, profile);
+  const signalContext = await buildKeywordSignals(input, input.mode, profile, options);
   const metricCandidates: DiscoveryMetricCandidate[] = uniqueKeywords.map((keyword, index) => {
     const features = extractKeywordFeatures(
       input,
@@ -7399,7 +7556,6 @@ async function buildRankedDiscoveryCandidates(
         candidate.displayQuality,
       ),
     )
-    .filter((candidate) => !isLowIntentGenericDiscoveryPhrase(candidate.features))
     .sort((a, b) => {
       if (b.baseline.relevance !== a.baseline.relevance) return b.baseline.relevance - a.baseline.relevance;
       if (a.baseline.difficulty !== b.baseline.difficulty) return a.baseline.difficulty - b.baseline.difficulty;
@@ -7408,7 +7564,8 @@ async function buildRankedDiscoveryCandidates(
     })
     .slice(0, profile.keywordLimit);
 
-  const payload = {
+  const payload: DiscoveryCandidateCacheEntry = {
+    completeness: input.mode,
     rankedCandidates,
     rawCount: refined.rawCount,
     geminiCount: refined.geminiCount,
@@ -7421,7 +7578,7 @@ async function buildRankedDiscoveryCandidates(
   );
 
   discoveryCandidateCache.set(cacheKey, payload);
-  return payload;
+  return trimDiscoveryCandidateCacheEntry(payload, input.mode);
 }
 
 async function discoverRankedKeywords(input: {
@@ -7436,68 +7593,37 @@ async function discoverRankedKeywords(input: {
   force?: boolean;
 }) {
   const profile = DISCOVERY_PROFILES[input.mode];
-  const cacheKey = JSON.stringify({
-    cacheVersion: DISCOVERY_CACHE_VERSION,
-    appId: input.appId,
-    title: normalizeKeyword(input.title),
-    description: normalizeKeyword(input.description || ''),
-    category: normalizeKeyword(input.category || ''),
-    developer: normalizeKeyword(input.developer || ''),
-    mode: input.mode,
-    store: input.store,
-    country: input.country,
-  });
-  const cached = discoveryCache.get<{
-    rankings: Array<{
-      keyword: string;
-      rank: number;
-      demand: number;
-      volume: number;
-      difficulty: number;
-      relevance: number;
-      confidence: 'low' | 'medium' | 'high';
-    }>;
-    suggestions?: Array<{
-      keyword: string;
-      demand: number;
-      volume: number;
-      difficulty: number;
-      relevance: number;
-      confidence: 'low' | 'medium' | 'high';
-    }>;
-    mode: DiscoveryMode;
-    checkedKeywords: number;
-    candidateCount: number;
-    searchDepth: number;
-    failedLookups: number;
-  }>(cacheKey);
-  if (!input.force && cached) {
-    return cached;
+  const cacheIdentity = getDiscoveryCacheIdentity(input);
+  const cacheKey = getDiscoveryRankedResultCacheKey(cacheIdentity);
+  const cached = discoveryCache.get<DiscoveryResultCacheEntry>(cacheKey);
+  if (!input.force && cached && (cached.completeness === 'deep' || cached.completeness === input.mode)) {
+    return buildDiscoveryPayloadFromCacheEntry(cached, input.mode);
   }
 
-  const candidateSet = await buildRankedDiscoveryCandidates(input, profile);
+  const candidateSet = await buildRankedDiscoveryCandidates(input, profile, { force: input.force });
   const rankedCandidates = candidateSet.rankedCandidates;
-  const validRankings: Array<{
-    keyword: string;
-    rank: number;
-    demand: number;
-    volume: number;
-    difficulty: number;
-    relevance: number;
-    confidence: 'low' | 'medium' | 'high';
-    displayQuality: number;
-    featureQuality: {
-      exactTitleMatch: number;
-      exactTitleSegment: number;
-      orderedTitleCoverage: number;
-      titleCoverage: number;
-      appTitleCoverage: number;
-      descriptionCoverage: number;
-      genericCoverage: number;
-      semanticCoverage: number;
-      categorySemanticCoverage: number;
-    };
-  }> = [];
+  const validRankings: DiscoveryCheckedCandidateOutcome[] = [];
+  const checkedOutcomes: DiscoveryCheckedCandidateOutcome[] = [];
+  const reusableOutcomeByKeyword = new Map<string, DiscoveryCheckedCandidateOutcome>();
+
+  if (!input.force && cached) {
+    cached.checkedOutcomes.forEach((outcome) => {
+      const reusableOutcome = getReusableDiscoveryOutcome(
+        cached,
+        outcome.keyword,
+        profile.searchDepth,
+      );
+      if (!reusableOutcome) {
+        return;
+      }
+
+      reusableOutcomeByKeyword.set(
+        normalizeKeyword(reusableOutcome.keyword),
+        reusableOutcome,
+      );
+    });
+  }
+
   let checkedKeywords = 0;
   let failedLookups = 0;
 
@@ -7506,6 +7632,13 @@ async function discoverRankedKeywords(input: {
     const batchResults = await Promise.all(
       batch.map(async (candidate) => {
         try {
+          const reusableOutcome = reusableOutcomeByKeyword.get(
+            normalizeKeyword(candidate.keyword),
+          );
+          if (reusableOutcome) {
+            return reusableOutcome;
+          }
+
           let rank: number;
 
           if (input.store === 'android') {
@@ -7533,12 +7666,10 @@ async function discoverRankedKeywords(input: {
             rank = index === -1 ? -1 : index + 1;
           }
 
-          if (rank === -1) {
-            return null;
+          if (rank !== -1) {
+            console.log(`[discovery] Found rank ${rank} for "${candidate.keyword}" (${input.store}/${input.country})`);
           }
 
-          console.log(`[discovery] Found rank ${rank} for "${candidate.keyword}" (${input.store}/${input.country})`);
-          const features = candidate.features;
           return {
             keyword: candidate.keyword,
             rank,
@@ -7548,17 +7679,7 @@ async function discoverRankedKeywords(input: {
             relevance: candidate.baseline.relevance,
             confidence: candidate.baseline.confidence,
             displayQuality: candidate.displayQuality,
-            featureQuality: {
-              exactTitleMatch: features?.exactTitleMatch || 0,
-              exactTitleSegment: features?.exactTitleSegment || 0,
-              orderedTitleCoverage: features?.orderedTitleCoverage || 0,
-              titleCoverage: features?.titleCoverage || 0,
-              appTitleCoverage: features?.appTitleCoverage || 0,
-              descriptionCoverage: features?.descriptionCoverage || 0,
-              genericCoverage: features?.genericCoverage || 0,
-              semanticCoverage: features?.semanticCoverage || 0,
-              categorySemanticCoverage: features?.categorySemanticCoverage || 0,
-            },
+            featureQuality: toDiscoveryFeatureQuality(candidate.features),
           };
         } catch (error) {
           console.warn(`Discovery ranking lookup failed for "${candidate.keyword}"`, error);
@@ -7569,8 +7690,14 @@ async function discoverRankedKeywords(input: {
     );
 
     checkedKeywords += batch.length;
+    checkedOutcomes.push(
+      ...batchResults.filter((result): result is DiscoveryCheckedCandidateOutcome => Boolean(result)),
+    );
     validRankings.push(
-      ...batchResults.filter((result): result is NonNullable<typeof result> => Boolean(result) && result.rank <= profile.searchDepth),
+      ...batchResults.filter(
+        (result): result is DiscoveryCheckedCandidateOutcome =>
+          Boolean(result) && result.rank > 0 && result.rank <= profile.searchDepth,
+      ),
     );
 
     if (
@@ -7633,7 +7760,16 @@ async function discoverRankedKeywords(input: {
     `[discovery-result] mode=${input.mode} checked=${checkedKeywords} candidates=${rankedCandidates.length} rankings=${rankings.length} suggestions=${suggestions.length} failed=${failedLookups}`,
   );
 
-  discoveryCache.set(cacheKey, payload);
+  discoveryCache.set(cacheKey, {
+    completeness: input.mode,
+    rankedCandidates,
+    checkedOutcomes,
+    checkedKeywords,
+    candidateCount: candidateSet.candidateCount,
+    searchDepth: profile.searchDepth,
+    failedLookups,
+    loadedAt: new Date().toISOString(),
+  } satisfies DiscoveryResultCacheEntry);
   return payload;
 }
 
@@ -8448,7 +8584,7 @@ async function startServer() {
         throw createBadRequestError('Announcement campaign has already been sent.');
       }
 
-      const result = await sendAnnouncementCampaign(adminDb, campaignDocRef, campaign);
+      const result = await sendAnnouncementCampaign(adminDb, campaignDocRef);
       res.json(result);
     } catch (error) {
       return sendApiError(res, error, 'Failed to send announcement campaign.');

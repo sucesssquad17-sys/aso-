@@ -34,6 +34,11 @@ import {
   isDiscoveryKeywordCandidate,
   shouldAdmitDiscoveryCandidate,
 } from '../src/lib/discoveryKeywordGating';
+import {
+  getDiscoveryCacheLookupKeys,
+  getDiscoveryCacheKey,
+  trimDiscoveryPayloadForMode,
+} from '../src/lib/discoveryCache';
 
 const fallback: TrackingSchedule = {
   enabled: true,
@@ -746,6 +751,76 @@ test('deep discovery admits broader semantic candidates than fast mode', () => {
     ),
     true,
   );
+});
+
+test('fast discovery can reuse a cached deep payload as a trimmed subset', () => {
+  const deepPayload = {
+    rankings: Array.from({ length: 14 }, (_, index) => ({
+      keyword: `keyword ${index + 1}`,
+      rank: index + 1,
+      demand: 80 - index,
+      volume: 80 - index,
+      difficulty: 60,
+      relevance: 90 - index,
+      confidence: 'high' as const,
+    })),
+    suggestions: Array.from({ length: 14 }, (_, index) => ({
+      keyword: `suggestion ${index + 1}`,
+      demand: 60 - index,
+      volume: 60 - index,
+      difficulty: 50,
+      relevance: 70 - index,
+      confidence: 'medium' as const,
+    })),
+    checkedKeywords: 20,
+    candidateCount: 80,
+    searchDepth: 150,
+    failedLookups: 0,
+    mode: 'deep' as const,
+    loadedAt: '2026-06-30T12:00:00.000Z',
+  };
+
+  const fastPayload = trimDiscoveryPayloadForMode(deepPayload, 'fast');
+
+  assert.equal(fastPayload.mode, 'fast');
+  assert.equal(fastPayload.rankings.length, 10);
+  assert.equal(fastPayload.suggestions.length, 10);
+  assert.equal(fastPayload.candidateCount, 40);
+  assert.equal(fastPayload.searchDepth, 100);
+});
+
+test('fast discovery lookup checks deep cache as a fallback', () => {
+  const keys = getDiscoveryCacheLookupKeys({
+    mode: 'fast',
+    store: 'android',
+    country: 'us',
+    appId: '123',
+    title: 'Instagram',
+    description: 'Social sharing app',
+    category: 'social',
+    developer: 'Meta',
+  });
+
+  assert.equal(keys.length, 2);
+  assert.notEqual(keys[0], keys[1]);
+  assert.match(keys[0], /-fast$/);
+  assert.match(keys[1], /-deep$/);
+});
+
+test('discovery cache keys use compact metadata fingerprints', () => {
+  const cacheKey = getDiscoveryCacheKey({
+    mode: 'deep',
+    store: 'android',
+    country: 'us',
+    appId: '123',
+    title: 'Instagram',
+    description: 'social app '.repeat(1000),
+    category: 'social',
+    developer: 'Meta',
+  });
+
+  assert.equal(cacheKey.includes('social app social app'), false);
+  assert.ok(cacheKey.length < 120);
 });
 
 test('active-limit helper always allows tracking when no keywords are paused', () => {
