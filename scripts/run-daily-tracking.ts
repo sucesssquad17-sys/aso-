@@ -235,6 +235,7 @@ type UserTrackingDocument = {
   alertRules?: AlertRule[];
   notificationSettings?: NotificationSettings;
   trackingSchedule?: TrackingSchedule;
+  billingEmail?: string;
   updatedAt?: string;
 };
 type DailyTrackingStatusRecord = Partial<DailyTrackingSummary> & {
@@ -1091,6 +1092,19 @@ function escapeAlertEmailHtml(value: string) {
     .replace(/'/g, '&#39;');
 }
 
+function normalizeEmailAddress(value: unknown) {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return normalized || null;
+}
+
+function isValidEmailAddress(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 function formatAlertEmailTimestamp(timestamp: string) {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
@@ -1171,36 +1185,52 @@ async function sendEmailAlertEvents(
     return;
   }
 
-  try {
-    const authUser = await getAuth().getUser(userDocRef.id);
-    const recipient = authUser.email?.trim().toLowerCase();
-    if (!recipient) {
-      log(`[email] Skipping alert email for user ${userDocRef.id} because no account email is available.`);
-      return;
-    }
+  let recipient: string | null = null;
 
-    await Promise.all(
-      events.map(async (event) => {
-        try {
-          const result = await resend.emails.send({
-            from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
-            to: recipient,
-            subject: getAlertEmailSubject(event),
-            html: buildAlertEmailHtml(event),
-          });
-          if (result.error) {
-            console.warn(`[email] Failed to deliver alert email ${event.id}`, result.error);
-            return;
-          }
-          log(`[email] Delivered alert email ${event.id} to ${recipient}.`);
-        } catch (error) {
-          console.warn(`[email] Failed to deliver alert email ${event.id}`, error);
-        }
-      }),
-    );
+  try {
+    const userSnapshot = await userDocRef.get();
+    const billingEmail = normalizeEmailAddress(userSnapshot.data()?.billingEmail);
+    if (billingEmail && isValidEmailAddress(billingEmail)) {
+      recipient = billingEmail;
+    }
   } catch (error) {
-    console.warn(`[email] Failed to resolve alert email for user ${userDocRef.id}`, error);
+    console.warn(`[email] Failed to read billing email for user ${userDocRef.id}`, error);
   }
+
+  if (!recipient) {
+    try {
+      const authUser = await getAuth().getUser(userDocRef.id);
+      const authEmail = normalizeEmailAddress(authUser.email);
+      recipient = authEmail && isValidEmailAddress(authEmail) ? authEmail : null;
+    } catch (error) {
+      console.warn(`[email] Failed to resolve alert email for user ${userDocRef.id}`, error);
+    }
+  }
+
+  if (!recipient) {
+    log(`[email] Skipping alert email for user ${userDocRef.id} because no account email is available.`);
+    return;
+  }
+
+  await Promise.all(
+    events.map(async (event) => {
+      try {
+        const result = await resend.emails.send({
+          from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+          to: recipient,
+          subject: getAlertEmailSubject(event),
+          html: buildAlertEmailHtml(event),
+        });
+        if (result.error) {
+          console.warn(`[email] Failed to deliver alert email ${event.id}`, result.error);
+          return;
+        }
+        log(`[email] Delivered alert email ${event.id} to ${recipient}.`);
+      } catch (error) {
+        console.warn(`[email] Failed to deliver alert email ${event.id}`, error);
+      }
+    }),
+  );
 }
 
 function buildCronFailureEmailHtml(input: {
@@ -1404,7 +1434,7 @@ async function evaluateAndDispatchAlertRules(
     ...rule,
     baselineKeys: Array.isArray(rule.baselineKeys) ? [...rule.baselineKeys] : [],
   }));
-  const pushEvents: AlertEvent[] = [];
+  const browserPushEvents: AlertEvent[] = [];
   const emailEvents: AlertEvent[] = [];
   const createdEvents: AlertEvent[] = [];
 
@@ -1476,8 +1506,8 @@ async function evaluateAndDispatchAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.inApp || rule.channels.push) {
-          pushEvents.push(event);
+        if (rule.channels.push) {
+          browserPushEvents.push(event);
         }
         if (rule.channels.email) {
           emailEvents.push(event);
@@ -1490,8 +1520,8 @@ async function evaluateAndDispatchAlertRules(
     }
   }
 
-  if (pushEvents.length) {
-    await sendPushAlertEvents(userDocRef, notificationSettings, pushEvents);
+  if (browserPushEvents.length) {
+    await sendPushAlertEvents(userDocRef, notificationSettings, browserPushEvents);
   }
   if (emailEvents.length) {
     await sendEmailAlertEvents(userDocRef, emailEvents);
@@ -1522,7 +1552,7 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
   }
 
   const createdEvents: AlertEvent[] = [];
-  const pushEvents: AlertEvent[] = [];
+  const browserPushEvents: AlertEvent[] = [];
   const emailEvents: AlertEvent[] = [];
 
   for (const rule of asoRules) {
@@ -1575,8 +1605,8 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           continue;
         }
         createdEvents.push(event);
-        if (rule.channels.inApp || rule.channels.push) {
-          pushEvents.push(event);
+        if (rule.channels.push) {
+          browserPushEvents.push(event);
         }
         if (rule.channels.email) {
           emailEvents.push(event);
@@ -1585,8 +1615,8 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
     }
   }
 
-  if (pushEvents.length) {
-    await sendPushAlertEvents(userDocRef, notificationSettings, pushEvents);
+  if (browserPushEvents.length) {
+    await sendPushAlertEvents(userDocRef, notificationSettings, browserPushEvents);
   }
   if (emailEvents.length) {
     await sendEmailAlertEvents(userDocRef, emailEvents);
