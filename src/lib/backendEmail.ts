@@ -1,0 +1,568 @@
+import type { AlertEvent } from "./alerts";
+import { GLOBAL_TRACKING_TIMEZONE } from "./trackingTime";
+import type { WeeklyReportWeekday } from "./weeklyReports";
+import type { DocumentData, DocumentReference } from "firebase-admin/firestore";
+import type { Resend } from "resend";
+
+type ResendSendResult = Awaited<ReturnType<Resend["emails"]["send"]>>;
+
+export function normalizeEmailAddress(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+export function isValidEmailAddress(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+export function escapeEmailHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function formatEmailTimestamp(timestamp: string) {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+  const primaryTime = date.toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: GLOBAL_TRACKING_TIMEZONE,
+  });
+  const utcTime = date.toLocaleString("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  });
+  return `${primaryTime} ${GLOBAL_TRACKING_TIMEZONE} (${utcTime} UTC)`;
+}
+
+export function getResendEmailId(result: ResendSendResult | null | undefined) {
+  const candidate = result?.data && typeof result.data === "object" ? result.data.id : null;
+  if (typeof candidate !== "string") {
+    return null;
+  }
+  const normalized = candidate.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function formatAlertChangedFieldLabel(field: string) {
+  switch (field) {
+    case "title":
+      return "Title";
+    case "description":
+      return "Description";
+    case "screenshots":
+      return "Screenshots";
+    case "icon":
+      return "Icon";
+    case "category":
+      return "Category";
+    default:
+      return field;
+  }
+}
+
+export function getAlertEmailSubject(event: AlertEvent) {
+  return event.scope === "competitor_aso"
+    ? `Competitor ASO alert: ${event.changedAppTitle || event.keyword}`
+    : `Keyword alert: ${event.keyword}`;
+}
+
+export function buildAlertEmailHtml(event: AlertEvent, dashboardUrl: string) {
+  const storeLabel = event.store === "ios" ? "iOS" : "Android";
+  const changedFields =
+    Array.isArray(event.changedFields) && event.changedFields.length
+      ? event.changedFields
+          .map((field) => formatAlertChangedFieldLabel(field))
+          .join(", ")
+      : null;
+  const heading =
+    event.scope === "competitor_aso"
+      ? escapeEmailHtml(event.changedAppTitle || event.keyword)
+      : escapeEmailHtml(event.keyword);
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
+      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeEmailHtml(getAlertEmailSubject(event))}</h2>
+      <p style="margin: 0 0 18px; color: #334155;">${escapeEmailHtml(event.message)}</p>
+      <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; padding: 18px;">
+        <p style="margin: 0 0 8px;"><strong>Target:</strong> ${heading}</p>
+        <p style="margin: 0 0 8px;"><strong>Store:</strong> ${storeLabel}</p>
+        <p style="margin: 0 0 8px;"><strong>Country:</strong> ${escapeEmailHtml(event.country.toUpperCase())}</p>
+        <p style="margin: 0 0 8px;"><strong>Triggered:</strong> ${escapeEmailHtml(formatEmailTimestamp(event.createdAt))}</p>
+        ${changedFields ? `<p style="margin: 0;"><strong>Changed fields:</strong> ${escapeEmailHtml(changedFields)}</p>` : ""}
+      </div>
+      <a href="${escapeEmailHtml(dashboardUrl)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
+        Open Workspace
+      </a>
+    </div>
+  `;
+}
+
+async function updateAlertEmailStatus(
+  userDocRef: DocumentReference<DocumentData>,
+  event: AlertEvent,
+  patch: Partial<AlertEvent>,
+) {
+  try {
+    await userDocRef.collection("alert_events").doc(event.id).set(patch, {
+      merge: true,
+    });
+  } catch (error) {
+    console.warn(`[email] Failed to persist delivery status for alert ${event.id}`, error);
+  }
+}
+
+export async function sendAlertEmailEvents(
+  userDocRef: DocumentReference<DocumentData>,
+  events: AlertEvent[],
+  input: {
+    resend: Resend | null;
+    fromEmail: string;
+    dashboardUrl: string;
+    resolveRecipient: (
+      userDocRef: DocumentReference<DocumentData>,
+    ) => Promise<string | null>;
+    logPrefix?: string;
+  },
+) {
+  if (!events.length) {
+    return;
+  }
+
+  const logPrefix = input.logPrefix || "[email]";
+  const attemptedAt = new Date().toISOString();
+
+  if (!input.resend) {
+    await Promise.all(
+      events.map((event) =>
+        updateAlertEmailStatus(userDocRef, event, {
+          emailDeliveryStatus: "failed",
+          emailDeliveryAttemptedAt: attemptedAt,
+          emailDeliveryFailedAt: attemptedAt,
+          emailDeliveryLastError: "resend-not-configured",
+        }),
+      ),
+    );
+    console.info(`${logPrefix} Skipping alert email because Resend is not configured.`);
+    return;
+  }
+
+  const sender = input.fromEmail.trim();
+  if (!sender) {
+    await Promise.all(
+      events.map((event) =>
+        updateAlertEmailStatus(userDocRef, event, {
+          emailDeliveryStatus: "failed",
+          emailDeliveryAttemptedAt: attemptedAt,
+          emailDeliveryFailedAt: attemptedAt,
+          emailDeliveryLastError: "sender-not-configured",
+        }),
+      ),
+    );
+    console.info(`${logPrefix} Skipping alert email because sender email is not configured.`);
+    return;
+  }
+
+  const recipient = await input.resolveRecipient(userDocRef);
+  if (!recipient) {
+    await Promise.all(
+      events.map((event) =>
+        updateAlertEmailStatus(userDocRef, event, {
+          emailDeliveryStatus: "failed",
+          emailDeliveryAttemptedAt: attemptedAt,
+          emailDeliveryFailedAt: attemptedAt,
+          emailDeliveryLastError: "no-account-email",
+        }),
+      ),
+    );
+    console.info(`${logPrefix} Skipping alert email for user ${userDocRef.id} because no account email is available.`);
+    return;
+  }
+
+  await Promise.all(
+    events.map(async (event) => {
+      const eventAttemptedAt = new Date().toISOString();
+      try {
+        const result = await input.resend!.emails.send({
+          from: `Rank Analyzer Pro <${sender}>`,
+          to: recipient,
+          subject: getAlertEmailSubject(event),
+          html: buildAlertEmailHtml(event, input.dashboardUrl),
+        });
+        if (result.error) {
+          await updateAlertEmailStatus(userDocRef, event, {
+            emailDeliveryStatus: "failed",
+            emailDeliveryRecipient: recipient,
+            emailDeliveryAttemptedAt: eventAttemptedAt,
+            emailDeliveryFailedAt: new Date().toISOString(),
+            emailDeliveryLastError:
+              typeof result.error.message === "string" && result.error.message
+                ? result.error.message
+                : "provider-error",
+          });
+          console.warn(`${logPrefix} Failed to deliver alert email ${event.id}`, result.error);
+          return;
+        }
+        if (!getResendEmailId(result)) {
+          console.warn(`${logPrefix} Alert email ${event.id} returned no message id.`);
+        }
+        await updateAlertEmailStatus(userDocRef, event, {
+          emailDeliveryStatus: "delivered",
+          emailDeliveryRecipient: recipient,
+          emailDeliveryAttemptedAt: eventAttemptedAt,
+          emailDeliveryDeliveredAt: new Date().toISOString(),
+          emailDeliveryFailedAt: undefined,
+          emailDeliveryLastError: undefined,
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : String(error);
+        await updateAlertEmailStatus(userDocRef, event, {
+          emailDeliveryStatus: "failed",
+          emailDeliveryRecipient: recipient,
+          emailDeliveryAttemptedAt: eventAttemptedAt,
+          emailDeliveryFailedAt: new Date().toISOString(),
+          emailDeliveryLastError: message,
+        });
+        console.warn(`${logPrefix} Failed to deliver alert email ${event.id}`, error);
+      }
+    }),
+  );
+}
+
+export type WeeklyTrackedKeywordSummaryInput = {
+  keyword: string;
+  appId: string;
+  appTitle: string;
+  store: "android" | "ios";
+  country: string;
+  lastRank: number;
+  lastCheckStatus?: string;
+  lastChecked?: string;
+};
+
+export type WeeklyRankHistorySummaryInput = {
+  appId: string;
+  keyword: string;
+  store: "android" | "ios";
+  country: string;
+  rank: number;
+  timestamp: string;
+  rankDepth?: number;
+};
+
+export type WeeklyCompetitorGroupSummaryInput = {
+  groupId: string;
+  ownApp: { title: string };
+  competitors: Array<{ title: string }>;
+};
+
+export type WeeklyCompetitorTrackedKeywordSummaryInput = {
+  trackedKeywordId: string;
+  groupId: string;
+  keyword: string;
+  store: "android" | "ios";
+  country: string;
+  apps: Array<{
+    appKey: string;
+    title: string;
+    lastRank: number;
+    lastCheckStatus?: string;
+  }>;
+};
+
+export type WeeklyCompetitorRankHistorySummaryInput = {
+  trackedKeywordId: string;
+  appKey: string;
+  rank: number;
+  timestamp: string;
+  rankDepth?: number;
+};
+
+type WeeklyMovementItem = {
+  keyword: string;
+  appTitle: string;
+  country: string;
+  currentRankLabel: string;
+  deltaLabel: string;
+};
+
+export type WeeklyReportEmailSummary = {
+  rangeLabel: string;
+  trackedKeywordCount: number;
+  rankedKeywordCount: number;
+  averageRankLabel: string;
+  top10Count: number;
+  top3Count: number;
+  competitorGroupCount: number;
+  competitorTrackedTermCount: number;
+  competitorRankedPairCount: number;
+  topMovers: WeeklyMovementItem[];
+  topGainers: WeeklyMovementItem[];
+  topLosers: WeeklyMovementItem[];
+};
+
+function getComparableRank(rank: number, rankDepth = 100) {
+  return rank === -1 ? rankDepth + 1 : rank;
+}
+
+function formatRankLabel(rank: number, rankDepth = 100) {
+  return rank === -1 ? `Not top ${rankDepth}` : `#${rank}`;
+}
+
+function formatDeltaLabel(delta: number) {
+  return delta > 0 ? `+${delta}` : `${delta}`;
+}
+
+export function buildWeeklyReportEmailSummary(input: {
+  trackedKeywords: WeeklyTrackedKeywordSummaryInput[];
+  rankHistory: WeeklyRankHistorySummaryInput[];
+  competitorGroups: WeeklyCompetitorGroupSummaryInput[];
+  competitorTrackedKeywords: WeeklyCompetitorTrackedKeywordSummaryInput[];
+  competitorRankHistory: WeeklyCompetitorRankHistorySummaryInput[];
+  now?: Date;
+}) {
+  const now = input.now || new Date();
+  const rangeStart = new Date(now);
+  rangeStart.setDate(rangeStart.getDate() - 6);
+  rangeStart.setHours(0, 0, 0, 0);
+
+  const rangeLabel = `${rangeStart.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  })} - ${now.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })}`;
+
+  const trackedRankedKeywords = input.trackedKeywords.filter(
+    (entry) => entry.lastCheckStatus !== "pending" && entry.lastRank !== -1,
+  );
+  const averageRank =
+    trackedRankedKeywords.length > 0
+      ? trackedRankedKeywords.reduce((sum, entry) => sum + entry.lastRank, 0) /
+        trackedRankedKeywords.length
+      : null;
+
+  const movementCandidates = input.trackedKeywords
+    .map((entry) => {
+      const history = input.rankHistory
+        .filter(
+          (historyEntry) =>
+            historyEntry.appId === entry.appId &&
+            historyEntry.keyword === entry.keyword &&
+            historyEntry.store === entry.store &&
+            historyEntry.country === entry.country &&
+            new Date(historyEntry.timestamp).getTime() >= rangeStart.getTime(),
+        )
+        .sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
+        );
+      const currentRank = entry.lastRank;
+      const currentComparable = getComparableRank(currentRank);
+      const previousHistory = history[0];
+      const previousComparable = previousHistory
+        ? getComparableRank(previousHistory.rank, previousHistory.rankDepth)
+        : currentComparable;
+      const delta = previousComparable - currentComparable;
+      return {
+        keyword: entry.keyword,
+        appTitle: entry.appTitle,
+        country: entry.country.toUpperCase(),
+        currentRankLabel: formatRankLabel(currentRank),
+        delta,
+      };
+    })
+    .filter((entry) => entry.delta !== 0);
+
+  const movementToDisplay = (entry: {
+    keyword: string;
+    appTitle: string;
+    country: string;
+    currentRankLabel: string;
+    delta: number;
+  }): WeeklyMovementItem => ({
+    keyword: entry.keyword,
+    appTitle: entry.appTitle,
+    country: entry.country,
+    currentRankLabel: entry.currentRankLabel,
+    deltaLabel: formatDeltaLabel(entry.delta),
+  });
+
+  const sortedMovers = [...movementCandidates].sort(
+    (a, b) => Math.abs(b.delta) - Math.abs(a.delta),
+  );
+  const sortedGainers = movementCandidates
+    .filter((entry) => entry.delta > 0)
+    .sort((a, b) => b.delta - a.delta);
+  const sortedLosers = movementCandidates
+    .filter((entry) => entry.delta < 0)
+    .sort((a, b) => a.delta - b.delta);
+
+  const competitorRankedPairCount = input.competitorTrackedKeywords.reduce(
+    (sum, record) =>
+      sum +
+      record.apps.filter(
+        (app) => app.lastCheckStatus !== "pending" && app.lastRank !== -1,
+      ).length,
+    0,
+  );
+
+  const summary: WeeklyReportEmailSummary = {
+    rangeLabel,
+    trackedKeywordCount: input.trackedKeywords.length,
+    rankedKeywordCount: trackedRankedKeywords.length,
+    averageRankLabel:
+      averageRank === null ? "-" : averageRank.toFixed(1),
+    top10Count: trackedRankedKeywords.filter((entry) => entry.lastRank <= 10)
+      .length,
+    top3Count: trackedRankedKeywords.filter((entry) => entry.lastRank <= 3)
+      .length,
+    competitorGroupCount: input.competitorGroups.length,
+    competitorTrackedTermCount: input.competitorTrackedKeywords.length,
+    competitorRankedPairCount,
+    topMovers: sortedMovers.slice(0, 3).map(movementToDisplay),
+    topGainers: sortedGainers.slice(0, 3).map(movementToDisplay),
+    topLosers: sortedLosers.slice(0, 3).map(movementToDisplay),
+  };
+
+  return summary;
+}
+
+function renderWeeklyMovementSection(
+  title: string,
+  items: WeeklyMovementItem[],
+  emptyLabel: string,
+) {
+  if (!items.length) {
+    return `
+      <div style="border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; background: #ffffff;">
+        <h3 style="margin: 0 0 10px; font-size: 16px; color: #0f172a;">${escapeEmailHtml(title)}</h3>
+        <p style="margin: 0; color: #64748b; font-size: 14px;">${escapeEmailHtml(emptyLabel)}</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div style="border: 1px solid #e2e8f0; border-radius: 14px; padding: 16px; background: #ffffff;">
+      <h3 style="margin: 0 0 10px; font-size: 16px; color: #0f172a;">${escapeEmailHtml(title)}</h3>
+      <div style="display: grid; gap: 10px;">
+        ${items
+          .map(
+            (item) => `
+              <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc;">
+                <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline;">
+                  <strong style="color: #0f172a;">${escapeEmailHtml(item.keyword)}</strong>
+                  <span style="color: #0891b2; font-weight: 700;">${escapeEmailHtml(item.deltaLabel)}</span>
+                </div>
+                <div style="margin-top: 4px; color: #334155; font-size: 13px;">${escapeEmailHtml(item.appTitle)} &middot; ${escapeEmailHtml(item.country)} &middot; ${escapeEmailHtml(item.currentRankLabel)}</div>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+const WEEKDAY_VERB_LABELS: Record<WeeklyReportWeekday, string> = {
+  sun: "Sunday",
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+};
+
+export function buildWeeklyReportWorkspaceUrl(
+  appUrl: string,
+  reportMode: "my" | "competitors" = "my",
+) {
+  const url = new URL(appUrl);
+  url.searchParams.set("viewMode", "reports");
+  url.searchParams.set("period", "7d");
+  url.searchParams.set("reportMode", reportMode);
+  url.searchParams.set("reportStore", "all");
+  url.searchParams.set("reportCountry", "all");
+  return url.toString();
+}
+
+export function buildWeeklyReportEmailHtml(input: {
+  summary: WeeklyReportEmailSummary;
+  reportUrl: string;
+  weekday: WeeklyReportWeekday;
+}) {
+  const hasTrackedData =
+    input.summary.trackedKeywordCount > 0 || input.summary.rankedKeywordCount > 0;
+  const hasCompetitorData =
+    input.summary.competitorGroupCount > 0 ||
+    input.summary.competitorTrackedTermCount > 0;
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a; background: #f8fafc; padding: 24px;">
+      <div style="border-radius: 20px; background: linear-gradient(135deg, #22d3ee, #14b8a6); padding: 24px; color: #082f49;">
+        <div style="font-size: 12px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase;">Weekly Report</div>
+        <h1 style="margin: 10px 0 8px; font-size: 28px; line-height: 1.15;">Your ASO summary for ${escapeEmailHtml(input.summary.rangeLabel)}</h1>
+        <p style="margin: 0; font-size: 15px; line-height: 1.6;">Delivered on your ${escapeEmailHtml(WEEKDAY_VERB_LABELS[input.weekday])} schedule with a direct link into the full in-app report.</p>
+      </div>
+
+      <div style="display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 18px;">
+        <div style="border: 1px solid #dbeafe; border-radius: 16px; padding: 16px; background: #ffffff;">
+          <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.12em;">Tracked Keywords</div>
+          <div style="margin-top: 8px; font-size: 28px; font-weight: 700;">${input.summary.trackedKeywordCount}</div>
+        </div>
+        <div style="border: 1px solid #dbeafe; border-radius: 16px; padding: 16px; background: #ffffff;">
+          <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.12em;">Currently Ranked</div>
+          <div style="margin-top: 8px; font-size: 28px; font-weight: 700;">${input.summary.rankedKeywordCount}</div>
+        </div>
+        <div style="border: 1px solid #dbeafe; border-radius: 16px; padding: 16px; background: #ffffff;">
+          <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.12em;">Average Rank</div>
+          <div style="margin-top: 8px; font-size: 28px; font-weight: 700;">${escapeEmailHtml(input.summary.averageRankLabel)}</div>
+        </div>
+        <div style="border: 1px solid #dbeafe; border-radius: 16px; padding: 16px; background: #ffffff;">
+          <div style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.12em;">Top 10 / Top 3</div>
+          <div style="margin-top: 8px; font-size: 28px; font-weight: 700;">${input.summary.top10Count} / ${input.summary.top3Count}</div>
+        </div>
+      </div>
+
+      ${hasCompetitorData ? `
+        <div style="margin-top: 18px; border: 1px solid #cbd5e1; border-radius: 16px; padding: 18px; background: #ffffff;">
+          <h2 style="margin: 0 0 12px; font-size: 18px;">Competitor coverage</h2>
+          <div style="display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr));">
+            <div><div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Groups</div><div style="margin-top: 6px; font-size: 22px; font-weight: 700;">${input.summary.competitorGroupCount}</div></div>
+            <div><div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Tracked Terms</div><div style="margin-top: 6px; font-size: 22px; font-weight: 700;">${input.summary.competitorTrackedTermCount}</div></div>
+            <div><div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Ranked Pairs</div><div style="margin-top: 6px; font-size: 22px; font-weight: 700;">${input.summary.competitorRankedPairCount}</div></div>
+          </div>
+        </div>
+      ` : ""}
+
+      <div style="display: grid; gap: 14px; margin-top: 18px;">
+        ${renderWeeklyMovementSection("Biggest movers", input.summary.topMovers, hasTrackedData ? "No major movement in the current 7-day window." : "Tracking is active, but there is not enough rank history yet.")}
+        ${renderWeeklyMovementSection("Top gains", input.summary.topGainers, hasTrackedData ? "No gains surfaced in the current 7-day window." : "Once tracked keywords build history, gains will appear here.")}
+        ${renderWeeklyMovementSection("Top losses", input.summary.topLosers, hasTrackedData ? "No losses surfaced in the current 7-day window." : "Once tracked keywords build history, losses will appear here.")}
+      </div>
+
+      <div style="margin-top: 20px; border-radius: 16px; background: #ffffff; border: 1px solid #cbd5e1; padding: 18px;">
+        <p style="margin: 0 0 14px; color: #334155; line-height: 1.6;">
+          ${hasTrackedData
+            ? "Open the full Reports workspace to inspect charts, keyword drilldowns, and the current 7-day movement view."
+            : "Open the Reports workspace to finish setup, review your tracked keywords, and start building richer weekly summaries."}
+        </p>
+        <a href="${escapeEmailHtml(input.reportUrl)}" style="display: inline-block; padding: 12px 18px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
+          View full report
+        </a>
+      </div>
+    </div>
+  `;
+}

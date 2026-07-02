@@ -479,12 +479,23 @@ function buildTrackedPlan(
           : "-",
       hint: `${payload.summary.trackedAppCount} active apps`,
     },
-    {
-      label: "Attention / Pending",
-      value: `${payload.summary.needsAttentionCount}/${payload.summary.pendingCount}`,
-      hint: "Errors and pending refreshes",
-    },
   ];
+
+  if (payload.summary.pendingCount > 0) {
+    summaryItems.push({
+      label: "Pending",
+      value: payload.summary.pendingCount,
+      hint: "Regions awaiting refresh",
+    });
+  }
+
+  if (payload.summary.needsAttentionCount > 0) {
+    summaryItems.push({
+      label: "Errors",
+      value: payload.summary.needsAttentionCount,
+      hint: "Regions with latest check errors",
+    });
+  }
 
   return {
     meta: meta.concat([

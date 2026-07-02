@@ -7,7 +7,9 @@ import {
   ChevronUp,
   Globe,
   LineChart,
+  Mail,
   Swords,
+  X,
 } from "lucide-react";
 import {
   CartesianGrid,
@@ -67,6 +69,11 @@ import {
   findCountryName,
   normalizeCountryCode,
 } from "../../lib/countries";
+import {
+  WEEKLY_REPORT_WEEKDAY_LABELS,
+  WEEKLY_REPORT_WEEKDAYS,
+  type WeeklyReportSettings,
+} from "../../lib/weeklyReports";
 import type {
   PdfSummaryItem,
   ReportsPdfSnapshot,
@@ -90,8 +97,8 @@ import {
   WorkspacePanel,
 } from "../app/workspacePrimitives";
 
-type ReportMode = "my" | "competitors";
-type ReportPeriodKey = "7d" | "30d" | "90d" | "12m" | "all";
+export type ReportMode = "my" | "competitors";
+export type ReportPeriodKey = "7d" | "30d" | "90d" | "12m" | "all";
 type MovementTabKey = "movers" | "gainers" | "losers";
 
 function formatReportDateTime(timestamp: string) {
@@ -390,14 +397,14 @@ function ReportSection({
   children: React.ReactNode;
 }) {
   return (
-    <WorkspacePanel tone="muted">
-      <div className="mb-3 flex items-start gap-2.5 sm:mb-4 sm:gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-app-border/70 bg-app-surface-muted/80 sm:h-10 sm:w-10 sm:rounded-2xl">
+    <WorkspacePanel tone="muted" className="workspace-summary-panel">
+      <div className="mb-2.5 flex items-start gap-2 sm:mb-3 sm:gap-2.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-app-border/70 bg-app-surface-muted/80 sm:h-9 sm:w-9 sm:rounded-2xl">
           <Icon className="h-4 w-4 text-cyan-300" />
         </div>
         <div>
-          <h3 className="text-base font-semibold text-app-text sm:text-lg">{title}</h3>
-          <p className="mt-1 text-xs text-app-text-muted sm:text-sm">{description}</p>
+          <h3 className="text-sm font-semibold text-app-text sm:text-base">{title}</h3>
+          <p className="mt-0.5 text-[11px] text-app-text-muted sm:text-xs">{description}</p>
         </div>
       </div>
       {children}
@@ -441,19 +448,19 @@ function CompactStatGrid({
   columnsClassName?: string;
 }) {
   return (
-    <div className={`grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3 ${columnsClassName}`}>
+    <div className={`grid grid-cols-2 gap-1.5 sm:gap-2 md:grid-cols-3 ${columnsClassName}`}>
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex flex-col rounded-xl border border-app-border/60 bg-app-surface/40 p-3 sm:rounded-2xl sm:p-4"
+          className="flex flex-col rounded-xl border border-app-border/60 bg-app-surface/40 p-2.5 sm:rounded-2xl sm:p-3"
         >
           <div className="workspace-chip-label !text-[10px] sm:!text-[11px] mb-1">
             {item.label}
           </div>
-          <div className="text-xl font-bold text-app-text font-display sm:text-2xl">
+          <div className="text-lg font-bold text-app-text font-display sm:text-xl">
             {item.value}
           </div>
-          <div className="mt-auto hidden pt-1.5 text-[10px] leading-tight text-app-text-muted sm:block sm:pt-2 sm:text-xs">
+          <div className="mt-auto hidden pt-1 text-[10px] leading-tight text-app-text-muted sm:block sm:pt-1.5 sm:text-[11px]">
             {item.hint}
           </div>
         </div>
@@ -660,6 +667,14 @@ export default function ReportsWorkspace({
   trackedOverview,
   defaultCountry,
   defaultStore,
+  initialReportMode,
+  initialPeriod,
+  initialStoreFilter,
+  initialCountryFilter,
+  weeklyReportSettings,
+  isWeeklyReportSettingsOpen = false,
+  onWeeklyReportSettingsOpenChange,
+  onWeeklyReportSettingsChange,
   onEditCompetitorKeywordCountries,
   onExportSnapshotChange,
 }: {
@@ -677,14 +692,28 @@ export default function ReportsWorkspace({
   trackedOverview: TrackedReportOverview;
   defaultCountry: string;
   defaultStore: StoreType;
+  initialReportMode?: ReportMode;
+  initialPeriod?: ReportPeriodKey;
+  initialStoreFilter?: StoreType | "all";
+  initialCountryFilter?: string;
+  weeklyReportSettings: WeeklyReportSettings;
+  isWeeklyReportSettingsOpen?: boolean;
+  onWeeklyReportSettingsOpenChange?: (isOpen: boolean) => void;
+  onWeeklyReportSettingsChange?: (
+    nextSettings: Partial<WeeklyReportSettings>,
+  ) => void;
   onEditCompetitorKeywordCountries?: (input: {
     groupId: string;
     keyword: string;
   }) => void;
   onExportSnapshotChange?: (snapshot: ReportsPdfSnapshot) => void;
 }) {
-  const [reportMode, setReportMode] = React.useState<ReportMode>("my");
-  const [period, setPeriod] = React.useState<ReportPeriodKey>("30d");
+  const [reportMode, setReportMode] = React.useState<ReportMode>(
+    initialReportMode || "my",
+  );
+  const [period, setPeriod] = React.useState<ReportPeriodKey>(
+    initialPeriod || "30d",
+  );
   const [myMovementTab, setMyMovementTab] =
     React.useState<MovementTabKey>("movers");
   const [competitorMovementTab, setCompetitorMovementTab] =
@@ -693,15 +722,25 @@ export default function ReportsWorkspace({
     React.useState(false);
   const [reportStoreFilter, setReportStoreFilter] = React.useState<
     StoreType | "all"
-  >(defaultStore);
+  >(initialStoreFilter || defaultStore);
   const [reportCountryFilter, setReportCountryFilter] =
-    React.useState<string>(defaultCountry);
+    React.useState<string>(initialCountryFilter || defaultCountry);
   const [reportAppFilter, setReportAppFilter] = React.useState<string>("all");
   const [reportKeywordFilter, setReportKeywordFilter] =
     React.useState<string>("all");
+  const [weeklyReportSettingsDraft, setWeeklyReportSettingsDraft] =
+    React.useState<WeeklyReportSettings>(weeklyReportSettings);
+  const [isConfirmingWeeklyReportSave, setIsConfirmingWeeklyReportSave] =
+    React.useState(false);
   const [competitorGroupFilter, setCompetitorGroupFilter] =
     React.useState<string>(competitorGroups[0]?.groupId || "");
   const hasKeywordDrilldown = reportKeywordFilter !== "all";
+  const initialStoreFilterPendingRef = React.useRef(
+    initialStoreFilter !== undefined,
+  );
+  const initialCountryFilterPendingRef = React.useRef(
+    initialCountryFilter !== undefined,
+  );
 
   React.useEffect(() => {
     if (
@@ -714,10 +753,18 @@ export default function ReportsWorkspace({
   }, [competitorGroupFilter, competitorGroups]);
 
   React.useEffect(() => {
+    if (initialStoreFilterPendingRef.current) {
+      initialStoreFilterPendingRef.current = false;
+      return;
+    }
     setReportStoreFilter(defaultStore);
   }, [defaultStore]);
 
   React.useEffect(() => {
+    if (initialCountryFilterPendingRef.current) {
+      initialCountryFilterPendingRef.current = false;
+      return;
+    }
     setReportCountryFilter(defaultCountry);
   }, [defaultCountry]);
 
@@ -1838,16 +1885,55 @@ export default function ReportsWorkspace({
     onExportSnapshotChangeRef.current?.(reportExportSnapshot);
   }, [reportExportSnapshot, reportExportSnapshotKey]);
 
+  React.useEffect(() => {
+    if (!isWeeklyReportSettingsOpen) {
+      return;
+    }
+    setWeeklyReportSettingsDraft(weeklyReportSettings);
+    setIsConfirmingWeeklyReportSave(false);
+  }, [isWeeklyReportSettingsOpen, weeklyReportSettings]);
+
+  const isWeeklyReportSettingsDirty =
+    weeklyReportSettingsDraft.enabled !== weeklyReportSettings.enabled ||
+    weeklyReportSettingsDraft.weekday !== weeklyReportSettings.weekday;
+
+  const closeWeeklyReportSettings = React.useCallback(() => {
+    setIsConfirmingWeeklyReportSave(false);
+    onWeeklyReportSettingsOpenChange?.(false);
+  }, [onWeeklyReportSettingsOpenChange]);
+
+  const requestWeeklyReportSettingsSave = React.useCallback(() => {
+    if (!isWeeklyReportSettingsDirty) {
+      closeWeeklyReportSettings();
+      return;
+    }
+    setIsConfirmingWeeklyReportSave(true);
+  }, [closeWeeklyReportSettings, isWeeklyReportSettingsDirty]);
+
+  const saveWeeklyReportSettings = React.useCallback(() => {
+    onWeeklyReportSettingsChange?.({
+      enabled: weeklyReportSettingsDraft.enabled,
+      weekday: weeklyReportSettingsDraft.weekday,
+      timezone: weeklyReportSettings.timezone,
+    });
+    closeWeeklyReportSettings();
+  }, [
+    closeWeeklyReportSettings,
+    onWeeklyReportSettingsChange,
+    weeklyReportSettings.timezone,
+    weeklyReportSettingsDraft,
+  ]);
+
   return (
     <div className="space-y-6">
-      <WorkspacePanel tone="strong">
+      <WorkspacePanel tone="strong" className="workspace-toolbar-panel">
         <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
             <div className="workspace-chip-label">Reports</div>
-            <h2 className="mt-1 text-lg lg:text-xl font-semibold text-app-text">
+            <h2 className="mt-1 text-base lg:text-lg font-semibold text-app-text">
               Rank movement analysis
             </h2>
-            <p className="mt-1 text-xs lg:text-sm text-app-text-muted lg:mt-2">
+            <p className="mt-1 text-[11px] lg:text-sm text-app-text-muted lg:mt-1.5">
               Review movement trends, drill into keywords, and compare competitor groups from one workspace.
             </p>
           </div>
@@ -1888,7 +1974,7 @@ export default function ReportsWorkspace({
 
       {reportMode === "my" ? (
         <>
-          <WorkspacePanel tone="muted">
+          <WorkspacePanel tone="muted" className="workspace-toolbar-panel">
             <div className="grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-[240px_220px_280px_minmax(0,1fr)]">
               <select
                 value={reportStoreFilter}
@@ -1956,10 +2042,10 @@ export default function ReportsWorkspace({
             ) : null}
           </WorkspacePanel>
 
-          <WorkspacePanel tone="muted">
+          <WorkspacePanel tone="muted" className="workspace-summary-panel">
             <div className="mb-3 lg:mb-4">
               <div className="workspace-chip-label">Quick Summary</div>
-              <h3 className="mt-1 text-base lg:text-lg font-semibold text-app-text">
+              <h3 className="mt-1 text-sm lg:text-base font-semibold text-app-text">
                 What changed in this period
               </h3>
             </div>
@@ -2457,6 +2543,115 @@ export default function ReportsWorkspace({
           )}
         </>
       )}
+      {isWeeklyReportSettingsOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
+          <div className="app-modal w-full max-w-md rounded-3xl p-5 shadow-2xl sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="workspace-chip-label">Weekly Email</div>
+                <h3 className="mt-1 text-base font-semibold text-app-text sm:text-lg">
+                  Weekly report summary
+                </h3>
+                <p className="mt-2 text-sm text-app-text-muted">
+                  Send a polished HTML summary with a link to the full 7-day reports view.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeWeeklyReportSettings}
+                className="workspace-icon-button h-8 w-8"
+                aria-label="Close weekly email settings"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="mt-5 space-y-3">
+              <label className="flex items-center justify-between gap-3 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-sm text-app-text">
+                <span className="flex items-center gap-2 font-medium">
+                  <Mail className="h-4 w-4 text-cyan-300" />
+                  Weekly email
+                </span>
+                <input
+                  type="checkbox"
+                  checked={weeklyReportSettingsDraft.enabled}
+                  onChange={(event) =>
+                    setWeeklyReportSettingsDraft((current) => ({
+                      ...current,
+                      enabled: event.target.checked,
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
+                />
+              </label>
+              <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                  Delivery day
+                </div>
+                <select
+                  value={weeklyReportSettingsDraft.weekday}
+                  onChange={(event) =>
+                    setWeeklyReportSettingsDraft((current) => ({
+                      ...current,
+                      weekday: event.target.value as WeeklyReportSettings["weekday"],
+                    }))
+                  }
+                  className="input-field mt-2 py-2 text-sm"
+                >
+                  {WEEKLY_REPORT_WEEKDAYS.map((weekday) => (
+                    <option key={weekday} value={weekday}>
+                      {WEEKLY_REPORT_WEEKDAY_LABELS[weekday]}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-xs text-app-text-muted">
+                  Uses your saved local timezone and links users back into Reports with 7D selected.
+                </p>
+              </div>
+            </div>
+            {isConfirmingWeeklyReportSave ? (
+              <div className="mt-4 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+                  Confirm Changes
+                </div>
+                <p className="mt-2 text-sm text-app-text">
+                  {weeklyReportSettingsDraft.enabled
+                    ? `Are you sure you want to send weekly report emails every ${WEEKLY_REPORT_WEEKDAY_LABELS[weeklyReportSettingsDraft.weekday]}?`
+                    : "Are you sure you want to turn off weekly report emails?"}
+                </p>
+              </div>
+            ) : null}
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeWeeklyReportSettings}
+                className="workspace-secondary-button px-3 py-2 text-xs sm:text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={
+                  isConfirmingWeeklyReportSave
+                    ? saveWeeklyReportSettings
+                    : requestWeeklyReportSettingsSave
+                }
+                className="workspace-secondary-button border-cyan-500/30 bg-cyan-500/15 px-3 py-2 text-xs text-cyan-200 sm:text-sm"
+              >
+                {isConfirmingWeeklyReportSave ? "Yes, Save" : "Save Changes"}
+              </button>
+              {isConfirmingWeeklyReportSave ? (
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingWeeklyReportSave(false)}
+                  className="workspace-secondary-button px-3 py-2 text-xs sm:text-sm"
+                >
+                  Go Back
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

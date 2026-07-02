@@ -1,0 +1,149 @@
+export const WEEKLY_REPORT_WEEKDAYS = [
+  "sun",
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
+] as const;
+
+export type WeeklyReportWeekday = (typeof WEEKLY_REPORT_WEEKDAYS)[number];
+
+export type WeeklyReportSettings = {
+  enabled: boolean;
+  weekday: WeeklyReportWeekday;
+  timezone: string;
+  lastSentWeekKey?: string;
+  lastSentAt?: string;
+};
+
+export const DEFAULT_WEEKLY_REPORT_WEEKDAY: WeeklyReportWeekday = "sun";
+
+export const WEEKLY_REPORT_WEEKDAY_LABELS: Record<
+  WeeklyReportWeekday,
+  string
+> = {
+  sun: "Sunday",
+  mon: "Monday",
+  tue: "Tuesday",
+  wed: "Wednesday",
+  thu: "Thursday",
+  fri: "Friday",
+  sat: "Saturday",
+};
+
+export function normalizeWeeklyReportWeekday(
+  input: unknown,
+): WeeklyReportWeekday {
+  return typeof input === "string" &&
+    WEEKLY_REPORT_WEEKDAYS.includes(input as WeeklyReportWeekday)
+    ? (input as WeeklyReportWeekday)
+    : DEFAULT_WEEKLY_REPORT_WEEKDAY;
+}
+
+export function getDefaultWeeklyReportSettings(
+  fallbackTimezone = "UTC",
+): WeeklyReportSettings {
+  return {
+    enabled: true,
+    weekday: DEFAULT_WEEKLY_REPORT_WEEKDAY,
+    timezone:
+      typeof fallbackTimezone === "string" && fallbackTimezone.trim()
+        ? fallbackTimezone.trim()
+        : "UTC",
+  };
+}
+
+export function normalizeWeeklyReportSettings(
+  input?: Partial<WeeklyReportSettings> | null,
+  fallbackTimezone = "UTC",
+): WeeklyReportSettings {
+  const defaults = getDefaultWeeklyReportSettings(fallbackTimezone);
+  return {
+    enabled: typeof input?.enabled === "boolean" ? input.enabled : true,
+    weekday: normalizeWeeklyReportWeekday(input?.weekday),
+    timezone:
+      typeof input?.timezone === "string" && input.timezone.trim()
+        ? input.timezone.trim()
+        : defaults.timezone,
+    lastSentWeekKey:
+      typeof input?.lastSentWeekKey === "string" && input.lastSentWeekKey.trim()
+        ? input.lastSentWeekKey.trim()
+        : undefined,
+    lastSentAt:
+      typeof input?.lastSentAt === "string" && input.lastSentAt.trim()
+        ? input.lastSentAt.trim()
+        : undefined,
+  };
+}
+
+function getZonedParts(date: Date, timeZone: string) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      weekday: "short",
+    })
+      .formatToParts(date)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  return {
+    year: String(parts.year),
+    month: String(parts.month),
+    day: String(parts.day),
+    weekday: String(parts.weekday).toLowerCase(),
+  };
+}
+
+function getUtcDateFromZonedParts(date: Date, timeZone: string) {
+  const parts = getZonedParts(date, timeZone);
+  return new Date(
+    Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)),
+  );
+}
+
+export function getWeeklyReportLocalWeekday(
+  date: Date,
+  timeZone: string,
+): WeeklyReportWeekday {
+  const weekday = getZonedParts(date, timeZone).weekday;
+  return weekday === "sun" ||
+    weekday === "mon" ||
+    weekday === "tue" ||
+    weekday === "wed" ||
+    weekday === "thu" ||
+    weekday === "fri" ||
+    weekday === "sat"
+    ? weekday
+    : DEFAULT_WEEKLY_REPORT_WEEKDAY;
+}
+
+export function getWeeklyReportDeliveryKey(date: Date, timeZone: string) {
+  const zonedDate = getUtcDateFromZonedParts(date, timeZone);
+  const day = zonedDate.getUTCDay() || 7;
+  zonedDate.setUTCDate(zonedDate.getUTCDate() + 4 - day);
+  const isoYear = zonedDate.getUTCFullYear();
+  const yearStart = new Date(Date.UTC(isoYear, 0, 1));
+  const week = Math.ceil(
+    ((zonedDate.getTime() - yearStart.getTime()) / 86400000 + 1) / 7,
+  );
+  return `${isoYear}-W${String(week).padStart(2, "0")}`;
+}
+
+export function shouldSendWeeklyReportForDate(
+  settings: WeeklyReportSettings,
+  date: Date,
+) {
+  const deliveryKey = getWeeklyReportDeliveryKey(date, settings.timezone);
+  return {
+    deliveryKey,
+    matchesWeekday:
+      getWeeklyReportLocalWeekday(date, settings.timezone) === settings.weekday,
+    alreadySent: settings.lastSentWeekKey === deliveryKey,
+  };
+}
