@@ -46,7 +46,7 @@ export function getDefaultWeeklyReportSettings(
   fallbackTimezone = "UTC",
 ): WeeklyReportSettings {
   return {
-    enabled: true,
+    enabled: false,
     weekday: DEFAULT_WEEKLY_REPORT_WEEKDAY,
     timezone:
       typeof fallbackTimezone === "string" && fallbackTimezone.trim()
@@ -61,7 +61,7 @@ export function normalizeWeeklyReportSettings(
 ): WeeklyReportSettings {
   const defaults = getDefaultWeeklyReportSettings(fallbackTimezone);
   return {
-    enabled: typeof input?.enabled === "boolean" ? input.enabled : true,
+    enabled: typeof input?.enabled === "boolean" ? input.enabled : false,
     weekday: normalizeWeeklyReportWeekday(input?.weekday),
     timezone:
       typeof input?.timezone === "string" && input.timezone.trim()
@@ -105,6 +105,43 @@ function getUtcDateFromZonedParts(date: Date, timeZone: string) {
   return new Date(
     Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)),
   );
+}
+
+export function getWeeklyReportRangeEndDate(date: Date, timeZone: string) {
+  return getUtcDateFromZonedParts(date, timeZone);
+}
+
+export function getWeeklyReportRangeStartDate(date: Date, timeZone: string) {
+  const rangeStart = getUtcDateFromZonedParts(date, timeZone);
+  rangeStart.setUTCDate(rangeStart.getUTCDate() - 6);
+  return rangeStart;
+}
+
+export function getWeeklyReportRangeStartIso(date: Date, timeZone: string) {
+  return getWeeklyReportRangeStartDate(date, timeZone).toISOString();
+}
+
+export function getWeeklyReportDateStamp(date: Date, timeZone: string) {
+  return getUtcDateFromZonedParts(date, timeZone).getTime();
+}
+
+export function formatWeeklyReportRangeLabel(
+  date: Date,
+  timeZone: string,
+  locale = "en-US",
+) {
+  const rangeStart = getWeeklyReportRangeStartDate(date, timeZone);
+  const rangeEnd = getWeeklyReportRangeEndDate(date, timeZone);
+  return `${rangeStart.toLocaleDateString(locale, {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+  })} - ${rangeEnd.toLocaleDateString(locale, {
+    timeZone: "UTC",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })}`;
 }
 
 export function getWeeklyReportLocalWeekday(
