@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import crypto from 'crypto';
 import { GoogleGenAI, Type } from '@google/genai';
+import OpenAI from 'openai';
 import DodoPayments from 'dodopayments';
 import express from 'express';
 import type { Server } from 'http';
@@ -64,6 +65,13 @@ import {
   GLOBAL_TRACKING_TIMEZONE,
 } from './src/lib/trackingTime';
 import {
+  buildWeeklyReportEmailHtml,
+  buildWeeklyReportEmailSummary,
+  buildWeeklyReportWorkspaceUrl,
+  getResendEmailId,
+  sendAlertEmailEvents as sendSharedAlertEmailEvents,
+} from './src/lib/backendEmail';
+import {
   DISCOVERY_CANDIDATE_CACHE_TTL,
   DISCOVERY_CACHE_VERSION,
   getDiscoveryCandidateCacheKey,
@@ -101,6 +109,11 @@ import {
   normalizeAlertRules,
   normalizeNotificationSettings,
 } from './src/lib/alerts';
+import {
+  normalizeWeeklyReportSettings,
+  shouldSendWeeklyReportForDate,
+  type WeeklyReportSettings,
+} from './src/lib/weeklyReports';
 import {
   findChartCategory,
   getChartCategoryOptions,
@@ -422,6 +435,7 @@ type UserTrackingDocument = {
   competitorTrackedKeywords?: CompetitorTrackedKeywordRecord[];
   competitorRankHistory?: CompetitorRankHistoryRecord[];
   trackingSchedule?: TrackingSchedule;
+  weeklyReportSettings?: WeeklyReportSettings;
   alertRules?: AlertRule[];
   notificationSettings?: NotificationSettings;
   announcementEmailsEnabled?: boolean;
@@ -481,6 +495,7 @@ type NormalizedUserTrackingDocument = TrackingState & {
   bookmarks: AppBookmark[];
   trackedApps: TrackedAppRecord[];
   appAnalysisSnapshots: AppAnalysisSnapshot[];
+  weeklyReportSettings: WeeklyReportSettings;
   alertRules: AlertRule[];
   notificationSettings: NotificationSettings;
   legalAcceptedAt?: string;
@@ -2704,6 +2719,7 @@ async function archiveAndTrimCompetitorRankHistory(
 }
 
 function normalizeUserTrackingDocument(data: any): NormalizedUserTrackingDocument {
+  const schedule = normalizeTrackingSchedule(data?.trackingSchedule);
   return {
     bookmarks: sanitizeBookmarks(data?.bookmarks),
     trackedApps: sanitizeTrackedApps(data?.trackedApps),
@@ -2717,7 +2733,11 @@ function normalizeUserTrackingDocument(data: any): NormalizedUserTrackingDocumen
     competitorAsoLatestSnapshots: sanitizeCompetitorAsoLatestSnapshots(
       data?.competitorAsoLatestSnapshots,
     ),
-    schedule: normalizeTrackingSchedule(data?.trackingSchedule),
+    schedule,
+    weeklyReportSettings: normalizeWeeklyReportSettings(
+      data?.weeklyReportSettings,
+      schedule.timezone || GLOBAL_TRACKING_TIMEZONE,
+    ),
     alertRules: normalizeAlertRules(data?.alertRules),
     notificationSettings: normalizeNotificationSettings(data?.notificationSettings),
     legalAcceptedAt:
@@ -3154,6 +3174,23 @@ function mergeEditableTrackingSchedule(
   };
 }
 
+function mergeEditableWeeklyReportSettings(
+  current: WeeklyReportSettings,
+  next: WeeklyReportSettings,
+): WeeklyReportSettings {
+  const normalizedNext = normalizeWeeklyReportSettings(
+    next,
+    current.timezone || GLOBAL_TRACKING_TIMEZONE,
+  );
+  return {
+    enabled: normalizedNext.enabled,
+    weekday: normalizedNext.weekday,
+    timezone: normalizedNext.timezone,
+    lastSentWeekKey: current.lastSentWeekKey,
+    lastSentAt: current.lastSentAt,
+  };
+}
+
 function mergeCompetitorGroupSnapshots(
   existing: CompetitorGroupSnapshotRecord[],
   incoming: CompetitorGroupSnapshotRecord[],
@@ -3253,6 +3290,10 @@ function mergeEditableUserTrackingState(
     schedule: mergeEditableTrackingSchedule(
       currentState.schedule,
       nextState.schedule,
+    ),
+    weeklyReportSettings: mergeEditableWeeklyReportSettings(
+      currentState.weeklyReportSettings,
+      nextState.weeklyReportSettings,
     ),
     alertRules: mergeEditableAlertRules(
       currentState.alertRules,
@@ -3989,57 +4030,6 @@ function formatAlertEmailTimestamp(timestamp: string) {
   return `${istTime} ${GLOBAL_TRACKING_TIMEZONE} (${utcTime} UTC)`;
 }
 
-function formatAlertChangedFieldLabel(field: string) {
-  switch (field) {
-    case 'title':
-      return 'Title';
-    case 'description':
-      return 'Description';
-    case 'screenshots':
-      return 'Screenshots';
-    case 'icon':
-      return 'Icon';
-    case 'category':
-      return 'Category';
-    default:
-      return field;
-  }
-}
-
-function getAlertEmailSubject(event: AlertEvent) {
-  return event.scope === 'competitor_aso'
-    ? `Competitor ASO alert: ${event.changedAppTitle || event.keyword}`
-    : `Keyword alert: ${event.keyword}`;
-}
-
-function buildAlertEmailHtml(event: AlertEvent) {
-  const storeLabel = event.store === 'ios' ? 'iOS' : 'Android';
-  const changedFields = Array.isArray(event.changedFields) && event.changedFields.length
-    ? event.changedFields.map((field) => formatAlertChangedFieldLabel(field)).join(', ')
-    : null;
-  const heading = event.scope === 'competitor_aso'
-    ? escapeAlertEmailHtml(event.changedAppTitle || event.keyword)
-    : escapeAlertEmailHtml(event.keyword);
-  const dashboardUrl = ALERT_EMAIL_APP_URL;
-
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
-      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeAlertEmailHtml(getAlertEmailSubject(event))}</h2>
-      <p style="margin: 0 0 18px; color: #334155;">${escapeAlertEmailHtml(event.message)}</p>
-      <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; padding: 18px;">
-        <p style="margin: 0 0 8px;"><strong>Target:</strong> ${heading}</p>
-        <p style="margin: 0 0 8px;"><strong>Store:</strong> ${storeLabel}</p>
-        <p style="margin: 0 0 8px;"><strong>Country:</strong> ${escapeAlertEmailHtml(event.country.toUpperCase())}</p>
-        <p style="margin: 0 0 8px;"><strong>Triggered:</strong> ${escapeAlertEmailHtml(formatAlertEmailTimestamp(event.createdAt))}</p>
-        ${changedFields ? `<p style="margin: 0;"><strong>Changed fields:</strong> ${escapeAlertEmailHtml(changedFields)}</p>` : ''}
-      </div>
-      <a href="${escapeAlertEmailHtml(dashboardUrl)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
-        Open Workspace
-      </a>
-    </div>
-  `;
-}
-
 async function resolveAlertEmailRecipient(
   userDocRef: DocumentReference<DocumentData>,
 ) {
@@ -4072,39 +4062,148 @@ async function sendEmailAlertEvents(
   userDocRef: DocumentReference<DocumentData>,
   events: AlertEvent[],
 ) {
-  if (!events.length) {
-    return;
+  await sendSharedAlertEmailEvents(userDocRef, events, {
+    resend,
+    fromEmail: RESEND_FROM_EMAIL,
+    dashboardUrl: ALERT_EMAIL_APP_URL,
+    resolveRecipient: resolveAlertEmailRecipient,
+  });
+}
+
+function buildWeeklyReportSummaryFromState(
+  state: Pick<
+    NormalizedUserTrackingDocument,
+    | 'trackedKeywords'
+    | 'rankHistory'
+    | 'competitorGroups'
+    | 'competitorTrackedKeywords'
+    | 'competitorRankHistory'
+  >,
+) {
+  return buildWeeklyReportEmailSummary({
+    trackedKeywords: state.trackedKeywords.map((entry) => ({
+      keyword: entry.keyword,
+      appId: entry.appId,
+      appTitle: entry.appTitle,
+      store: entry.store,
+      country: entry.country,
+      lastRank: entry.lastRank,
+      lastCheckStatus: entry.lastCheckStatus,
+      lastChecked: entry.lastChecked,
+    })),
+    rankHistory: state.rankHistory.map((entry) => ({
+      appId: entry.appId,
+      keyword: entry.keyword,
+      store: entry.store,
+      country: entry.country,
+      rank: entry.rank,
+      timestamp: entry.timestamp,
+      rankDepth: entry.rankDepth,
+    })),
+    competitorGroups: state.competitorGroups.map((group) => ({
+      groupId: group.groupId,
+      ownApp: { title: group.ownApp.title },
+      competitors: group.competitors.map((app) => ({ title: app.title })),
+    })),
+    competitorTrackedKeywords: state.competitorTrackedKeywords.map((entry) => ({
+      trackedKeywordId: entry.trackedKeywordId,
+      groupId: entry.groupId,
+      keyword: entry.keyword,
+      store: entry.store,
+      country: entry.country,
+      apps: entry.apps.map((app) => ({
+        appKey: app.appKey,
+        title: app.title,
+        lastRank: app.lastRank,
+        lastCheckStatus: app.lastCheckStatus,
+      })),
+    })),
+    competitorRankHistory: state.competitorRankHistory.map((entry) => ({
+      trackedKeywordId: entry.trackedKeywordId,
+      appKey: entry.appKey,
+      rank: entry.rank,
+      timestamp: entry.timestamp,
+      rankDepth: entry.rankDepth,
+    })),
+  });
+}
+
+async function maybeSendWeeklyReportEmail(
+  userDocRef: DocumentReference<DocumentData>,
+  state: Pick<
+    NormalizedUserTrackingDocument,
+    | 'trackedKeywords'
+    | 'rankHistory'
+    | 'competitorGroups'
+    | 'competitorTrackedKeywords'
+    | 'competitorRankHistory'
+    | 'weeklyReportSettings'
+  >,
+  date: Date,
+) {
+  const settings = state.weeklyReportSettings;
+  if (!settings.enabled) {
+    return null;
+  }
+
+  const eligibility = shouldSendWeeklyReportForDate(settings, date);
+  if (!eligibility.matchesWeekday || eligibility.alreadySent) {
+    return null;
   }
   if (!resend) {
-    console.info('[email] Skipping alert email because Resend is not configured.');
-    return;
+    console.info('[email] Skipping weekly report email because Resend is not configured.');
+    return null;
+  }
+
+  const sender = RESEND_FROM_EMAIL.trim();
+  if (!sender) {
+    console.info('[email] Skipping weekly report email because sender email is not configured.');
+    return null;
   }
 
   const recipient = await resolveAlertEmailRecipient(userDocRef);
   if (!recipient) {
-    console.info(`[email] Skipping alert email for user ${userDocRef.id} because no account email is available.`);
-    return;
+    console.info(`[email] Skipping weekly report email for user ${userDocRef.id} because no account email is available.`);
+    return null;
   }
 
-  await Promise.all(
-    events.map(async (event) => {
-      try {
-        const result = await resend.emails.send({
-          from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
-          to: recipient,
-          subject: getAlertEmailSubject(event),
-          html: buildAlertEmailHtml(event),
-        });
-        if (result.error) {
-          console.warn(`[email] Failed to deliver alert email ${event.id}`, result.error);
-          return;
-        }
-        console.info(`[email] Delivered alert email ${event.id} to ${recipient}.`);
-      } catch (error) {
-        console.warn(`[email] Failed to deliver alert email ${event.id}`, error);
-      }
-    }),
-  );
+  const summary = buildWeeklyReportSummaryFromState(state);
+  const reportMode =
+    summary.competitorGroupCount > 0 && summary.trackedKeywordCount === 0
+      ? 'competitors'
+      : 'my';
+  const reportUrl = buildWeeklyReportWorkspaceUrl(ALERT_EMAIL_APP_URL, reportMode);
+
+  try {
+    const result = await resend.emails.send({
+      from: `Rank Analyzer Pro <${sender}>`,
+      to: recipient,
+      subject: `Your weekly ASO report · ${summary.rangeLabel}`,
+      html: buildWeeklyReportEmailHtml({
+        summary,
+        reportUrl,
+        weekday: settings.weekday,
+      }),
+    });
+    if (result.error) {
+      console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, result.error);
+      return null;
+    }
+    if (!getResendEmailId(result)) {
+      console.warn(`[email] Weekly report email for user ${userDocRef.id} returned no message id.`);
+    }
+
+    const sentAt = new Date().toISOString();
+    console.info(`[email] Delivered weekly report email to ${recipient}.`);
+    return {
+      ...settings,
+      lastSentWeekKey: eligibility.deliveryKey,
+      lastSentAt: sentAt,
+    } satisfies WeeklyReportSettings;
+  } catch (error) {
+    console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, error);
+    return null;
+  }
 }
 
 function buildCronFailureEmailHtml(input: {
@@ -4356,6 +4455,9 @@ async function sendAnnouncementCampaign(
       if (result.error) {
         throw new Error(result.error.message || 'Resend rejected the message.');
       }
+      if (!getResendEmailId(result)) {
+        console.warn(`[email] Announcement email for campaign ${claimedCampaign.campaignId} to ${recipient.email} returned no message id.`);
+      }
 
       deliveredCount += 1;
       await recipient.userDocRef.set({
@@ -4426,6 +4528,9 @@ async function sendCronFailureEmail(input: {
     if (result.error) {
       console.warn('[email] Failed to deliver cron failure email.', result.error);
       return;
+    }
+    if (!getResendEmailId(result)) {
+      console.warn(`[email] Cron failure email for ${input.runKey} returned no message id.`);
     }
     console.info(`[email] Delivered cron failure email for ${input.runKey}.`);
   } catch (error) {
@@ -6316,110 +6421,137 @@ async function runAllUserTrackingSchedules(
         return;
       }
       const state = normalizeUserTrackingDocument(userData);
-      if (
-        !state.trackedKeywords.length &&
-        !state.competitorTrackedKeywords.length &&
-        !state.competitorGroups.length
-      ) {
-        return;
-      }
+      const hasTrackedData =
+        state.trackedKeywords.length > 0 ||
+        state.competitorTrackedKeywords.length > 0 ||
+        state.competitorGroups.length > 0;
+      const updatePayload: Partial<UserTrackingDocument> = {};
+      let weeklyEmailState: Pick<
+        NormalizedUserTrackingDocument,
+        | 'trackedKeywords'
+        | 'rankHistory'
+        | 'competitorGroups'
+        | 'competitorTrackedKeywords'
+        | 'competitorRankHistory'
+        | 'weeklyReportSettings'
+      > = state;
 
-      const schedule = normalizeTrackingSchedule(state.schedule);
-      if (!shouldRunTrackingRefresh(schedule, {
-        hasTrackedData: true,
-        runKey,
-        force: options?.force,
-      })) {
-        return;
-      }
-
-      const planLimits = getResolvedPlanLimits(userData);
-      const { scopedState } = getTrackedKeywordScopedState(state, planLimits);
-      const recoveryScope =
-        options?.mode === 'unresolved_only'
-          ? getTrackingRecoveryScope(scopedState, runKey)
-          : {
-              scopedState,
-              counts: {
-                trackedKeywords: scopedState.trackedKeywords.length,
-                competitorTrackedApps: scopedState.competitorTrackedKeywords.reduce(
-                  (sum, trackedKeyword) => sum + trackedKeyword.apps.length,
-                  0,
-                ),
-                competitorAsoTargets: getUnresolvedCompetitorAsoTargetCount(
+      if (hasTrackedData) {
+        const schedule = normalizeTrackingSchedule(state.schedule);
+        if (shouldRunTrackingRefresh(schedule, {
+          hasTrackedData: true,
+          runKey,
+          force: options?.force,
+        })) {
+          const planLimits = getResolvedPlanLimits(userData);
+          const { scopedState } = getTrackedKeywordScopedState(state, planLimits);
+          const recoveryScope =
+            options?.mode === 'unresolved_only'
+              ? getTrackingRecoveryScope(scopedState, runKey)
+              : {
                   scopedState,
-                  runKey,
-                ),
+                  counts: {
+                    trackedKeywords: scopedState.trackedKeywords.length,
+                    competitorTrackedApps: scopedState.competitorTrackedKeywords.reduce(
+                      (sum, trackedKeyword) => sum + trackedKeyword.apps.length,
+                      0,
+                    ),
+                    competitorAsoTargets: getUnresolvedCompetitorAsoTargetCount(
+                      scopedState,
+                      runKey,
+                    ),
+                  },
+                };
+          const hasTrackedRefreshWork =
+            recoveryScope.counts.trackedKeywords > 0 ||
+            recoveryScope.counts.competitorTrackedApps > 0;
+          const hasCompetitorAsoWork = recoveryScope.counts.competitorAsoTargets > 0;
+          if (hasTrackedRefreshWork || hasCompetitorAsoWork) {
+            const refreshed = await refreshAllTrackingState(recoveryScope.scopedState, {
+              updateScheduleMetadata: true,
+              runKey,
+              mode: options?.mode,
+            });
+            const nextTrackedKeywords = mergeTrackedKeywords(
+              state.trackedKeywords,
+              refreshed.nextState.trackedKeywords,
+            );
+            const nextCompetitorTrackedKeywords = mergeCompetitorTrackedKeywords(
+              state.competitorTrackedKeywords,
+              refreshed.nextState.competitorTrackedKeywords,
+            );
+            const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
+              userDoc.ref,
+              state.trackedKeywords,
+              nextTrackedKeywords,
+              state.alertRules,
+              state.notificationSettings,
+              runKey,
+            );
+            const asoResult = await captureCompetitorAsoState(
+              userDoc.ref,
+              {
+                competitorGroups: state.competitorGroups,
+                competitorTrackedKeywords: nextCompetitorTrackedKeywords,
+                competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
+                alertRules: updatedAlertRules,
+                notificationSettings: state.notificationSettings,
               },
+              runKey,
+              { mode: options?.mode },
+            );
+            const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
+              userDoc.ref,
+              refreshed.nextState.rankHistory,
+            );
+            const retainedCompetitorRankHistory = await archiveAndTrimCompetitorRankHistory(
+              userDoc.ref,
+              refreshed.nextState.competitorRankHistory,
+            );
+
+            updatePayload.trackedKeywords = nextTrackedKeywords;
+            updatePayload.rankHistory = retainedRankHistory;
+            updatePayload.competitorTrackedKeywords = nextCompetitorTrackedKeywords;
+            updatePayload.competitorRankHistory = retainedCompetitorRankHistory;
+            updatePayload.competitorAsoLatestSnapshots = asoResult.nextLatestSnapshots;
+            updatePayload.trackingSchedule = refreshed.nextState.schedule;
+            updatePayload.alertRules = updatedAlertRules;
+
+            weeklyEmailState = {
+              trackedKeywords: nextTrackedKeywords,
+              rankHistory: retainedRankHistory,
+              competitorGroups: state.competitorGroups,
+              competitorTrackedKeywords: nextCompetitorTrackedKeywords,
+              competitorRankHistory: retainedCompetitorRankHistory,
+              weeklyReportSettings: state.weeklyReportSettings,
             };
-      const hasTrackedRefreshWork =
-        recoveryScope.counts.trackedKeywords > 0 ||
-        recoveryScope.counts.competitorTrackedApps > 0;
-      const hasCompetitorAsoWork = recoveryScope.counts.competitorAsoTargets > 0;
-      if (!hasTrackedRefreshWork && !hasCompetitorAsoWork) {
-        return;
+
+            ran += 1;
+            checked += refreshed.checked;
+            changed += refreshed.changed;
+            failed += refreshed.failed;
+            asoChecked += asoResult.checked;
+            asoChanged += asoResult.changed;
+            asoFailed += asoResult.failed;
+          }
+        }
       }
 
-      const refreshed = await refreshAllTrackingState(recoveryScope.scopedState, {
-        updateScheduleMetadata: true,
-        runKey,
-        mode: options?.mode,
-      });
-      const nextTrackedKeywords = mergeTrackedKeywords(
-        state.trackedKeywords,
-        refreshed.nextState.trackedKeywords,
-      );
-      const nextCompetitorTrackedKeywords = mergeCompetitorTrackedKeywords(
-        state.competitorTrackedKeywords,
-        refreshed.nextState.competitorTrackedKeywords,
-      );
-      const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
+      const nextWeeklyReportSettings = await maybeSendWeeklyReportEmail(
         userDoc.ref,
-        state.trackedKeywords,
-        nextTrackedKeywords,
-        state.alertRules,
-        state.notificationSettings,
-        runKey,
+        weeklyEmailState,
+        now,
       );
-      const asoResult = await captureCompetitorAsoState(
-        userDoc.ref,
-        {
-          competitorGroups: state.competitorGroups,
-          competitorTrackedKeywords: nextCompetitorTrackedKeywords,
-          competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
-          alertRules: updatedAlertRules,
-          notificationSettings: state.notificationSettings,
-        },
-        runKey,
-        { mode: options?.mode },
-      );
-      const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
-        userDoc.ref,
-        refreshed.nextState.rankHistory,
-      );
-      const retainedCompetitorRankHistory = await archiveAndTrimCompetitorRankHistory(
-        userDoc.ref,
-        refreshed.nextState.competitorRankHistory,
-      );
+      if (nextWeeklyReportSettings) {
+        updatePayload.weeklyReportSettings = nextWeeklyReportSettings;
+      }
 
-      await userDoc.ref.set({
-        trackedKeywords: nextTrackedKeywords,
-        rankHistory: retainedRankHistory,
-        competitorTrackedKeywords: nextCompetitorTrackedKeywords,
-        competitorRankHistory: retainedCompetitorRankHistory,
-        competitorAsoLatestSnapshots: asoResult.nextLatestSnapshots,
-        trackingSchedule: refreshed.nextState.schedule,
-        alertRules: updatedAlertRules,
-        updatedAt: new Date().toISOString(),
-      } satisfies UserTrackingDocument, { merge: true });
-
-      ran += 1;
-      checked += refreshed.checked;
-      changed += refreshed.changed;
-      failed += refreshed.failed;
-      asoChecked += asoResult.checked;
-      asoChanged += asoResult.changed;
-      asoFailed += asoResult.failed;
+      if (Object.keys(updatePayload).length > 0) {
+        await userDoc.ref.set({
+          ...updatePayload,
+          updatedAt: new Date().toISOString(),
+        } satisfies UserTrackingDocument, { merge: true });
+      }
     });
 
     return {
@@ -7117,6 +7249,31 @@ async function buildKeywordCandidates(
 const genai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
 const GEMINI_DISCOVERY_MODELS = ['gemini-2.5-flash-lite', 'gemini-2.5-flash'] as const;
 const GEMINI_DISCOVERY_RETRY_DELAYS_MS = [600, 1500] as const;
+const groqClient = process.env.GROQ_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GROQ_API_KEY,
+      baseURL: 'https://api.groq.com/openai/v1',
+    })
+  : null;
+const DISCOVERY_PRIMARY_MODEL = process.env.DISCOVERY_PRIMARY_MODEL || 'openai/gpt-oss-20b';
+const DISCOVERY_FALLBACK_MODEL = process.env.DISCOVERY_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
+const DISCOVERY_REFINEMENT_RETRY_DELAYS_MS = [600, 1500] as const;
+const DISCOVERY_REFINEMENT_LIMITS = {
+  fast: {
+    promptCandidateLimit: 28,
+    featureSummaryLimit: 8,
+    outputKeywordLimit: 24,
+    outputTokenLimit: 320,
+    minimumUsableCount: 8,
+  },
+  deep: {
+    promptCandidateLimit: 56,
+    featureSummaryLimit: 12,
+    outputKeywordLimit: 40,
+    outputTokenLimit: 640,
+    minimumUsableCount: 14,
+  },
+} as const;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -7210,9 +7367,14 @@ type DiscoveryCandidateCacheEntry = {
   completeness: DiscoveryMode;
   rankedCandidates: DiscoveryMetricCandidate[];
   rawCount: number;
-  geminiCount: number;
-  sanitizedGeminiCount: number;
+  modelCount: number;
+  sanitizedModelCount: number;
   candidateCount: number;
+  providerUsed?: 'groq' | 'gemini' | null;
+  modelUsed?: string | null;
+  promptCandidateCount?: number;
+  featureLineCount?: number;
+  fallbackReason?: string | null;
 };
 
 type DiscoveryResultCacheEntry = {
@@ -7224,6 +7386,50 @@ type DiscoveryResultCacheEntry = {
   searchDepth: number;
   failedLookups: number;
   loadedAt: string;
+};
+
+type DiscoveryRefinementContext = {
+  title: string;
+  description?: string;
+  category?: string;
+  developer?: string;
+  store: StoreType;
+  country: string;
+};
+
+type DiscoveryProviderName = 'groq' | 'gemini';
+
+type DiscoveryKeywordProviderResult = {
+  keywords: string[];
+  model: string;
+  provider: DiscoveryProviderName;
+};
+
+type DiscoveryProviderAttemptFailureReason =
+  | 'provider_error'
+  | 'timeout'
+  | 'invalid_json'
+  | 'empty_output'
+  | 'insufficient_output'
+  | 'unconfigured';
+
+type DiscoveryProviderAttempt = {
+  error?: unknown;
+  failureReason: DiscoveryProviderAttemptFailureReason | null;
+  result: DiscoveryKeywordProviderResult | null;
+};
+
+type DiscoveryRefinementCacheEntry = {
+  keywords: string[];
+  rawCount: number;
+  modelCount: number;
+  sanitizedModelCount: number;
+  fallbackAddedCount: number;
+  providerUsed: DiscoveryProviderName | null;
+  modelUsed: string | null;
+  promptCandidateCount: number;
+  featureLineCount: number;
+  fallbackReason: DiscoveryProviderAttemptFailureReason | null;
 };
 
 function dedupeKeywords(keywords: string[]) {
@@ -7353,6 +7559,408 @@ Your task is to significantly expand and refine this list to discover a large va
 
   console.log(
     `[keyword-refine] mode=${mode} usedGemini=${shouldUseGemini} raw=${rawKeywords.length} gemini=${geminiKeywords.length} sanitizedGemini=${sanitizedGeminiKeywords.length} fallbackAdded=${fallbackKeywords.length}`,
+  );
+
+  keywordRefinementCache.set(cacheKey, payload);
+  return payload;
+}
+
+function parseKeywordArrayResponse(text: string) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((keyword): keyword is string => typeof keyword === 'string');
+    }
+  } catch {}
+
+  const arrayStart = trimmed.indexOf('[');
+  const arrayEnd = trimmed.lastIndexOf(']');
+  if (arrayStart === -1 || arrayEnd <= arrayStart) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed.slice(arrayStart, arrayEnd + 1));
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    return parsed.filter((keyword): keyword is string => typeof keyword === 'string');
+  } catch {
+    return null;
+  }
+}
+
+function compactDiscoveryPromptCandidates(rawKeywords: string[], mode: DiscoveryMode) {
+  return dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate)).slice(
+    0,
+    DISCOVERY_REFINEMENT_LIMITS[mode].promptCandidateLimit,
+  );
+}
+
+function extractDiscoveryFeatureSummary(
+  description: string | undefined,
+  mode: DiscoveryMode,
+) {
+  if (!description) {
+    return [];
+  }
+
+  const limit = DISCOVERY_REFINEMENT_LIMITS[mode].featureSummaryLimit;
+  const releaseNotePattern =
+    /\b(update|updated|version|release|bug|bugs|fix|fixed|fixes|crash|performance|privacy|policy|terms)\b/i;
+  const chunks = String(description)
+    .split(/[\r\n]+|[•·▪●]|[.!?;]+/)
+    .map((chunk) => normalizeKeyword(chunk))
+    .filter(Boolean);
+  const seen = new Set<string>();
+
+  return chunks
+    .map((chunk) => {
+      const tokens = tokenize(chunk).filter((token) => token.length > 2);
+      if (tokens.length < 2 || releaseNotePattern.test(chunk)) {
+        return null;
+      }
+      const text = tokens.slice(0, 10).join(' ');
+      if (!text || seen.has(text)) {
+        return null;
+      }
+      seen.add(text);
+      const meaningfulTokenCount = tokens.filter((token) => !HIGH_VOLUME_TERMS.has(token)).length;
+      const score =
+        meaningfulTokenCount * 3 +
+        Math.min(tokens.length, 6) +
+        (tokens.length >= 4 && tokens.length <= 8 ? 3 : 0);
+      return { score, text };
+    })
+    .filter((entry): entry is { score: number; text: string } => Boolean(entry))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((entry) => entry.text);
+}
+
+function buildDiscoveryRefinementPrompt(input: {
+  candidateKeywords: string[];
+  context: DiscoveryRefinementContext;
+  excludedBrandTokens: string[];
+  featureSummary: string[];
+  mode: DiscoveryMode;
+}) {
+  const limits = DISCOVERY_REFINEMENT_LIMITS[input.mode];
+  const featureBlock =
+    input.featureSummary.length > 0
+      ? input.featureSummary.map((feature, index) => `${index + 1}. ${feature}`).join('\n')
+      : 'N/A';
+
+  return `You are an App Store Optimization keyword strategist.
+Return only real user-searchable ASO keywords for this app.
+
+App metadata:
+- Title: ${input.context.title || 'N/A'}
+- Category: ${input.context.category || 'N/A'}
+- Developer: ${input.context.developer || 'N/A'}
+- Store: ${input.context.store}
+- Country: ${input.context.country}
+
+Compressed feature summary:
+${featureBlock}
+
+Candidate keywords to refine:
+${input.candidateKeywords.join(', ')}
+
+Do not use competitor brands or trademarked rival names:
+${input.excludedBrandTokens.length > 0 ? input.excludedBrandTokens.join(', ') : 'N/A'}
+
+Rules:
+1. Return only a JSON array of strings. No markdown. No commentary.
+2. Include at most ${limits.outputKeywordLimit} keywords.
+3. Include head, mid-tail, long-tail, feature, audience, and intent phrases only when relevant to this app.
+4. Prefer concrete search intent grounded in the app metadata and feature summary.
+5. Exclude junk, release-note phrasing, unrelated broad terms, and competitor-brand phrases.
+6. Keep each keyword phrase natural and human-searchable, with a maximum of 8 words.`;
+}
+
+function sanitizeRefinedKeywords(
+  keywords: string[],
+  excludedBrandTokens: Set<string>,
+  mode: DiscoveryMode,
+) {
+  return dedupeKeywords(
+    keywords
+      .filter(isDiscoveryKeywordCandidate)
+      .filter((keyword) => !keywordContainsExcludedBrandToken(keyword, excludedBrandTokens)),
+  ).slice(0, DISCOVERY_REFINEMENT_LIMITS[mode].outputKeywordLimit);
+}
+
+async function generateGroqKeywordList(prompt: string, mode: DiscoveryMode) {
+  if (!groqClient) {
+    return null;
+  }
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= DISCOVERY_REFINEMENT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const response = await groqClient.chat.completions.create({
+        model: DISCOVERY_PRIMARY_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'Return only a valid JSON array of keyword strings.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.4,
+        max_tokens: DISCOVERY_REFINEMENT_LIMITS[mode].outputTokenLimit,
+      });
+      return parseKeywordArrayResponse(response.choices[0]?.message?.content || '');
+    } catch (error) {
+      lastError = error;
+      const retryable = isUnavailableLikeError(error) || isTimeoutLikeError(error);
+      const delayMs = DISCOVERY_REFINEMENT_RETRY_DELAYS_MS[attempt];
+      if (retryable && typeof delayMs === 'number') {
+        await sleep(delayMs);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Groq keyword refinement failed.');
+}
+
+async function generateGeminiDiscoveryKeywordList(prompt: string, mode: DiscoveryMode) {
+  if (!genai) {
+    return null;
+  }
+
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt <= DISCOVERY_REFINEMENT_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const response = await genai.models.generateContent({
+        model: DISCOVERY_FALLBACK_MODEL,
+        contents: prompt,
+        config: {
+          temperature: 0.4,
+          maxOutputTokens: DISCOVERY_REFINEMENT_LIMITS[mode].outputTokenLimit,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+          },
+        },
+      });
+      return parseKeywordArrayResponse(response.text || '');
+    } catch (error) {
+      lastError = error;
+      const retryable = isUnavailableLikeError(error) || isTimeoutLikeError(error);
+      const delayMs = DISCOVERY_REFINEMENT_RETRY_DELAYS_MS[attempt];
+      if (retryable && typeof delayMs === 'number') {
+        await sleep(delayMs);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Gemini keyword refinement failed.');
+}
+
+async function runDiscoveryProviderAttempt(input: {
+  mode: DiscoveryMode;
+  prompt: string;
+  provider: DiscoveryProviderName;
+}): Promise<DiscoveryProviderAttempt> {
+  if (input.provider === 'groq') {
+    if (!groqClient) {
+      return { result: null, failureReason: 'unconfigured' };
+    }
+    try {
+      const keywords = await generateGroqKeywordList(input.prompt, input.mode);
+      if (!keywords) {
+        return { result: null, failureReason: 'invalid_json' };
+      }
+      if (keywords.length === 0) {
+        return { result: null, failureReason: 'empty_output' };
+      }
+      return {
+        result: {
+          keywords,
+          provider: 'groq',
+          model: DISCOVERY_PRIMARY_MODEL,
+        },
+        failureReason: null,
+      };
+    } catch (error) {
+      return {
+        result: null,
+        error,
+        failureReason: isTimeoutLikeError(error) ? 'timeout' : 'provider_error',
+      };
+    }
+  }
+
+  if (!genai) {
+    return { result: null, failureReason: 'unconfigured' };
+  }
+  try {
+    const keywords = await generateGeminiDiscoveryKeywordList(input.prompt, input.mode);
+    if (!keywords) {
+      return { result: null, failureReason: 'invalid_json' };
+    }
+    if (keywords.length === 0) {
+      return { result: null, failureReason: 'empty_output' };
+    }
+    return {
+      result: {
+        keywords,
+        provider: 'gemini',
+        model: DISCOVERY_FALLBACK_MODEL,
+      },
+      failureReason: null,
+    };
+  } catch (error) {
+    return {
+      result: null,
+      error,
+      failureReason: isTimeoutLikeError(error) ? 'timeout' : 'provider_error',
+    };
+  }
+}
+
+async function refineKeywordsWithModel(
+  context: DiscoveryRefinementContext,
+  rawKeywords: string[],
+  mode: DiscoveryMode,
+  excludedBrandTokens?: string[],
+  options?: { force?: boolean },
+): Promise<DiscoveryRefinementCacheEntry> {
+  const refinementPoolLimit = DISCOVERY_PROFILES[mode].keywordLimit;
+  const promptKeywords = compactDiscoveryPromptCandidates(rawKeywords, mode);
+  const featureSummary = extractDiscoveryFeatureSummary(context.description, mode);
+  const normalizedContext = {
+    title: normalizeKeyword(context.title),
+    category: normalizeKeyword(context.category || ''),
+    developer: normalizeKeyword(context.developer || ''),
+    store: context.store,
+    country: normalizeCountryCode(context.country, 'us'),
+    featureSummary,
+    excludedBrandTokens: (excludedBrandTokens || []).slice().sort((a, b) => a.localeCompare(b)),
+    mode,
+    promptKeywords,
+  };
+  const cacheKey = JSON.stringify({
+    cacheVersion: DISCOVERY_CACHE_VERSION,
+    type: 'keyword-refinement-v2',
+    ...normalizedContext,
+  });
+  const cached = keywordRefinementCache.get<DiscoveryRefinementCacheEntry>(cacheKey);
+  if (!options?.force && cached) {
+    console.log(
+      `[keyword-refine] cache=hit mode=${mode} provider=${cached.providerUsed || 'local'} model=${cached.modelUsed || 'none'} raw=${cached.rawCount} prompt=${cached.promptCandidateCount} features=${cached.featureLineCount} modelOut=${cached.modelCount} sanitized=${cached.sanitizedModelCount} fallbackReason=${cached.fallbackReason || 'none'} fallbackAdded=${cached.fallbackAddedCount}`,
+    );
+    return cached;
+  }
+
+  const excludedBrandTokenSet = new Set(normalizedContext.excludedBrandTokens);
+  const prompt = buildDiscoveryRefinementPrompt({
+    context,
+    mode,
+    candidateKeywords: promptKeywords,
+    excludedBrandTokens: normalizedContext.excludedBrandTokens,
+    featureSummary,
+  });
+
+  let providerUsed: DiscoveryProviderName | null = null;
+  let modelUsed: string | null = null;
+  let fallbackReason: DiscoveryProviderAttemptFailureReason | null = null;
+  let modelKeywords: string[] = [];
+
+  if (promptKeywords.length > 0) {
+    const primaryAttempt = await runDiscoveryProviderAttempt({
+      prompt,
+      mode,
+      provider: 'groq',
+    });
+    if (primaryAttempt.result) {
+      const sanitizedPrimary = sanitizeRefinedKeywords(
+        primaryAttempt.result.keywords,
+        excludedBrandTokenSet,
+        mode,
+      );
+      if (sanitizedPrimary.length >= DISCOVERY_REFINEMENT_LIMITS[mode].minimumUsableCount) {
+        providerUsed = primaryAttempt.result.provider;
+        modelUsed = primaryAttempt.result.model;
+        modelKeywords = sanitizedPrimary;
+      } else {
+        fallbackReason =
+          sanitizedPrimary.length === 0 ? 'empty_output' : 'insufficient_output';
+      }
+    } else {
+      fallbackReason = primaryAttempt.failureReason;
+    }
+
+    if (!modelKeywords.length) {
+      const fallbackAttempt = await runDiscoveryProviderAttempt({
+        prompt,
+        mode,
+        provider: 'gemini',
+      });
+      if (fallbackAttempt.result) {
+        const sanitizedFallback = sanitizeRefinedKeywords(
+          fallbackAttempt.result.keywords,
+          excludedBrandTokenSet,
+          mode,
+        );
+        if (sanitizedFallback.length >= DISCOVERY_REFINEMENT_LIMITS[mode].minimumUsableCount) {
+          providerUsed = fallbackAttempt.result.provider;
+          modelUsed = fallbackAttempt.result.model;
+          modelKeywords = sanitizedFallback;
+        } else if (!fallbackReason) {
+          fallbackReason =
+            sanitizedFallback.length === 0 ? 'empty_output' : 'insufficient_output';
+        }
+      } else if (!fallbackReason) {
+        fallbackReason = fallbackAttempt.failureReason;
+      }
+    }
+  }
+
+  const primaryKeywords = modelKeywords.slice(0, refinementPoolLimit);
+  const seen = new Set(primaryKeywords.map((keyword) => normalizeKeyword(keyword)));
+  const fallbackKeywords: string[] = [];
+
+  for (const keyword of dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate))) {
+    if (keywordContainsExcludedBrandToken(keyword, excludedBrandTokenSet)) {
+      continue;
+    }
+    const normalized = normalizeKeyword(keyword);
+    if (!normalized || seen.has(normalized)) continue;
+    seen.add(normalized);
+    fallbackKeywords.push(keyword);
+    if (primaryKeywords.length + fallbackKeywords.length >= refinementPoolLimit) {
+      break;
+    }
+  }
+
+  const payload: DiscoveryRefinementCacheEntry = {
+    keywords: [...primaryKeywords, ...fallbackKeywords],
+    rawCount: rawKeywords.length,
+    modelCount: modelKeywords.length,
+    sanitizedModelCount: modelKeywords.length,
+    fallbackAddedCount: fallbackKeywords.length,
+    providerUsed,
+    modelUsed,
+    promptCandidateCount: promptKeywords.length,
+    featureLineCount: featureSummary.length,
+    fallbackReason,
+  };
+
+  console.log(
+    `[keyword-refine] cache=miss mode=${mode} provider=${providerUsed || 'local'} model=${modelUsed || 'none'} raw=${rawKeywords.length} prompt=${promptKeywords.length} features=${featureSummary.length} modelOut=${modelKeywords.length} sanitized=${modelKeywords.length} fallbackReason=${fallbackReason || 'none'} fallbackAdded=${fallbackKeywords.length}`,
   );
 
   keywordRefinementCache.set(cacheKey, payload);
@@ -7534,12 +8142,14 @@ async function buildRankedDiscoveryCandidates(
   }, input.mode, profile, options);
   const rawKeywords = candidateSource.keywords;
 
-  const refined = await refineKeywordsWithGemini(
+  const refined = await refineKeywordsWithModel(
     {
       title: input.title,
       description: input.description,
       category: input.category,
       developer: input.developer,
+      store: input.store,
+      country: input.country,
     },
     rawKeywords,
     input.mode,
@@ -7607,13 +8217,18 @@ async function buildRankedDiscoveryCandidates(
     completeness: input.mode,
     rankedCandidates,
     rawCount: refined.rawCount,
-    geminiCount: refined.geminiCount,
-    sanitizedGeminiCount: refined.sanitizedGeminiCount,
+    modelCount: refined.modelCount,
+    sanitizedModelCount: refined.sanitizedModelCount,
     candidateCount: rankedCandidates.length,
+    providerUsed: refined.providerUsed,
+    modelUsed: refined.modelUsed,
+    promptCandidateCount: refined.promptCandidateCount,
+    featureLineCount: refined.featureLineCount,
+    fallbackReason: refined.fallbackReason,
   };
 
   console.log(
-    `[discovery-candidates] mode=${input.mode} raw=${refined.rawCount} gemini=${refined.geminiCount} sanitizedGemini=${refined.sanitizedGeminiCount} admitted=${rankedCandidates.length}`,
+    `[discovery-candidates] mode=${input.mode} provider=${refined.providerUsed || 'local'} model=${refined.modelUsed || 'none'} raw=${refined.rawCount} prompt=${refined.promptCandidateCount} features=${refined.featureLineCount} modelOut=${refined.modelCount} sanitized=${refined.sanitizedModelCount} admitted=${rankedCandidates.length} fallbackReason=${refined.fallbackReason || 'none'}`,
   );
 
   discoveryCandidateCache.set(cacheKey, payload);
@@ -8175,6 +8790,7 @@ async function startServer() {
           competitorRankHistory: FieldValue.delete(),
           competitorAsoLatestSnapshots: FieldValue.delete(),
           trackingSchedule: FieldValue.delete(),
+          weeklyReportSettings: FieldValue.delete(),
           alertRules: FieldValue.delete(),
           notificationSettings: FieldValue.delete(),
           migratedFromLocalAt: FieldValue.delete(),
@@ -8347,6 +8963,7 @@ async function startServer() {
         competitorTrackedKeywords: mergedState.competitorTrackedKeywords,
         competitorRankHistory: retainedCompetitorRankHistory,
         trackingSchedule: mergedState.schedule,
+        weeklyReportSettings: mergedState.weeklyReportSettings,
         alertRules: mergedState.alertRules,
         notificationSettings: mergedState.notificationSettings,
         ...(mergedState.migratedFromLocalAt
@@ -8525,13 +9142,17 @@ async function startServer() {
           retryable: true,
         });
       }
+      const emailId = getResendEmailId(result);
+      if (!emailId) {
+        console.warn(`[email] Test email to ${recipient} returned no message id.`);
+      }
 
       res.json({
         ok: true,
         to: recipient,
         subject,
         sentAt,
-        id: result.data?.id || null,
+        ...(emailId ? { id: emailId } : {}),
       });
     } catch (error) {
       return sendApiError(res, error, 'Failed to send test email.');
@@ -8708,12 +9329,31 @@ async function startServer() {
       const existingTrackedKeyword = state.trackedKeywords.find(
         (entry) => getTrackedKeywordKey(entry) === trackedKeywordKey,
       );
-
-      if (!existingTrackedKeyword) {
-        throw createBadRequestError('Tracked keyword record was not found for this account.');
-      }
+      const refreshTrackedKeywordRecordInput =
+        existingTrackedKeyword ||
+        ({
+          groupId,
+          keyword,
+          appId,
+          appTitle:
+            state.trackedApps.find(
+              (entry) => entry.appId === appId && entry.store === store,
+            )?.title || appId,
+          store,
+          country,
+          createdAt: new Date().toISOString(),
+          lastRank: -1,
+          lastChecked: new Date(0).toISOString(),
+          lastCheckStatus: 'pending' as const,
+        } satisfies TrackedKeywordRecord);
+      const refreshableTrackedKeywords = existingTrackedKeyword
+        ? state.trackedKeywords
+        : state.trackedKeywords.concat(refreshTrackedKeywordRecordInput);
       const { activity } = getTrackedKeywordScopedState(
-        state,
+        {
+          ...state,
+          trackedKeywords: refreshableTrackedKeywords,
+        },
         getResolvedPlanLimits(userData),
       );
       if (!activity.activeTrackedKeywordKeys.has(trackedKeywordKey)) {
@@ -8723,10 +9363,10 @@ async function startServer() {
       }
 
       const refreshResult = await refreshTrackedKeywordRecord(
-        existingTrackedKeyword,
+        refreshTrackedKeywordRecordInput,
         rankingDepth,
       );
-      const nextTrackedKeywords = state.trackedKeywords.map((entry) =>
+      const nextTrackedKeywords = refreshableTrackedKeywords.map((entry) =>
         getTrackedKeywordKey(entry) === trackedKeywordKey
           ? refreshResult.trackedKeyword
           : entry,
@@ -9459,8 +10099,15 @@ async function startServer() {
         country: normalizeCountryCode(country, 'us'),
       }, 'deep', DISCOVERY_PROFILES.deep);
       const rawKeywords = candidateSource.keywords;
-      const refined = await refineKeywordsWithGemini(
-        { title, description, category, developer },
+      const refined = await refineKeywordsWithModel(
+        {
+          title,
+          description,
+          category,
+          developer,
+          store: storeType as StoreType,
+          country: normalizeCountryCode(country, 'us'),
+        },
         rawKeywords,
         'deep',
         candidateSource.competitorBrandTokens,

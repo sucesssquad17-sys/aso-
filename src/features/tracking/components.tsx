@@ -51,10 +51,10 @@ export function CountrySearchSelect({
         type="button"
         aria-label={ariaLabel}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="input-field py-2 w-full text-left flex items-center justify-between gap-3"
+        className="workspace-select-trigger input-field w-full text-left flex items-center justify-between gap-2 py-1.5 text-xs sm:py-2 sm:text-sm"
       >
         <span className="truncate">{selectedLabel}</span>
-        <span className="text-app-text-muted text-xs uppercase">
+        <span className="text-[10px] uppercase text-app-text-muted sm:text-xs">
           {value.toUpperCase()}
         </span>
       </button>

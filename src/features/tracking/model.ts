@@ -11,6 +11,11 @@ import {
   GLOBAL_TRACKING_TIMEZONE,
   TRACKING_CHART_TIMEZONE,
 } from "../../lib/trackingTime";
+import {
+  getDefaultWeeklyReportSettings,
+  normalizeWeeklyReportSettings,
+  type WeeklyReportSettings,
+} from "../../lib/weeklyReports";
 
 export type StoreType = "android" | "ios";
 export type DiscoveryMode = "fast" | "deep";
@@ -444,6 +449,7 @@ export interface UserAppStateDocument {
   competitorTrackedKeywords?: CompetitorTrackedKeywordRecord[];
   competitorRankHistory?: CompetitorRankHistoryEntry[];
   trackingSchedule?: TrackingSchedule;
+  weeklyReportSettings?: WeeklyReportSettings;
   alertRules?: AlertRule[];
   notificationSettings?: NotificationSettings;
   legalAcceptedAt?: string;
@@ -514,6 +520,10 @@ export function getDefaultTrackingSchedule(): TrackingSchedule {
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
   };
+}
+
+export function getDefaultWeeklyReportEmailSettings(timezone?: string) {
+  return getDefaultWeeklyReportSettings(timezone);
 }
 
 export function getLegacyTrackingGroupId({
@@ -2237,6 +2247,13 @@ export function normalizeTrackingScheduleState(
   };
 }
 
+export function normalizeWeeklyReportSettingsState(
+  settings?: Partial<WeeklyReportSettings>,
+  fallbackTimezone = "UTC",
+): WeeklyReportSettings {
+  return normalizeWeeklyReportSettings(settings, fallbackTimezone);
+}
+
 export function readLegacyLocalUserState() {
   const readArray = <T,>(key: string): T[] => {
     try {
@@ -2280,6 +2297,7 @@ export function hasPersistedUserState(
       Array.isArray(state.competitorRankHistory) ||
       Array.isArray(state.alertRules) ||
       state.trackingSchedule ||
+      state.weeklyReportSettings ||
       state.notificationSettings ||
       state.legalAcceptedAt ||
       state.legalVersion,
@@ -2341,6 +2359,13 @@ export function serializeEditableUserStateForApi(
             timezone: state.trackingSchedule.timezone,
             lastRunAt: state.trackingSchedule.lastRunAt,
             lastRunKey: state.trackingSchedule.lastRunKey,
+          }
+        : undefined,
+      weeklyReportSettings: state.weeklyReportSettings
+        ? {
+            enabled: state.weeklyReportSettings.enabled,
+            weekday: state.weeklyReportSettings.weekday,
+            timezone: state.weeklyReportSettings.timezone,
           }
         : undefined,
       alertRules: state.alertRules?.map((rule) => ({

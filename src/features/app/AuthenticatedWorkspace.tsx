@@ -19,6 +19,7 @@ import {
   Download,
   Bell,
   BellRing,
+  Mail,
   LogOut,
   ShieldCheck,
   CreditCard,
@@ -86,6 +87,7 @@ import {
   PRIORITY_TRACKING_COUNTRY_CODES,
   type CountryOption,
 } from "../../lib/countries";
+import type { WeeklyReportSettings } from "../../lib/weeklyReports";
 import {
   CHART_TYPE_OPTIONS,
   getChartTypeLabel,
@@ -175,7 +177,11 @@ import {
   type TrackedKeywordStatus,
   type TrackingSchedule,
   type UserAppStateDocument,
+  getBrowserTimeZone,
+  getDefaultTrackingSchedule as getSharedDefaultTrackingSchedule,
+  getDefaultWeeklyReportEmailSettings,
   normalizeTrackingScheduleState as normalizeSharedTrackingScheduleState,
+  normalizeWeeklyReportSettingsState,
   reconcileCompetitorTrackedKeywordCountryEdit,
   serializeEditableUserStateForApi,
 } from "../tracking/model";
@@ -191,7 +197,10 @@ import {
   type WorkspacePageConfig,
   type WorkspaceViewMode,
 } from "./workspacePrimitives";
-import ReportsWorkspace from "../reports/ReportsWorkspace";
+import ReportsWorkspace, {
+  type ReportMode,
+  type ReportPeriodKey,
+} from "../reports/ReportsWorkspace";
 import BrandMark from "../../components/BrandMark";
 import {
   DEFAULT_GLOBAL_TRACKING_TIME,
@@ -201,10 +210,55 @@ import {
 } from "../../lib/trackingTime";
 
 function getDefaultTrackingSchedule(): TrackingSchedule {
+  return getSharedDefaultTrackingSchedule();
+}
+
+function getDefaultWeeklyReportSettings(): WeeklyReportSettings {
+  return getDefaultWeeklyReportEmailSettings(getBrowserTimeZone());
+}
+
+type ReportsDeepLinkState = {
+  reportMode?: ReportMode;
+  period?: ReportPeriodKey;
+  storeFilter?: StoreType | "all";
+  countryFilter?: string;
+};
+
+function parseReportsDeepLinkFromLocation(): ReportsDeepLinkState | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const url = new URL(window.location.href);
+  if (url.searchParams.get("viewMode") !== "reports") {
+    return null;
+  }
+
+  const rawReportMode = url.searchParams.get("reportMode");
+  const rawPeriod = url.searchParams.get("period");
+  const rawStore = url.searchParams.get("reportStore");
+  const rawCountry = url.searchParams.get("reportCountry");
+
   return {
-    enabled: true,
-    time: DEFAULT_GLOBAL_TRACKING_TIME,
-    timezone: GLOBAL_TRACKING_TIMEZONE,
+    reportMode:
+      rawReportMode === "my" || rawReportMode === "competitors"
+        ? rawReportMode
+        : undefined,
+    period:
+      rawPeriod === "7d" ||
+      rawPeriod === "30d" ||
+      rawPeriod === "90d" ||
+      rawPeriod === "12m" ||
+      rawPeriod === "all"
+        ? rawPeriod
+        : undefined,
+    storeFilter:
+      rawStore === "all" || rawStore === "android" || rawStore === "ios"
+        ? rawStore
+        : undefined,
+    countryFilter:
+      typeof rawCountry === "string" && rawCountry.trim()
+        ? normalizeCountryCode(rawCountry, rawCountry)
+        : undefined,
   };
 }
 
@@ -1381,6 +1435,7 @@ function buildDemoWorkspaceState() {
       lastRunAt: hoursAgo(2),
       lastRunKey: hoursAgo(2).slice(0, 10),
     },
+    weeklyReportSettings: getDefaultWeeklyReportSettings(),
   };
 }
 
@@ -2709,6 +2764,13 @@ function normalizeTrackingScheduleState(
   return normalizeSharedTrackingScheduleState(schedule);
 }
 
+function normalizeWeeklyReportEmailSettings(
+  settings?: Partial<WeeklyReportSettings>,
+  fallbackTimezone = getBrowserTimeZone(),
+): WeeklyReportSettings {
+  return normalizeWeeklyReportSettingsState(settings, fallbackTimezone);
+}
+
 function readLegacyLocalUserState() {
   const readArray = <T,>(key: string): T[] => {
     try {
@@ -3185,10 +3247,10 @@ function CountrySearchSelect({
         type="button"
         aria-label={ariaLabel}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="input-field py-2 w-full text-left flex items-center justify-between gap-3"
+        className="workspace-select-trigger input-field w-full text-left flex items-center justify-between gap-2 py-1.5 text-xs sm:py-2 sm:text-sm"
       >
         <span className="truncate">{selectedLabel}</span>
-        <span className="text-app-text-muted text-xs uppercase">
+        <span className="text-[10px] uppercase text-app-text-muted sm:text-xs">
           {value.toUpperCase()}
         </span>
       </button>{" "}
@@ -3514,6 +3576,11 @@ function AuthenticatedApp({
   const [viewMode, setViewMode] = useState<WorkspaceViewMode | "charts">(
     "single",
   );
+  const reportDeepLinkStateRef = React.useRef<ReportsDeepLinkState | null>(
+    parseReportsDeepLinkFromLocation(),
+  );
+  const [initialReportsDeepLinkState, setInitialReportsDeepLinkState] =
+    useState<ReportsDeepLinkState | null>(reportDeepLinkStateRef.current);
   const [isMobileViewport, setIsMobileViewport] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 1100px)").matches;
@@ -3757,6 +3824,7 @@ function AuthenticatedApp({
       ),
     );
     setTrackingSchedule(demoState.trackingSchedule);
+    setWeeklyReportSettings(demoState.weeklyReportSettings);
     setAlertRules([]);
     setAlertEvents([]);
     setNotificationServerStatus(null);
@@ -4354,6 +4422,15 @@ function AuthenticatedApp({
   const [trackingSchedule, setTrackingSchedule] = useState<TrackingSchedule>(
     getDefaultTrackingSchedule,
   );
+  const [weeklyReportSettings, setWeeklyReportSettings] =
+    useState<WeeklyReportSettings>(getDefaultWeeklyReportSettings);
+  const [isWeeklyReportSettingsOpen, setIsWeeklyReportSettingsOpen] =
+    useState(false);
+  useEffect(() => {
+    if (viewMode !== "reports") {
+      setIsWeeklyReportSettingsOpen(false);
+    }
+  }, [viewMode]);
   useEffect(() => {
     if (isDemoMode) return;
     let cancelled = false;
@@ -4384,6 +4461,7 @@ function AuthenticatedApp({
       setExpandedCompetitorTrackedKeywordGroupKeys([]);
       setCompetitorSummaryCountryByKeywordGroup({});
       setTrackingSchedule(getDefaultTrackingSchedule());
+      setWeeklyReportSettings(getDefaultWeeklyReportSettings());
       setAlertRules([]);
       setAlertEvents([]);
       setAlertEventsError(null);
@@ -4523,6 +4601,10 @@ function AuthenticatedApp({
         const nextTrackingSchedule = normalizeTrackingScheduleState(
           hasRemoteState ? remoteState?.trackingSchedule : undefined,
         );
+        const nextWeeklyReportSettings = normalizeWeeklyReportEmailSettings(
+          hasRemoteState ? remoteState?.weeklyReportSettings : undefined,
+          getBrowserTimeZone(),
+        );
         const nextAlertRules = normalizeAlertRules(
           hasRemoteState ? remoteState?.alertRules : [],
         );
@@ -4547,6 +4629,7 @@ function AuthenticatedApp({
             competitorTrackedKeywords: nextCompetitorTrackedKeywords,
             competitorRankHistory: nextCompetitorRankHistory,
             trackingSchedule: nextTrackingSchedule,
+            weeklyReportSettings: nextWeeklyReportSettings,
             alertRules: nextAlertRules,
             notificationSettings: nextNotificationSettings,
             legalAcceptedAt: nextLegalAcceptedAt,
@@ -4591,6 +4674,7 @@ function AuthenticatedApp({
           competitorTrackedKeywords: nextCompetitorTrackedKeywords,
           competitorRankHistory: nextCompetitorRankHistory,
           trackingSchedule: nextTrackingSchedule,
+          weeklyReportSettings: nextWeeklyReportSettings,
           alertRules: nextAlertRules,
           notificationSettings: nextNotificationSettings,
           legalAcceptedAt:
@@ -4617,6 +4701,7 @@ function AuthenticatedApp({
         setCompetitorTrackedKeywords(nextCompetitorTrackedKeywords);
         setCompetitorRankHistory(nextCompetitorRankHistory);
         setTrackingSchedule(nextTrackingSchedule);
+        setWeeklyReportSettings(nextWeeklyReportSettings);
         setAlertRules(nextAlertRules);
         setNotificationSettings(nextNotificationSettings);
         setHasAcceptedLegal(
@@ -4690,6 +4775,7 @@ function AuthenticatedApp({
         competitorTrackedKeywords,
         competitorRankHistory,
         trackingSchedule,
+        weeklyReportSettings,
         alertRules,
         notificationSettings,
         updatedAt: new Date().toISOString(),
@@ -4729,6 +4815,7 @@ function AuthenticatedApp({
     trackedApps,
     trackedKeywords,
     trackingSchedule,
+    weeklyReportSettings,
     userStateHydrated,
   ]);
   const loadAlertEvents = React.useCallback(async () => {
@@ -4930,6 +5017,29 @@ function AuthenticatedApp({
     url.searchParams.delete("subscription_id");
     window.history.replaceState({}, document.title, url.toString());
   }, [isDemoMode, loadBillingStatus]);
+  useEffect(() => {
+    if (isDemoMode || !userStateHydrated || typeof window === "undefined") {
+      return;
+    }
+    if (!initialReportsDeepLinkState) {
+      return;
+    }
+
+    setViewMode("reports");
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("viewMode");
+    url.searchParams.delete("reportMode");
+    url.searchParams.delete("period");
+    url.searchParams.delete("reportStore");
+    url.searchParams.delete("reportCountry");
+    window.history.replaceState({}, document.title, url.toString());
+  }, [initialReportsDeepLinkState, isDemoMode, userStateHydrated]);
+  useEffect(() => {
+    if (viewMode === "reports" && initialReportsDeepLinkState) {
+      setInitialReportsDeepLinkState(null);
+    }
+  }, [initialReportsDeepLinkState, viewMode]);
   const onboardingDismissStorageKey = React.useMemo(
     () => `aso-onboarding-dismissed:${currentUser.uid}`,
     [currentUser.uid],
@@ -5770,6 +5880,7 @@ function AuthenticatedApp({
   const competitorDraftStarted = Boolean(
     competitorDraftOwnApp || competitorDraftApps.length > 0 || competitorDraftAnalysis,
   );
+  const competitorDraftHasAnalysis = Boolean(competitorDraftAnalysis);
   React.useEffect(() => {
     setCompetitorDraftSelectedKeywords((prev) => {
       const normalized = normalizeCompetitorDraftKeywordSelections(prev, country);
@@ -10086,8 +10197,8 @@ function AuthenticatedApp({
         eyebrow: "Keyword Research",
         title: selectedApp ? selectedApp.title : "Analyze Apps",
         description: selectedApp
-          ? `Active context: ${selectedApp.developer} in ${findCountryName(country) || country}.`
-          : "Search an app, inspect its current keyword footprint, and drill into ranking signals.",
+          ? `Context: ${selectedApp.developer} · ${findCountryName(country) || country}.`
+          : "Search an app and inspect its current keyword footprint.",
       },
       {
         id: "compare",
@@ -10096,8 +10207,7 @@ function AuthenticatedApp({
         icon: Layers,
         eyebrow: "Competitive Set",
         title: "Compare Apps",
-        description:
-          "Compare keyword coverage, contested terms, and whitespace opportunities across the selected set.",
+        description: "Compare keyword coverage and contested opportunities.",
         badge: comparedApps.length > 0 ? comparedApps.length : undefined,
       },
       {
@@ -10107,8 +10217,7 @@ function AuthenticatedApp({
         icon: BarChart3,
         eyebrow: "Movement Analysis",
         title: "Reports",
-        description:
-          "Review keyword movers, gainers, losers, and competitor group movement with period-based reporting.",
+        description: "Review movers, losers, and competitor movement by period.",
       },
       {
         id: "bookmarks",
@@ -10117,8 +10226,7 @@ function AuthenticatedApp({
         icon: Bookmark,
         eyebrow: "Quick Access",
         title: "Bookmarked Apps",
-        description:
-          "Keep your priority apps one click away and jump back into analysis without re-searching.",
+        description: "Keep priority apps one click away for quick re-entry.",
         badge: bookmarks.length > 0 ? bookmarks.length : undefined,
       },
       {
@@ -10128,8 +10236,7 @@ function AuthenticatedApp({
         icon: Globe,
         eyebrow: "Battle Groups",
         title: "Competitor Groups",
-        description:
-          "Build one-vs-rival groups and keep tracked competitive terms inside the same workspace.",
+        description: "Build rival groups and track competitive terms in one place.",
         badge:
           competitorGroupStats.groupCount > 0
             ? competitorGroupStats.groupCount
@@ -10142,8 +10249,7 @@ function AuthenticatedApp({
         icon: Bell,
         eyebrow: "Daily Monitoring",
         title: "Tracked Keywords",
-        description:
-          "Monitor rank movement, region coverage, and refresh health across the apps you care about most.",
+        description: "Monitor rank movement, region coverage, and refresh health.",
         badge:
           trackedAppUsageCount > 0 ? trackedAppUsageCount : undefined,
       },
@@ -10178,6 +10284,51 @@ function AuthenticatedApp({
   const activeWorkspacePage =
     workspacePageConfigs.find((page) => page.id === visibleWorkspaceMode) ||
     workspacePageConfigs[0];
+  const isAnalyzeLandingSummary =
+    visibleWorkspaceMode === "single" && !selectedApp;
+  const isDenseWorkspaceLandingSummary =
+    (visibleWorkspaceMode === "single" && !selectedApp) ||
+    visibleWorkspaceMode === "compare" ||
+    visibleWorkspaceMode === "bookmarks" ||
+    visibleWorkspaceMode === "competitors" ||
+    visibleWorkspaceMode === "tracked";
+  const compactWorkspaceLandingCopy = React.useMemo<
+    Partial<
+      Record<
+        WorkspaceViewMode,
+        {
+          title: string;
+          description: string;
+        }
+      >
+    >
+  >(
+    () => ({
+      single: {
+        title: "Analyze",
+        description: "Search an app for keywords.",
+      },
+      compare: {
+        title: "Compare",
+        description: "Compare apps for keywords.",
+      },
+      bookmarks: {
+        title: "Bookmarks",
+        description: "Keep apps ready to reopen.",
+      },
+      competitors: {
+        title: "Competitors",
+        description: "Track rival groups and terms.",
+      },
+      tracked: {
+        title: "Tracked",
+        description: "Monitor rank movement and health.",
+      },
+    }),
+    [],
+  );
+  const activeWorkspaceLandingCopy =
+    compactWorkspaceLandingCopy[visibleWorkspaceMode];
   const isMobileTrackWorkspace =
     isMobileViewport &&
     (visibleWorkspaceMode === "tracked" ||
@@ -10229,22 +10380,66 @@ function AuthenticatedApp({
     return () => mediaQuery.removeListener(handleChange);
   }, []);
 
-  const workspaceSummaryCards = React.useMemo(() => {
+  const getTrackedStatusPills = React.useCallback(
+    (pendingCount: number, errorCount: number) => {
+      const pills: Array<{
+        key: "pending" | "error";
+        label: string;
+        className: string;
+      }> = [];
+
+      if (pendingCount > 0) {
+        pills.push({
+          key: "pending",
+          label: `${pendingCount} pending`,
+          className:
+            "rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-amber-300",
+        });
+      }
+
+      if (errorCount > 0) {
+        pills.push({
+          key: "error",
+          label: `${errorCount} errors`,
+          className:
+            "rounded-full border border-rose-400/30 bg-rose-500/10 px-2.5 py-1 text-rose-300",
+        });
+      }
+
+      return pills;
+    },
+    [],
+  );
+
+  const workspaceSummaryCards = React.useMemo<
+    Array<{
+      label: string;
+      value: React.ReactNode;
+      hint?: React.ReactNode;
+      trend?: React.ReactNode;
+      accent: "cyan" | "emerald" | "amber" | "violet" | "slate";
+    }>
+  >(() => {
     if (visibleWorkspaceMode === "reports") {
       return [];
     }
     if (visibleWorkspaceMode === "tracked") {
+      const trackedStatusPills = getTrackedStatusPills(
+        trackedDashboardStats.pendingCount,
+        trackedDashboardStats.needsAttentionCount,
+      );
+
       return [
         {
           label: "Regions Ranked",
           value: trackedDashboardStats.rankedCount,
-          hint: `${trackedDashboardStats.totalGroups} keyword group${trackedDashboardStats.totalGroups === 1 ? "" : "s"} in view`,
+          hint: `${trackedDashboardStats.totalGroups} group${trackedDashboardStats.totalGroups === 1 ? "" : "s"} in view`,
           accent: "cyan" as const,
         },
         {
           label: "Regions Monitored",
           value: trackedDashboardStats.totalRegions,
-          hint: `${trackedViewAppCount} tracked app${trackedViewAppCount === 1 ? "" : "s"} in view`,
+          hint: `${trackedViewAppCount} tracked app${trackedViewAppCount === 1 ? "" : "s"}`,
           accent: "cyan" as const,
         },
         {
@@ -10252,7 +10447,7 @@ function AuthenticatedApp({
           value: trackedOverviewStats.averageRank
             ? trackedOverviewStats.averageRank.toFixed(1)
             : "-",
-          hint: "Across all ranked regions",
+          hint: "Across ranked regions",
           accent: "violet" as const,
         },
         {
@@ -10260,7 +10455,20 @@ function AuthenticatedApp({
           value:
             trackedDashboardStats.pendingCount +
             trackedDashboardStats.needsAttentionCount,
-          hint: `${trackedDashboardStats.pendingCount} pending / ${trackedDashboardStats.needsAttentionCount} errors`,
+          hint: "Statuses needing follow-up",
+          trend:
+            trackedStatusPills.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                {trackedStatusPills.map((pill) => (
+                  <span
+                    key={pill.key}
+                    className={cn("text-[10px] font-semibold sm:text-xs", pill.className)}
+                  >
+                    {pill.label}
+                  </span>
+                ))}
+              </div>
+            ) : undefined,
           accent: "amber" as const,
         },
       ];
@@ -10270,7 +10478,7 @@ function AuthenticatedApp({
         {
           label: "Apps In Set",
           value: comparedApps.length,
-          hint: "Current compare selection",
+          hint: "Current set",
           accent: "cyan" as const,
         },
         {
@@ -10282,7 +10490,7 @@ function AuthenticatedApp({
         {
           label: "Contested Keywords",
           value: compareSharedBattles.length,
-          hint: "Direct overlaps surfaced",
+          hint: "Direct overlaps",
           accent: "violet" as const,
         },
         {
@@ -10304,19 +10512,19 @@ function AuthenticatedApp({
         {
           label: "Snapshots",
           value: competitorGroupStats.snapshotCount,
-          hint: "Saved competitive analyses",
+          hint: "Saved analyses",
           accent: "violet" as const,
         },
         {
           label: "Tracked Terms",
           value: competitorGroupStats.trackedKeywordCount,
-          hint: "Keywords monitored in groups",
+          hint: "Terms in groups",
           accent: "cyan" as const,
         },
         {
           label: "Ranked Pairs",
           value: competitorRankedPairs,
-          hint: "Apps currently ranking in tracked battles",
+          hint: "Pairs ranking now",
           accent: "amber" as const,
         },
       ];
@@ -10326,58 +10534,58 @@ function AuthenticatedApp({
         {
           label: "Saved Apps",
           value: bookmarks.length,
-          hint: "Quick analysis entry points",
+          hint: "Quick entry points",
           accent: "cyan" as const,
         },
         {
           label: "Play Store",
           value: bookmarksByStore.android,
-          hint: "Android bookmarks",
+          hint: "Android saved",
           accent: "cyan" as const,
         },
         {
           label: "App Store",
           value: bookmarksByStore.ios,
-          hint: "iOS bookmarks",
+          hint: "iOS saved",
           accent: "violet" as const,
         },
         {
           label: "Markets",
           value: bookmarksByStore.countries,
-          hint: "Distinct countries saved",
+          hint: "Countries saved",
           accent: "slate" as const,
         },
       ];
     }
     return [
       {
-        label: "Discovered Rankings",
-        value: autoRankings.length,
-        hint: selectedAppAnalysisSnapshot
-          ? `${selectedAppAnalysisSnapshot.top10} in top 10`
-          : "Auto-discovered keyword results",
+          label: "Discovered Rankings",
+          value: autoRankings.length,
+          hint: selectedAppAnalysisSnapshot
+            ? `${selectedAppAnalysisSnapshot.top10} in top 10`
+            : "Auto results",
         accent: "cyan" as const,
       },
       {
-        label: "Suggestions",
-        value: keywordSuggestions.length,
-        hint: "Estimated next opportunities",
+          label: "Suggestions",
+          value: keywordSuggestions.length,
+          hint: "Opportunities",
         accent: "violet" as const,
       },
       {
-        label: "Average Rank",
-        value: selectedAppAnalysisSnapshot?.averageRank
-          ? selectedAppAnalysisSnapshot.averageRank.toFixed(1)
-          : "-",
-        hint: selectedAppAnalysisSnapshot
-          ? `${selectedAppAnalysisSnapshot.top100} ranked keywords`
-          : "Run discovery to populate",
+          label: "Average Rank",
+          value: selectedAppAnalysisSnapshot?.averageRank
+            ? selectedAppAnalysisSnapshot.averageRank.toFixed(1)
+            : "-",
+          hint: selectedAppAnalysisSnapshot
+            ? `${selectedAppAnalysisSnapshot.top100} ranked keywords`
+            : "Run scan",
         accent: "cyan" as const,
       },
       {
-        label: "Chart Position",
-        value: selectedAppChartEntry ? `#${selectedAppChartEntry.position}` : "-",
-        hint: selectedChartCategory?.label || "Category chart",
+          label: "Chart Position",
+          value: selectedAppChartEntry ? `#${selectedAppChartEntry.position}` : "-",
+          hint: selectedChartCategory?.label || "Chart",
         accent: "amber" as const,
       },
     ];
@@ -10407,6 +10615,7 @@ function AuthenticatedApp({
     trackedKeywordGroupCount,
     trackedOverviewStats.averageRank,
     trackedViewAppCount,
+    getTrackedStatusPills,
     visibleWorkspaceMode,
   ]);
   const isLightTheme = themeMode === "light";
@@ -10673,27 +10882,27 @@ function AuthenticatedApp({
   }
 
   const renderSearchSection = (isCompact = false) => (
-    <WorkspacePanel className={`workspace-search-panel ${isCompact ? "p-3 mb-6" : "mb-8"}`} tone={isCompact ? "muted" : "strong"}>
+    <WorkspacePanel className={`workspace-search-panel workspace-toolbar-panel ${isCompact ? "p-3 mb-6" : "mb-8"}`} tone={isCompact ? "muted" : "strong"}>
               {!isCompact && (
-<div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-                <div>
+<div className="workspace-search-composer-header mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
                   <div className="workspace-chip-label">Search Composer</div>
-                  <h2 className="mt-1 text-xl font-semibold text-app-text">
+                  <h2 className="workspace-search-composer-title mt-1 text-base font-semibold text-app-text sm:text-lg">
                     {visibleWorkspaceMode === "single"
                       ? "Find an app to analyze"
                       : visibleWorkspaceMode === "competitors"
                         ? "Build a competitor group"
                         : "Search and add apps to compare"}
                   </h2>
-                  <p className="mt-2 text-sm text-app-text-muted">
+                  <p className="workspace-search-composer-description mt-1 text-[11px] text-app-text-muted sm:text-sm">
                     {visibleWorkspaceMode === "single"
-                      ? "Search by app name or paste a direct store URL to load its workspace."
+                      ? "Search by app name or paste a store URL."
                       : visibleWorkspaceMode === "competitors"
-                        ? "Pick one of your apps, then assign a direct rival before running the group analysis."
-                        : "Add up to five apps and compare their keyword coverage side by side."}
+                        ? "Pick your app and one rival, then run the group."
+                        : "Add up to five apps and compare keywords side by side."}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="workspace-search-composer-meta flex flex-wrap gap-1.5">
                   {visibleWorkspaceMode === "compare" && (
                     <span className="workspace-status-chip">Max 5 apps</span>
                   )}
@@ -10703,8 +10912,8 @@ function AuthenticatedApp({
                 </div>
               </div>
               )}
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center gap-2">
+              <div className="workspace-search-composer-body flex flex-col gap-2">
+                <div className="workspace-search-composer-controls flex flex-wrap items-center gap-1.5">
                   <div className="workspace-store-toggle shrink-0">
                     <button
                       type="button"
@@ -10739,16 +10948,16 @@ function AuthenticatedApp({
                       onChange={handleCountryChange}
                       options={COUNTRIES}
                       ariaLabel="Select storefront country"
-                      className="w-[140px] min-w-0 sm:w-auto sm:min-w-[12rem]"
+                      className="w-[120px] min-w-0 sm:w-[168px] sm:min-w-[168px]"
                     />
                   </div>
                 </div>
                 <form
                   onSubmit={handleSearch}
-                  className="flex flex-col sm:flex-row gap-2 w-full"
+                  className="workspace-search-form flex flex-col gap-1.5 w-full sm:flex-row"
                 >
                   <div className="relative flex-1">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-app-text-muted" />
+                    <Search className="absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-app-text-muted" />
                     <input
                       id="app-search"
                       name="appSearch"
@@ -10758,10 +10967,10 @@ function AuthenticatedApp({
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder={`Search apps or paste a ${storeType === "android" ? "Play Store" : "App Store"} URL...`}
-                      className="input-field !py-2.5 sm:!py-3.5 text-sm sm:text-base w-full"
+                      className="input-field workspace-search-composer-input !py-2 text-sm sm:!py-2.5 sm:text-[0.95rem] w-full"
                       style={{
-                        paddingLeft: "2.75rem",
-                        paddingRight: searchTerm ? "2.75rem" : "1.25rem",
+                        paddingLeft: "2.45rem",
+                        paddingRight: searchTerm ? "2.45rem" : "1rem",
                       }}
                     />
                     {searchTerm && (
@@ -10781,7 +10990,7 @@ function AuthenticatedApp({
                   <button
                     type="submit"
                     disabled={isSearching || !searchTerm.trim()}
-                    className="btn-primary sm:w-auto w-full !py-2.5 sm:!py-[0.875rem] !px-4 sm:!px-8 text-sm sm:text-[0.9375rem]"
+                    className="btn-primary workspace-search-composer-submit w-full !px-4 !py-2 text-sm sm:w-auto sm:!px-6 sm:!py-2.5 sm:text-[0.9rem]"
                   >
                     {isSearching ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -10793,6 +11002,159 @@ function AuthenticatedApp({
                     )}
                   </button>
                 </form>
+                {visibleWorkspaceMode === "competitors" &&
+                  !isCompact &&
+                  competitorDraftStarted && (
+                  <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/45 p-3 sm:p-4">
+                    <div className="flex flex-col gap-3">
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <div className="rounded-xl border border-app-border/60 bg-app-surface-muted/65 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
+                              Your App
+                            </p>
+                            {!competitorDraftOwnApp ? (
+                              <span className="text-[10px] font-semibold text-cyan-400">
+                                Required
+                              </span>
+                            ) : null}
+                          </div>
+                          {competitorDraftOwnApp ? (
+                            <div className="mt-2 flex items-center gap-3">
+                              <img
+                                src={competitorDraftOwnApp.icon}
+                                alt={competitorDraftOwnApp.title}
+                                className="h-10 w-10 rounded-lg border border-app-border/60 bg-app-surface-muted/80"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-semibold text-app-text">
+                                  {competitorDraftOwnApp.title}
+                                </p>
+                                <p className="truncate text-xs text-app-text-muted">
+                                  {competitorDraftOwnApp.developer}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  clearCompetitorDraftAnalysis();
+                                  setCompetitorDraftOwnApp(null);
+                                }}
+                                className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-xs text-app-text-muted">
+                              Use `Set My App` on a search result.
+                            </p>
+                          )}
+                        </div>
+                        <div className="rounded-xl border border-app-border/60 bg-app-surface-muted/65 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                              Rival App
+                            </p>
+                            <span className="text-[10px] font-semibold text-app-text-muted">
+                              {competitorDraftApps.length}/1
+                            </span>
+                          </div>
+                          {competitorDraftApps.length > 0 ? (
+                            <div className="mt-2 space-y-2">
+                              {competitorDraftApps.map((app) => (
+                                <div
+                                  key={getCompareAppKey(app, storeType)}
+                                  className="flex items-center gap-3"
+                                >
+                                  <img
+                                    src={app.icon}
+                                    alt={app.title}
+                                    className="h-10 w-10 rounded-lg border border-app-border/60 bg-app-surface-muted/80"
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-semibold text-app-text">
+                                      {app.title}
+                                    </p>
+                                    <p className="truncate text-xs text-app-text-muted">
+                                      {app.developer}
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeCompetitorDraftApp(
+                                        getCompareAppKey(app, storeType),
+                                      )
+                                    }
+                                    className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-xs text-app-text-muted">
+                              {competitorDraftOwnApp
+                                ? "Use `+ Rival` on a search result."
+                                : "Select your app first."}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="inline-flex w-fit rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
+                          {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => {
+                                if (mode === competitorGroupMode) return;
+                                setCompetitorGroupMode(mode);
+                                clearCompetitorDraftAnalysis();
+                              }}
+                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${competitorGroupMode === mode ? "bg-app-surface-muted text-cyan-100 ring-1 ring-inset ring-cyan-300/10" : "text-app-text-muted hover:text-app-text"}`}
+                            >
+                              {mode}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void analyzeCompetitorDraftGroup()}
+                            disabled={
+                              isAnalyzingCompetitorGroup || !competitorDraftCanAnalyze
+                            }
+                            className="btn-primary"
+                          >
+                            {isAnalyzingCompetitorGroup ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="w-4 h-4" />
+                            )}
+                            Analyze Group
+                          </button>
+                          {competitorDraftStarted ? (
+                            <button
+                              type="button"
+                              onClick={resetCompetitorDraft}
+                              className="btn-ghost"
+                            >
+                              Reset
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                      {competitorGroupError ? (
+                        <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-sm text-amber-200">
+                          {competitorGroupError}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                )}
               </div>
               {error && (
                 <div
@@ -10823,35 +11185,35 @@ function AuthenticatedApp({
               {/* Search Results Skeleton */}{" "}
               {isSearching && (
                 <div
-                  className="mt-4 rounded-2xl overflow-hidden border border-app-border/40 bg-app-surface/60"
+                  className="workspace-search-results-list mt-4 rounded-2xl overflow-hidden border border-app-border/40 bg-app-surface/60"
                 >
                   {" "}
                   {[1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className="p-5 flex items-center justify-between gap-4"
+                      className="workspace-search-result-skeleton flex items-center justify-between gap-3 sm:gap-4"
                       style={{
                         borderBottom:
                           i < 4 ? "1px solid rgba(30,41,59,0.8)" : "none",
                       }}
                     >
                       {" "}
-                      <div className="flex items-center gap-4 flex-1">
+                      <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
                         {" "}
-                        <div className="skeleton w-14 h-14 rounded-2xl" />{" "}
-                        <div className="space-y-2.5 flex-1">
+                        <div className="skeleton h-11 w-11 rounded-xl sm:h-14 sm:w-14 sm:rounded-2xl" />{" "}
+                        <div className="space-y-2 flex-1 min-w-0">
                           {" "}
                           <div
                             className="skeleton h-4 rounded-lg"
-                            style={{ width: "40%" }}
+                            style={{ width: "58%" }}
                           />{" "}
                           <div
                             className="skeleton h-3 rounded-lg"
-                            style={{ width: "25%" }}
+                            style={{ width: "34%" }}
                           />{" "}
                         </div>{" "}
                       </div>{" "}
-                      <div className="skeleton w-28 h-10 rounded-xl" />{" "}
+                      <div className="skeleton h-8 w-20 rounded-lg sm:h-10 sm:w-28 sm:rounded-xl" />{" "}
                     </div>
                   ))}{" "}
                 </div>
@@ -10870,11 +11232,11 @@ function AuthenticatedApp({
                   </div>
                 )}{" "}
               {!isSearching && searchResults.length > 0 && shouldShowSearchResults && (
-                <div className="mt-5 space-y-3">
+                <div className="mt-4 space-y-2.5">
                   {" "}
                   {/* Category Filters */}{" "}
                   {categories.length > 1 && (
-                    <div className="flex overflow-x-auto scrollbar-hide gap-2 pb-2">
+                    <div className="workspace-search-category-filters flex overflow-x-auto scrollbar-hide gap-2 pb-2">
                       {" "}
                       <button
                         onClick={() => setSelectedCategory(null)}
@@ -10917,8 +11279,14 @@ function AuthenticatedApp({
                       ))}{" "}
                     </div>
                   )}{" "}
+                  {filteredResults.length > 3 ? (
+                    <div className="flex items-center justify-between rounded-xl border border-app-border/40 bg-app-surface-muted/45 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-app-text-muted sm:hidden">
+                      <span>{filteredResults.length} apps found</span>
+                      <span>Scroll for more</span>
+                    </div>
+                  ) : null}
                   <div
-                    className="rounded-2xl overflow-hidden max-h-[560px] overflow-y-auto border border-app-border/40 bg-app-surface/70"
+                    className="workspace-search-results-list rounded-2xl overflow-hidden overflow-y-auto border border-app-border/40 bg-app-surface/70"
                   >
                     {" "}
                     {filteredResults.length > 0 ? (
@@ -10936,13 +11304,13 @@ function AuthenticatedApp({
                         return (
                         <div
                           key={app.appId || app.id}
-                          className={`group flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 transition-all hover:bg-app-surface-strong/50 cursor-pointer ${
+                          className={`workspace-search-result-row group flex items-center justify-between gap-3 sm:gap-4 transition-all hover:bg-app-surface-strong/50 ${
                             idx < filteredResults.length - 1 ? "border-b border-app-border/70" : ""
                           }`}
                         >
                           {" "}
                           <div
-                            className="flex items-center gap-4 flex-1 min-w-0"
+                            className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 cursor-pointer"
                             onClick={() =>
                               viewMode === "single"
                                 ? handleSelectApp(app)
@@ -10953,23 +11321,22 @@ function AuthenticatedApp({
                             <img
                               src={app.icon}
                               alt={app.title}
-                              className="w-14 h-14 rounded-2xl shadow-lg object-cover flex-shrink-0 border border-app-border/40"
+                              className="h-11 w-11 rounded-xl border border-app-border/40 object-cover shadow-lg flex-shrink-0 sm:h-14 sm:w-14 sm:rounded-2xl"
                             />{" "}
                             <div className="min-w-0">
                               {" "}
                               <h3
-                                className="font-semibold text-app-text line-clamp-1 mb-0.5"
-                                style={{ fontSize: "0.9375rem" }}
+                                className="mb-0.5 line-clamp-1 text-sm font-semibold text-app-text sm:text-[0.9375rem]"
                               >
                                 {app.title}
                               </h3>{" "}
-                              <div className="flex flex-wrap items-center gap-2">
+                              <div className="flex min-w-0 items-center gap-2">
                                 {" "}
-                                <p className="text-sm text-app-text-muted">
+                                <p className="line-clamp-1 text-xs text-app-text-muted sm:text-sm">
                                   {app.developer}
                                 </p>{" "}
                                 {app.category && (
-                                  <span className="badge badge-cyan">
+                                  <span className="badge badge-cyan hidden sm:inline-flex">
                                     {app.category}
                                   </span>
                                 )}{" "}
@@ -10980,7 +11347,7 @@ function AuthenticatedApp({
                             <button
                               onClick={() => handleSelectApp(app)}
                               disabled={isComparedApp || comparedApps.length >= 5}
-                              className="text-xs font-bold px-5 py-2.5 rounded-xl transition-all disabled:opacity-40 flex-shrink-0"
+                              className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40 flex-shrink-0"
                               style={
                                 isComparedApp
                                   ? {
@@ -10999,11 +11366,11 @@ function AuthenticatedApp({
                               {isComparedApp ? "Added" : "+ Compare"}{" "}
                             </button>
                           ) : viewMode === "competitors" ? (
-                            <div className="flex flex-wrap gap-2 flex-shrink-0">
+                            <div className="workspace-search-result-actions flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
                               <button
                                 onClick={() => void assignCompetitorDraftOwnApp(app)}
                                 disabled={isDraftOwnApp}
-                                className="text-xs font-bold px-4 py-2.5 rounded-xl transition-all disabled:opacity-40"
+                                className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
                                 style={
                                   isDraftOwnApp
                                     ? {
@@ -11031,7 +11398,7 @@ function AuthenticatedApp({
                                       competitorDraftApps.length >= 1,
                                   )
                                 }
-                                className="text-xs font-bold px-4 py-2.5 rounded-xl transition-all disabled:opacity-40"
+                                className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
                                 style={
                                   isDraftCompetitorApp
                                     ? {
@@ -11054,8 +11421,7 @@ function AuthenticatedApp({
                           ) : (
                             <button
                               onClick={() => handleSelectApp(app)}
-                              className="btn-primary text-xs flex-shrink-0"
-                              style={{ padding: "0.6rem 1.25rem" }}
+                              className="workspace-search-result-primary btn-primary text-[11px] flex-shrink-0"
                             >
                               Analyze
                             </button>
@@ -11593,11 +11959,29 @@ function AuthenticatedApp({
             <WorkspacePanel className="workspace-page-header-panel" tone="strong">
                 <WorkspacePageIntro
                   eyebrow={activeWorkspacePage.eyebrow}
-                  title={activeWorkspacePage.title}
-                  description={activeWorkspacePage.description}
+                  title={
+                    isDenseWorkspaceLandingSummary &&
+                    activeWorkspaceLandingCopy?.title
+                      ? activeWorkspaceLandingCopy.title
+                      : activeWorkspacePage.title
+                  }
+                  description={
+                    isDenseWorkspaceLandingSummary &&
+                    activeWorkspaceLandingCopy?.description
+                      ? activeWorkspaceLandingCopy.description
+                      : activeWorkspacePage.description
+                  }
                   icon={activeWorkspacePage.icon}
+                  compact
+                  dense={isDenseWorkspaceLandingSummary}
                   aside={
-                    <div className="workspace-page-context">
+                    <div
+                      className={cn(
+                        "workspace-page-context",
+                        isDenseWorkspaceLandingSummary &&
+                          "workspace-page-context-dense",
+                      )}
+                    >
                       <span className="workspace-status-chip">
                         {storeType === "ios" ? "iOS" : "Play"}
                       </span>
@@ -11605,8 +11989,14 @@ function AuthenticatedApp({
                         {findCountryName(country) || country}
                       </span>
                       {visibleWorkspaceMode === "tracked" ? (
-                        <span className="workspace-status-chip">
-                          Updated{" "}
+                        <span
+                          className={cn(
+                            "workspace-status-chip",
+                            isDenseWorkspaceLandingSummary &&
+                              "workspace-status-chip-dense hidden sm:inline-flex",
+                          )}
+                        >
+                          {isDenseWorkspaceLandingSummary ? "" : "Updated "}
                           {trackingSchedule.lastRunAt
                             ? formatTrackingChartDateTime(
                                 trackingSchedule.lastRunAt,
@@ -11614,21 +12004,51 @@ function AuthenticatedApp({
                             : "Not yet"}
                         </span>
                       ) : null}
-                      {currentPagePdfExport ? (
+                      {currentPagePdfExport &&
+                      !(isDenseWorkspaceLandingSummary && isMobileViewport) ? (
+                        <div
+                          className={cn(
+                            "flex items-center gap-2",
+                            isDenseWorkspaceLandingSummary &&
+                              "workspace-page-action-row-dense",
+                          )}
+                        >
+                          {visibleWorkspaceMode === "reports" ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsPdfExportOptionsOpen(false);
+                                setIsWeeklyReportSettingsOpen(true);
+                              }}
+                              className="workspace-secondary-button inline-flex items-center gap-1.5 px-3 py-2 text-xs"
+                            >
+                              <Mail className="h-4 w-4" />
+                              <span className="hidden sm:inline">Weekly Email</span>
+                              <span className="sm:hidden">Email</span>
+                            </button>
+                          ) : null}
                         <div className="workspace-pdf-export-anchor relative">
                           <button
                             type="button"
                             onClick={() => setIsPdfExportOptionsOpen((prev) => !prev)}
                             disabled={isExporting}
-                            className="workspace-secondary-button workspace-pdf-export-trigger inline-flex items-center gap-1.5 px-3 py-2 text-xs disabled:opacity-60"
+                            className={cn(
+                              "workspace-secondary-button workspace-pdf-export-trigger inline-flex items-center gap-1.5 px-3 py-2 text-xs disabled:opacity-60",
+                              isDenseWorkspaceLandingSummary &&
+                                "workspace-secondary-button-dense",
+                            )}
                           >
                             {isExporting ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <Download className="h-4 w-4" />
                             )}
-                            <span className="hidden sm:inline">Export PDF</span>
-                            <span className="sm:hidden">PDF</span>
+                            {isDenseWorkspaceLandingSummary ? null : (
+                              <>
+                                <span className="hidden sm:inline">Export PDF</span>
+                                <span className="sm:hidden">PDF</span>
+                              </>
+                            )}
                           </button>
                           {isPdfExportOptionsOpen ? (
                             <div className="workspace-popover workspace-pdf-export-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-1rem)] max-w-sm rounded-2xl p-3 shadow-xl sm:p-4">
@@ -11715,6 +12135,7 @@ function AuthenticatedApp({
                             </div>
                           ) : null}
                         </div>
+                        </div>
                       ) : null}
                     </div>
                   }
@@ -11756,14 +12177,17 @@ function AuthenticatedApp({
                   </div>
                 ) : null}
                 {workspaceSummaryCards.length > 0 ? (
-                  <WorkspaceMetricGrid>
+                  <WorkspaceMetricGrid compact dense={isDenseWorkspaceLandingSummary}>
                     {workspaceSummaryCards.map((card) => (
                       <WorkspaceMetricCard
                         key={card.label}
                         label={card.label}
                         value={card.value}
                         hint={card.hint}
+                        trend={card.trend}
                         accent={card.accent}
+                        compact
+                        dense={isDenseWorkspaceLandingSummary}
                       />
                     ))}
                   </WorkspaceMetricGrid>
@@ -11776,14 +12200,14 @@ function AuthenticatedApp({
             visibleWorkspaceMode !== "reports" &&
             !(visibleWorkspaceMode === "single" && selectedApp) &&
             !(visibleWorkspaceMode === "compare" && comparedApps.length > 0) &&
-            !(visibleWorkspaceMode === "competitors" && (competitorDraftOwnApp || competitorDraftApps.length > 0)) &&
+            !(visibleWorkspaceMode === "competitors" && competitorDraftHasAnalysis) &&
             renderSearchSection(false)
           }          {/* Competitors Dashboard */}{" "}
           {viewMode === "competitors" && (
             <div className="space-y-6" ref={competitorsExportRef}>
               {/* Compact Search Section for Competitors */}
-              {(competitorDraftOwnApp || competitorDraftApps.length > 0) && renderSearchSection(true)}
-              {competitorDraftStarted ? (
+              {competitorDraftHasAnalysis && renderSearchSection(true)}
+              {competitorDraftHasAnalysis ? (
                 <div className="card p-5 md:p-6">
                   <div className="flex flex-col gap-5">
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -13258,6 +13682,25 @@ function AuthenticatedApp({
                 }}
                 defaultCountry={country}
                 defaultStore={storeType}
+                initialReportMode={initialReportsDeepLinkState?.reportMode}
+                initialPeriod={initialReportsDeepLinkState?.period}
+                initialStoreFilter={initialReportsDeepLinkState?.storeFilter}
+                initialCountryFilter={initialReportsDeepLinkState?.countryFilter}
+                weeklyReportSettings={weeklyReportSettings}
+                isWeeklyReportSettingsOpen={isWeeklyReportSettingsOpen}
+                onWeeklyReportSettingsOpenChange={setIsWeeklyReportSettingsOpen}
+                onWeeklyReportSettingsChange={(nextSettings) =>
+                  setWeeklyReportSettings((current) =>
+                    normalizeWeeklyReportEmailSettings(
+                      {
+                        ...current,
+                        ...nextSettings,
+                        timezone: getBrowserTimeZone(),
+                      },
+                      getBrowserTimeZone(),
+                    ),
+                  )
+                }
                 onEditCompetitorKeywordCountries={
                   openCompetitorTrackedKeywordCountryPicker
                 }
@@ -13387,14 +13830,14 @@ function AuthenticatedApp({
           {viewMode === "tracked" && (
             <div className="space-y-6" ref={trackedExportRef}>
               <div className="space-y-3">
-                <WorkspacePanel tone="strong">
+                <WorkspacePanel tone="strong" className="workspace-toolbar-panel">
                   <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
                     <div>
                       <div className="workspace-chip-label">Tracking</div>
                       <h2 className="mt-1 text-lg lg:text-xl font-semibold text-app-text">
                         Tracked Keywords
                       </h2>
-                      <p className="mt-1 text-xs lg:text-sm text-app-text-muted lg:mt-2">
+                      <p className="mt-1 text-[11px] lg:text-sm text-app-text-muted lg:mt-1.5">
                         Focus on the latest rank, region coverage, and what needs attention.
                       </p>
                     </div>
@@ -13682,14 +14125,20 @@ function AuthenticatedApp({
                                     <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-cyan-300">
                                       {selectedStoreGroup.rankedCount} ranking
                                     </span>
-                                    {(selectedStoreGroup.pendingCount > 0 ||
-                                      selectedStoreGroup.needsAttentionCount >
-                                        0) && (
-                                      <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-amber-300">
-                                        {selectedStoreGroup.pendingCount} pending /{" "}
-                                        {selectedStoreGroup.needsAttentionCount} errors
+                                    {getTrackedStatusPills(
+                                      selectedStoreGroup.pendingCount,
+                                      selectedStoreGroup.needsAttentionCount,
+                                    ).map((pill) => (
+                                      <span
+                                        key={`${selectedStoreGroup.store}:${pill.key}`}
+                                        className={cn(
+                                          "px-3 py-1.5 text-[11px] sm:text-xs",
+                                          pill.className,
+                                        )}
+                                      >
+                                        {pill.label}
                                       </span>
-                                    )}
+                                    ))}
                                   </div>
                                 </div>
                               </div>

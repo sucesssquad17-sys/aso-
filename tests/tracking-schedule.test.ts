@@ -15,12 +15,16 @@ import {
 } from '../src/lib/backendTracking';
 import {
   getDefaultTrackingSchedule,
+  normalizeWeeklyReportSettingsState,
   normalizeTrackingScheduleState,
   reconcileCompetitorTrackedKeywordCountryEdit,
   type CompetitorTrackedKeywordRecord as FrontendCompetitorTrackedKeywordRecord,
   type CompetitorGroupRecord,
   serializeEditableUserStateForApi,
 } from '../src/features/tracking/model';
+import {
+  shouldSendWeeklyReportForDate,
+} from '../src/lib/weeklyReports';
 import {
   getCompetitorTrackedKeywordCardState,
   getTrackedAppUsageCountForOverview,
@@ -121,6 +125,42 @@ test('frontend tracking schedule helpers also normalize to enabled', () => {
   assert.equal(normalized.timezone, 'UTC');
   assert.equal(normalized.lastRunAt, '2026-06-21T03:30:00.000Z');
   assert.equal(normalized.lastRunKey, '2026-06-21T09:00');
+});
+
+test('frontend weekly report settings default to enabled sunday with caller timezone', () => {
+  const normalized = normalizeWeeklyReportSettingsState(undefined, 'America/New_York');
+
+  assert.equal(normalized.enabled, true);
+  assert.equal(normalized.weekday, 'sun');
+  assert.equal(normalized.timezone, 'America/New_York');
+  assert.equal(normalized.lastSentWeekKey, undefined);
+});
+
+test('weekly report delivery eligibility matches local weekday and suppresses same-week duplicates', () => {
+  const firstCheck = shouldSendWeeklyReportForDate(
+    {
+      enabled: true,
+      weekday: 'sun',
+      timezone: 'America/Los_Angeles',
+    },
+    new Date('2026-06-28T19:00:00.000Z'),
+  );
+
+  assert.equal(firstCheck.matchesWeekday, true);
+  assert.equal(firstCheck.alreadySent, false);
+
+  const secondCheck = shouldSendWeeklyReportForDate(
+    {
+      enabled: true,
+      weekday: 'sun',
+      timezone: 'America/Los_Angeles',
+      lastSentWeekKey: firstCheck.deliveryKey,
+    },
+    new Date('2026-06-28T23:30:00.000Z'),
+  );
+
+  assert.equal(secondCheck.matchesWeekday, true);
+  assert.equal(secondCheck.alreadySent, true);
 });
 
 test('same-day unresolved tracked keywords include old-day, pending, and error rows but skip ok/not_ranked', () => {
@@ -440,6 +480,13 @@ test('editable user-state serialization preserves histories, schedule timing, an
       lastRunAt: '2026-06-22T03:45:00.000Z',
       lastRunKey: '2026-06-22T11:15',
     },
+    weeklyReportSettings: {
+      enabled: true,
+      weekday: 'wed',
+      timezone: 'America/New_York',
+      lastSentWeekKey: '2026-W26',
+      lastSentAt: '2026-06-22T03:45:00.000Z',
+    },
     alertRules: [{
       id: 'rule-1',
       enabled: true,
@@ -472,6 +519,11 @@ test('editable user-state serialization preserves histories, schedule timing, an
   assert.equal(serialized.trackingSchedule?.timezone, 'UTC');
   assert.equal(serialized.trackingSchedule?.lastRunAt, '2026-06-22T03:45:00.000Z');
   assert.equal(serialized.trackingSchedule?.lastRunKey, '2026-06-22T11:15');
+  assert.equal(serialized.weeklyReportSettings?.enabled, true);
+  assert.equal(serialized.weeklyReportSettings?.weekday, 'wed');
+  assert.equal(serialized.weeklyReportSettings?.timezone, 'America/New_York');
+  assert.equal(serialized.weeklyReportSettings?.lastSentWeekKey, undefined);
+  assert.equal(serialized.weeklyReportSettings?.lastSentAt, undefined);
   assert.equal(serialized.alertRules?.[0]?.scope, 'competitor_aso');
   assert.deepEqual(serialized.alertRules?.[0]?.targetAppIds, ['app.comp1']);
 });

@@ -51,26 +51,30 @@ export function WorkspacePageIntro({
   description,
   icon: Icon,
   aside,
+  compact = false,
+  dense = false,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   icon: LucideIcon;
   aside?: React.ReactNode;
+  compact?: boolean;
+  dense?: boolean;
 }) {
   return (
-    <div className="workspace-page-intro relative overflow-visible">
-      <div className="workspace-page-intro-main relative z-10">
-        <div className="workspace-page-intro-icon hidden sm:inline-flex">
+    <div className={cn("workspace-page-intro relative overflow-visible", compact && "workspace-page-intro-compact", dense && "workspace-page-intro-dense")}>
+      <div className={cn("workspace-page-intro-main relative z-10", compact && "workspace-page-intro-main-compact", dense && "workspace-page-intro-main-dense")}>
+        <div className={cn("workspace-page-intro-icon hidden sm:inline-flex", compact && "workspace-page-intro-icon-compact", dense && "workspace-page-intro-icon-dense")}>
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
           <div className="workspace-page-eyebrow">{eyebrow}</div>
-          <h1 className="workspace-page-title">{title}</h1>
-          <p className="workspace-page-description">{description}</p>
+          <h1 className={cn("workspace-page-title", compact && "workspace-page-title-compact", dense && "workspace-page-title-dense")}>{title}</h1>
+          <p className={cn("workspace-page-description", compact && "workspace-page-description-compact", dense && "workspace-page-description-dense")}>{description}</p>
         </div>
       </div>
-      {aside ? <div className="workspace-page-intro-aside relative z-10">{aside}</div> : null}
+      {aside ? <div className={cn("workspace-page-intro-aside relative z-10", compact && "workspace-page-intro-aside-compact", dense && "workspace-page-intro-aside-dense")}>{aside}</div> : null}
     </div>
   );
 }
@@ -81,19 +85,23 @@ export function WorkspaceMetricCard({
   hint,
   trend,
   accent = "cyan",
+  compact = false,
+  dense = false,
 }: {
   label: string;
   value: React.ReactNode;
   hint?: React.ReactNode;
   trend?: React.ReactNode;
   accent?: "cyan" | "emerald" | "amber" | "violet" | "slate";
+  compact?: boolean;
+  dense?: boolean;
 }) {
   return (
-    <div className={cn("workspace-metric-card flex flex-col", `workspace-metric-${accent}`)}>
-      <div className="workspace-metric-label mb-1 !text-[10px] sm:!text-[11px]">{label}</div>
-      <div className="workspace-metric-value !text-[1.15rem] sm:!text-3xl">{value}</div>
+    <div className={cn("workspace-metric-card flex flex-col", compact && "workspace-metric-card-compact", dense && "workspace-metric-card-dense", `workspace-metric-${accent}`)}>
+      <div className={cn("workspace-metric-label mb-0.5 !text-[9px] sm:!text-[10px]", dense && "workspace-metric-label-dense")}>{label}</div>
+      <div className={cn("workspace-metric-value !text-[1.15rem] sm:!text-3xl", compact && "workspace-metric-value-compact", dense && "workspace-metric-value-dense")}>{value}</div>
       {hint ? (
-        <div className="workspace-metric-hint mt-auto pt-1.5 !text-[10px] leading-tight sm:pt-2 sm:!text-xs line-clamp-2">
+        <div className={cn("workspace-metric-hint mt-auto pt-1 !text-[9px] leading-tight sm:pt-1.5 sm:!text-[11px] line-clamp-2", compact && "workspace-metric-hint-compact", dense && "workspace-metric-hint-dense")}>
           {hint}
         </div>
       ) : null}
@@ -105,11 +113,15 @@ export function WorkspaceMetricCard({
 export function WorkspaceMetricGrid({
   children,
   className,
+  compact = false,
+  dense = false,
 }: {
   children: React.ReactNode;
   className?: string;
+  compact?: boolean;
+  dense?: boolean;
 }) {
-  return <div className={cn("workspace-metric-grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-4", className)}>{children}</div>;
+  return <div className={cn("workspace-metric-grid grid-cols-2 gap-1.5 sm:gap-4 md:grid-cols-4", compact && "workspace-metric-grid-compact", dense && "workspace-metric-grid-dense", className)}>{children}</div>;
 }
 
 export function WorkspaceNavButton({

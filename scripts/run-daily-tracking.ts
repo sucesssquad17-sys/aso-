@@ -29,6 +29,13 @@ import {
   GLOBAL_TRACKING_TIMEZONE,
 } from '../src/lib/trackingTime';
 import {
+  buildWeeklyReportEmailHtml,
+  buildWeeklyReportEmailSummary,
+  buildWeeklyReportWorkspaceUrl,
+  getResendEmailId,
+  sendAlertEmailEvents as sendSharedAlertEmailEvents,
+} from '../src/lib/backendEmail';
+import {
   DAILY_TRACKING_LEASE_TTL_MINUTES,
   getDailyTrackingFinalStatus,
   getEmptyDailyTrackingSummary,
@@ -45,6 +52,11 @@ import {
   normalizeAlertRules,
   normalizeNotificationSettings,
 } from '../src/lib/alerts';
+import {
+  normalizeWeeklyReportSettings,
+  shouldSendWeeklyReportForDate,
+  type WeeklyReportSettings,
+} from '../src/lib/weeklyReports';
 import {
   getGlobalTrackingRunKey as getSharedGlobalTrackingRunKey,
   getZonedDateParts as getSharedZonedDateParts,
@@ -223,6 +235,7 @@ type TrackingState = {
   alertRules: AlertRule[];
   notificationSettings: NotificationSettings;
   schedule: TrackingSchedule;
+  weeklyReportSettings: WeeklyReportSettings;
 };
 
 type UserTrackingDocument = {
@@ -235,6 +248,7 @@ type UserTrackingDocument = {
   alertRules?: AlertRule[];
   notificationSettings?: NotificationSettings;
   trackingSchedule?: TrackingSchedule;
+  weeklyReportSettings?: WeeklyReportSettings;
   billingEmail?: string;
   updatedAt?: string;
 };
@@ -1123,70 +1137,23 @@ function formatAlertEmailTimestamp(timestamp: string) {
   return `${istTime} ${GLOBAL_TRACKING_TIMEZONE} (${utcTime} UTC)`;
 }
 
-function formatAlertChangedFieldLabel(field: string) {
-  switch (field) {
-    case 'title':
-      return 'Title';
-    case 'description':
-      return 'Description';
-    case 'screenshots':
-      return 'Screenshots';
-    case 'icon':
-      return 'Icon';
-    case 'category':
-      return 'Category';
-    default:
-      return field;
-  }
-}
-
-function getAlertEmailSubject(event: AlertEvent) {
-  return event.scope === 'competitor_aso'
-    ? `Competitor ASO alert: ${event.changedAppTitle || event.keyword}`
-    : `Keyword alert: ${event.keyword}`;
-}
-
-function buildAlertEmailHtml(event: AlertEvent) {
-  const storeLabel = event.store === 'ios' ? 'iOS' : 'Android';
-  const changedFields = Array.isArray(event.changedFields) && event.changedFields.length
-    ? event.changedFields.map((field) => formatAlertChangedFieldLabel(field)).join(', ')
-    : null;
-  const heading = event.scope === 'competitor_aso'
-    ? escapeAlertEmailHtml(event.changedAppTitle || event.keyword)
-    : escapeAlertEmailHtml(event.keyword);
-
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; color: #0f172a;">
-      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeAlertEmailHtml(getAlertEmailSubject(event))}</h2>
-      <p style="margin: 0 0 18px; color: #334155;">${escapeAlertEmailHtml(event.message)}</p>
-      <div style="border: 1px solid #cbd5e1; border-radius: 12px; background: #f8fafc; padding: 18px;">
-        <p style="margin: 0 0 8px;"><strong>Target:</strong> ${heading}</p>
-        <p style="margin: 0 0 8px;"><strong>Store:</strong> ${storeLabel}</p>
-        <p style="margin: 0 0 8px;"><strong>Country:</strong> ${escapeAlertEmailHtml(event.country.toUpperCase())}</p>
-        <p style="margin: 0 0 8px;"><strong>Triggered:</strong> ${escapeAlertEmailHtml(formatAlertEmailTimestamp(event.createdAt))}</p>
-        ${changedFields ? `<p style="margin: 0;"><strong>Changed fields:</strong> ${escapeAlertEmailHtml(changedFields)}</p>` : ''}
-      </div>
-      <a href="${escapeAlertEmailHtml(ALERT_EMAIL_APP_URL)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
-        Open Workspace
-      </a>
-    </div>
-  `;
-}
-
 async function sendEmailAlertEvents(
   userDocRef: DocumentReference<DocumentData>,
   events: AlertEvent[],
 ) {
-  if (!events.length) {
-    return;
-  }
-  if (!resend) {
-    log('[email] Skipping alert email because Resend is not configured.');
-    return;
-  }
+  await sendSharedAlertEmailEvents(userDocRef, events, {
+    resend,
+    fromEmail: RESEND_FROM_EMAIL,
+    dashboardUrl: ALERT_EMAIL_APP_URL,
+    resolveRecipient: resolveAlertEmailRecipient,
+    logPrefix: '[email]',
+  });
+}
 
+async function resolveAlertEmailRecipient(
+  userDocRef: DocumentReference<DocumentData>,
+) {
   let recipient: string | null = null;
-
   try {
     const userSnapshot = await userDocRef.get();
     const billingEmail = normalizeEmailAddress(userSnapshot.data()?.billingEmail);
@@ -1207,30 +1174,143 @@ async function sendEmailAlertEvents(
     }
   }
 
-  if (!recipient) {
-    log(`[email] Skipping alert email for user ${userDocRef.id} because no account email is available.`);
-    return;
+  return recipient;
+}
+
+function buildWeeklyReportSummaryFromState(
+  state: Pick<
+    TrackingState,
+    | 'trackedKeywords'
+    | 'rankHistory'
+    | 'competitorGroups'
+    | 'competitorTrackedKeywords'
+    | 'competitorRankHistory'
+  >,
+) {
+  return buildWeeklyReportEmailSummary({
+    trackedKeywords: state.trackedKeywords.map((entry) => ({
+      keyword: entry.keyword,
+      appId: entry.appId,
+      appTitle: entry.appTitle,
+      store: entry.store,
+      country: entry.country,
+      lastRank: entry.lastRank,
+      lastCheckStatus: entry.lastCheckStatus,
+      lastChecked: entry.lastChecked,
+    })),
+    rankHistory: state.rankHistory.map((entry) => ({
+      appId: entry.appId,
+      keyword: entry.keyword,
+      store: entry.store,
+      country: entry.country,
+      rank: entry.rank,
+      timestamp: entry.timestamp,
+      rankDepth: entry.rankDepth,
+    })),
+    competitorGroups: state.competitorGroups.map((group) => ({
+      groupId: group.groupId,
+      ownApp: { title: group.ownApp.title },
+      competitors: group.competitors.map((app) => ({ title: app.title })),
+    })),
+    competitorTrackedKeywords: state.competitorTrackedKeywords.map((entry) => ({
+      trackedKeywordId: entry.trackedKeywordId,
+      groupId: entry.groupId,
+      keyword: entry.keyword,
+      store: entry.store,
+      country: entry.country,
+      apps: entry.apps.map((app) => ({
+        appKey: app.appKey,
+        title: app.title,
+        lastRank: app.lastRank,
+        lastCheckStatus: app.lastCheckStatus,
+      })),
+    })),
+    competitorRankHistory: state.competitorRankHistory.map((entry) => ({
+      trackedKeywordId: entry.trackedKeywordId,
+      appKey: entry.appKey,
+      rank: entry.rank,
+      timestamp: entry.timestamp,
+      rankDepth: entry.rankDepth,
+    })),
+  });
+}
+
+async function maybeSendWeeklyReportEmail(
+  userDocRef: DocumentReference<DocumentData>,
+  state: Pick<
+    TrackingState,
+    | 'trackedKeywords'
+    | 'rankHistory'
+    | 'competitorGroups'
+    | 'competitorTrackedKeywords'
+    | 'competitorRankHistory'
+    | 'weeklyReportSettings'
+  >,
+  date: Date,
+) {
+  const settings = state.weeklyReportSettings;
+  if (!settings.enabled) {
+    return null;
   }
 
-  await Promise.all(
-    events.map(async (event) => {
-      try {
-        const result = await resend.emails.send({
-          from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
-          to: recipient,
-          subject: getAlertEmailSubject(event),
-          html: buildAlertEmailHtml(event),
-        });
-        if (result.error) {
-          console.warn(`[email] Failed to deliver alert email ${event.id}`, result.error);
-          return;
-        }
-        log(`[email] Delivered alert email ${event.id} to ${recipient}.`);
-      } catch (error) {
-        console.warn(`[email] Failed to deliver alert email ${event.id}`, error);
-      }
-    }),
-  );
+  const eligibility = shouldSendWeeklyReportForDate(settings, date);
+  if (!eligibility.matchesWeekday || eligibility.alreadySent) {
+    return null;
+  }
+  if (!resend) {
+    log('[email] Skipping weekly report email because Resend is not configured.');
+    return null;
+  }
+
+  const sender = RESEND_FROM_EMAIL.trim();
+  if (!sender) {
+    log('[email] Skipping weekly report email because sender email is not configured.');
+    return null;
+  }
+
+  const recipient = await resolveAlertEmailRecipient(userDocRef);
+  if (!recipient) {
+    log(`[email] Skipping weekly report email for user ${userDocRef.id} because no account email is available.`);
+    return null;
+  }
+
+  const summary = buildWeeklyReportSummaryFromState(state);
+  const reportMode =
+    summary.competitorGroupCount > 0 && summary.trackedKeywordCount === 0
+      ? 'competitors'
+      : 'my';
+  const reportUrl = buildWeeklyReportWorkspaceUrl(ALERT_EMAIL_APP_URL, reportMode);
+
+  try {
+    const result = await resend.emails.send({
+      from: `Rank Analyzer Pro <${sender}>`,
+      to: recipient,
+      subject: `Your weekly ASO report · ${summary.rangeLabel}`,
+      html: buildWeeklyReportEmailHtml({
+        summary,
+        reportUrl,
+        weekday: settings.weekday,
+      }),
+    });
+    if (result.error) {
+      console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, result.error);
+      return null;
+    }
+    if (!getResendEmailId(result)) {
+      console.warn(`[email] Weekly report email for user ${userDocRef.id} returned no message id.`);
+    }
+
+    const sentAt = new Date().toISOString();
+    log(`[email] Delivered weekly report email to ${recipient}.`);
+    return {
+      ...settings,
+      lastSentWeekKey: eligibility.deliveryKey,
+      lastSentAt: sentAt,
+    } satisfies WeeklyReportSettings;
+  } catch (error) {
+    console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, error);
+    return null;
+  }
 }
 
 function buildCronFailureEmailHtml(input: {
@@ -1287,6 +1367,9 @@ async function sendCronFailureEmail(input: {
     if (result.error) {
       console.warn('[email] Failed to deliver cron failure email.', result.error);
       return;
+    }
+    if (!getResendEmailId(result)) {
+      console.warn(`[email] Cron failure email for ${input.runKey} returned no message id.`);
     }
     log(`[email] Delivered cron failure email for ${input.runKey}.`);
   } catch (error) {
@@ -2276,7 +2359,11 @@ async function main() {
       );
       const alertRules = normalizeAlertRules(data?.alertRules);
       const notificationSettings = normalizeNotificationSettings(data?.notificationSettings);
-      if (!trackedKeywords.length && !competitorTrackedKeywords.length && !competitorGroups.length) continue;
+      const schedule = normalizeSharedTrackingSchedule(data?.trackingSchedule, {
+        enabled: true,
+        time: DEFAULT_GLOBAL_TRACKING_TIME,
+        timezone: GLOBAL_TRACKING_TIMEZONE,
+      });
 
       const state: TrackingState = {
         trackedKeywords,
@@ -2287,12 +2374,110 @@ async function main() {
         competitorAsoLatestSnapshots,
         alertRules,
         notificationSettings,
-        schedule: normalizeSharedTrackingSchedule(data?.trackingSchedule, {
-          enabled: true,
-          time: DEFAULT_GLOBAL_TRACKING_TIME,
-          timezone: GLOBAL_TRACKING_TIMEZONE,
-        }),
+        schedule,
+        weeklyReportSettings: normalizeWeeklyReportSettings(
+          data?.weeklyReportSettings,
+          schedule.timezone || GLOBAL_TRACKING_TIMEZONE,
+        ),
       };
+      const hasTrackedData =
+        trackedKeywords.length > 0 ||
+        competitorTrackedKeywords.length > 0 ||
+        competitorGroups.length > 0;
+      const updatePayload: Partial<UserTrackingDocument> = {};
+      let weeklyEmailState: Pick<
+        TrackingState,
+        | 'trackedKeywords'
+        | 'rankHistory'
+        | 'competitorGroups'
+        | 'competitorTrackedKeywords'
+        | 'competitorRankHistory'
+        | 'weeklyReportSettings'
+      > = state;
+
+      if (hasTrackedData) {
+        if (!shouldRunTrackingRefresh(state.schedule, { hasTrackedData: true, runKey })) {
+          log(`  â†’ User ${userDoc.id}: tracking already ran for ${runKey}, skipping refresh`);
+        } else {
+          log(`  â†’ User ${userDoc.id}: refreshing ${trackedKeywords.length} keyword(s)...`);
+          const refreshResult = await refreshUserTrackingDaily(state, runKey);
+          const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
+            userDoc.ref,
+            state.trackedKeywords,
+            refreshResult.nextState.trackedKeywords,
+            state.alertRules,
+            state.notificationSettings,
+            runKey,
+          );
+          const asoResult = await captureCompetitorAsoState(
+            userDoc.ref,
+            {
+              competitorGroups: state.competitorGroups,
+              competitorTrackedKeywords: refreshResult.nextState.competitorTrackedKeywords,
+              competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
+              alertRules: updatedAlertRules,
+              notificationSettings: state.notificationSettings,
+            },
+            runKey,
+          );
+          const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
+            userDoc.ref,
+            refreshResult.nextState.rankHistory,
+          );
+          const retainedCompetitorRankHistory = await archiveAndTrimCompetitorRankHistory(
+            userDoc.ref,
+            refreshResult.nextState.competitorRankHistory,
+          );
+
+          updatePayload.trackedKeywords = refreshResult.nextState.trackedKeywords;
+          updatePayload.rankHistory = retainedRankHistory;
+          updatePayload.competitorTrackedKeywords = refreshResult.nextState.competitorTrackedKeywords;
+          updatePayload.competitorRankHistory = retainedCompetitorRankHistory;
+          updatePayload.competitorGroups = state.competitorGroups;
+          updatePayload.competitorAsoLatestSnapshots = asoResult.nextLatestSnapshots;
+          updatePayload.alertRules = updatedAlertRules;
+          updatePayload.trackingSchedule = refreshResult.nextState.schedule;
+
+          weeklyEmailState = {
+            trackedKeywords: refreshResult.nextState.trackedKeywords,
+            rankHistory: retainedRankHistory,
+            competitorGroups: state.competitorGroups,
+            competitorTrackedKeywords: refreshResult.nextState.competitorTrackedKeywords,
+            competitorRankHistory: retainedCompetitorRankHistory,
+            weeklyReportSettings: state.weeklyReportSettings,
+          };
+
+          totalRan += 1;
+          totalChecked += refreshResult.checked;
+          totalChanged += refreshResult.changed;
+          totalFailed += refreshResult.failed;
+          totalAsoChecked += asoResult.checked;
+          totalAsoChanged += asoResult.changed;
+          totalAsoFailed += asoResult.failed;
+
+          log(`  âœ“ User ${userDoc.id}: checked=${refreshResult.checked}, changed=${refreshResult.changed}, failed=${refreshResult.failed}`);
+        }
+      }
+
+      const nextWeeklyReportSettings = await maybeSendWeeklyReportEmail(
+        userDoc.ref,
+        weeklyEmailState,
+        new Date(),
+      );
+      if (nextWeeklyReportSettings) {
+        updatePayload.weeklyReportSettings = nextWeeklyReportSettings;
+      }
+      if (Object.keys(updatePayload).length > 0) {
+        await userDoc.ref.set(
+          {
+            ...updatePayload,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        );
+      }
+      const useLegacyTrackingLoop = process.env.LEGACY_TRACKING_LOOP === '1';
+      if (useLegacyTrackingLoop) {
       if (!shouldRunTrackingRefresh(state.schedule, { hasTrackedData: true, runKey })) {
         log(`  → User ${userDoc.id}: already ran for ${runKey}, skipping`);
         continue;
@@ -2351,6 +2536,8 @@ async function main() {
       totalAsoFailed += asoResult.failed;
 
       log(`  ✓ User ${userDoc.id}: checked=${result.checked}, changed=${result.changed}, failed=${result.failed}`);
+
+      }
 
       /* Legacy summary email path retired in favor of rule-based alert emails.
       if (false && result.changed > 0 && resend) {
