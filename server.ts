@@ -68,6 +68,7 @@ import {
   buildWeeklyReportEmailHtml,
   buildWeeklyReportEmailSummary,
   buildWeeklyReportWorkspaceUrl,
+  getSafeAppUrl,
   getResendEmailId,
   sendAlertEmailEvents as sendSharedAlertEmailEvents,
 } from './src/lib/backendEmail';
@@ -110,6 +111,7 @@ import {
   normalizeNotificationSettings,
 } from './src/lib/alerts';
 import {
+  getWeeklyReportRangeStartIso,
   normalizeWeeklyReportSettings,
   shouldSendWeeklyReportForDate,
   type WeeklyReportSettings,
@@ -170,7 +172,7 @@ const ADMIN_EMAIL_ALLOWLIST = (process.env.ADMIN_EMAIL_ALLOWLIST || '')
   .filter(Boolean);
 const EMAIL_UNSUBSCRIBE_SECRET = process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim() || '';
 const ANNOUNCEMENT_EMAIL_CAMPAIGNS_COLLECTION = 'admin_email_campaigns';
-const ALERT_EMAIL_APP_URL = process.env.APP_URL?.trim() || 'https://rankanalyzerpro.com';
+const ALERT_EMAIL_APP_URL = getSafeAppUrl(process.env.APP_URL);
 const PLAY_STORE_FETCH_TIMEOUT_MS = 60000;
 const UPSTREAM_REQUEST_TIMEOUT_MS = 60000;
 const UPSTREAM_FAILURE_CACHE_TTL_SECONDS = 15;
@@ -4035,7 +4037,14 @@ async function resolveAlertEmailRecipient(
 ) {
   try {
     const userSnapshot = await userDocRef.get();
-    const billingEmail = normalizeEmailAddress(userSnapshot.data()?.billingEmail);
+    const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+    if (
+      userData?.accountStatus === 'deleted' ||
+      userData?.accountStatus === 'deleting'
+    ) {
+      return null;
+    }
+    const billingEmail = normalizeEmailAddress(userData?.billingEmail);
     if (billingEmail && isValidEmailAddress(billingEmail)) {
       return billingEmail;
     }
@@ -4066,6 +4075,7 @@ async function sendEmailAlertEvents(
     resend,
     fromEmail: RESEND_FROM_EMAIL,
     dashboardUrl: ALERT_EMAIL_APP_URL,
+    preferencesUrl: ALERT_EMAIL_APP_URL,
     resolveRecipient: resolveAlertEmailRecipient,
   });
 }
@@ -4079,6 +4089,7 @@ function buildWeeklyReportSummaryFromState(
     | 'competitorTrackedKeywords'
     | 'competitorRankHistory'
   >,
+  timeZone: string,
 ) {
   return buildWeeklyReportEmailSummary({
     trackedKeywords: state.trackedKeywords.map((entry) => ({
@@ -4125,7 +4136,51 @@ function buildWeeklyReportSummaryFromState(
       timestamp: entry.timestamp,
       rankDepth: entry.rankDepth,
     })),
+    timeZone,
   });
+}
+
+async function hydrateWeeklyReportStateWithArchive(
+  userDocRef: DocumentReference<DocumentData>,
+  state: Pick<
+    NormalizedUserTrackingDocument,
+    | 'trackedKeywords'
+    | 'rankHistory'
+    | 'competitorGroups'
+    | 'competitorTrackedKeywords'
+    | 'competitorRankHistory'
+  >,
+  date: Date,
+  timeZone: string,
+) {
+  const rangeStartIso = getWeeklyReportRangeStartIso(date, timeZone);
+  const [archivedRankHistorySnapshot, archivedCompetitorRankHistorySnapshot] =
+    await Promise.all([
+      userDocRef
+        .collection(USER_RANK_HISTORY_ARCHIVE_COLLECTION)
+        .where('timestamp', '>=', rangeStartIso)
+        .get(),
+      userDocRef
+        .collection(USER_COMPETITOR_RANK_HISTORY_ARCHIVE_COLLECTION)
+        .where('timestamp', '>=', rangeStartIso)
+        .get(),
+    ]);
+
+  const archivedRankHistory = sanitizeRankHistory(
+    archivedRankHistorySnapshot.docs.map((doc) => doc.data()),
+  );
+  const archivedCompetitorRankHistory = sanitizeCompetitorRankHistory(
+    archivedCompetitorRankHistorySnapshot.docs.map((doc) => doc.data()),
+  );
+
+  return {
+    ...state,
+    rankHistory: mergeRankHistory(state.rankHistory, archivedRankHistory),
+    competitorRankHistory: mergeCompetitorRankHistory(
+      state.competitorRankHistory,
+      archivedCompetitorRankHistory,
+    ),
+  };
 }
 
 async function maybeSendWeeklyReportEmail(
@@ -4143,6 +4198,13 @@ async function maybeSendWeeklyReportEmail(
 ) {
   const settings = state.weeklyReportSettings;
   if (!settings.enabled) {
+    return null;
+  }
+  const hasTrackedData =
+    state.trackedKeywords.length > 0 ||
+    state.competitorTrackedKeywords.length > 0 ||
+    state.competitorGroups.length > 0;
+  if (!hasTrackedData) {
     return null;
   }
 
@@ -4167,7 +4229,16 @@ async function maybeSendWeeklyReportEmail(
     return null;
   }
 
-  const summary = buildWeeklyReportSummaryFromState(state);
+  const hydratedState = await hydrateWeeklyReportStateWithArchive(
+    userDocRef,
+    state,
+    date,
+    settings.timezone,
+  );
+  const summary = buildWeeklyReportSummaryFromState(
+    hydratedState,
+    settings.timezone,
+  );
   const reportMode =
     summary.competitorGroupCount > 0 && summary.trackedKeywordCount === 0
       ? 'competitors'
@@ -4183,6 +4254,7 @@ async function maybeSendWeeklyReportEmail(
         summary,
         reportUrl,
         weekday: settings.weekday,
+        preferencesUrl: reportUrl,
       }),
     });
     if (result.error) {

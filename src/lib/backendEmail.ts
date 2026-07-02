@@ -1,7 +1,15 @@
 import type { AlertEvent } from "./alerts";
 import { GLOBAL_TRACKING_TIMEZONE } from "./trackingTime";
-import type { WeeklyReportWeekday } from "./weeklyReports";
-import type { DocumentData, DocumentReference } from "firebase-admin/firestore";
+import {
+  formatWeeklyReportRangeLabel,
+  getWeeklyReportDateStamp,
+  type WeeklyReportWeekday,
+} from "./weeklyReports";
+import {
+  FieldValue,
+  type DocumentData,
+  type DocumentReference,
+} from "firebase-admin/firestore";
 import type { Resend } from "resend";
 
 type ResendSendResult = Awaited<ReturnType<Resend["emails"]["send"]>>;
@@ -50,6 +58,18 @@ export function getResendEmailId(result: ResendSendResult | null | undefined) {
   return normalized.length > 0 ? normalized : null;
 }
 
+export function getSafeAppUrl(
+  rawAppUrl: string | null | undefined,
+  fallbackAppUrl = "https://rankanalyzerpro.com",
+) {
+  const normalizedRaw = typeof rawAppUrl === "string" ? rawAppUrl.trim() : "";
+  try {
+    return new URL(normalizedRaw || fallbackAppUrl).toString();
+  } catch {
+    return fallbackAppUrl;
+  }
+}
+
 function formatAlertChangedFieldLabel(field: string) {
   switch (field) {
     case "title":
@@ -73,7 +93,28 @@ export function getAlertEmailSubject(event: AlertEvent) {
     : `Keyword alert: ${event.keyword}`;
 }
 
-export function buildAlertEmailHtml(event: AlertEvent, dashboardUrl: string) {
+function getBatchedAlertEmailSubject(events: AlertEvent[]) {
+  if (events.length === 1) {
+    return getAlertEmailSubject(events[0]);
+  }
+  const competitorCount = events.filter(
+    (event) => event.scope === "competitor_aso",
+  ).length;
+  const keywordCount = events.length - competitorCount;
+  if (competitorCount > 0 && keywordCount > 0) {
+    return `${events.length} ASO alerts triggered`;
+  }
+  if (competitorCount > 0) {
+    return `${events.length} competitor ASO alert${events.length === 1 ? "" : "s"} triggered`;
+  }
+  return `${events.length} keyword alert${events.length === 1 ? "" : "s"} triggered`;
+}
+
+export function buildAlertEmailHtml(
+  event: AlertEvent,
+  dashboardUrl: string,
+  preferencesUrl?: string,
+) {
   const storeLabel = event.store === "ios" ? "iOS" : "Android";
   const changedFields =
     Array.isArray(event.changedFields) && event.changedFields.length
@@ -100,6 +141,69 @@ export function buildAlertEmailHtml(event: AlertEvent, dashboardUrl: string) {
       <a href="${escapeEmailHtml(dashboardUrl)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
         Open Workspace
       </a>
+      ${preferencesUrl
+        ? `<p style="margin: 18px 0 0; color: #64748b; font-size: 13px;"><a href="${escapeEmailHtml(preferencesUrl)}" style="color: #0f766e; text-decoration: underline;">Manage alert email preferences</a></p>`
+        : ""}
+    </div>
+  `;
+}
+
+function buildBatchedAlertEmailHtml(
+  events: AlertEvent[],
+  dashboardUrl: string,
+  preferencesUrl?: string,
+) {
+  const rows = events
+    .slice()
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    )
+    .map((event) => {
+      const scopeLabel =
+        event.scope === "competitor_aso" ? "Competitor ASO" : "Keyword";
+      const changedFields =
+        Array.isArray(event.changedFields) && event.changedFields.length
+          ? ` · ${event.changedFields
+              .map((field) => formatAlertChangedFieldLabel(field))
+              .join(", ")}`
+          : "";
+      return `
+        <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #ffffff;">
+          <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline;">
+            <strong style="color: #0f172a;">${escapeEmailHtml(
+              event.scope === "competitor_aso"
+                ? event.changedAppTitle || event.keyword
+                : event.keyword,
+            )}</strong>
+            <span style="color: #64748b; font-size: 12px;">${escapeEmailHtml(formatEmailTimestamp(event.createdAt))}</span>
+          </div>
+          <div style="margin-top: 6px; color: #334155; font-size: 13px; line-height: 1.55;">
+            <div><strong>${escapeEmailHtml(scopeLabel)}</strong> · ${escapeEmailHtml(
+              event.store === "ios" ? "iOS" : "Android",
+            )} · ${escapeEmailHtml(event.country.toUpperCase())}${escapeEmailHtml(changedFields)}</div>
+            <div style="margin-top: 4px;">${escapeEmailHtml(event.message)}</div>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
+      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeEmailHtml(getBatchedAlertEmailSubject(events))}</h2>
+      <p style="margin: 0 0 18px; color: #334155;">${escapeEmailHtml(
+        events.length === 1
+          ? "One alert triggered in your workspace."
+          : `${events.length} alerts triggered in your workspace.`,
+      )}</p>
+      <div style="display: grid; gap: 10px;">${rows}</div>
+      <a href="${escapeEmailHtml(dashboardUrl)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
+        Open Workspace
+      </a>
+      ${preferencesUrl
+        ? `<p style="margin: 18px 0 0; color: #64748b; font-size: 13px;"><a href="${escapeEmailHtml(preferencesUrl)}" style="color: #0f766e; text-decoration: underline;">Manage alert email preferences</a></p>`
+        : ""}
     </div>
   `;
 }
@@ -107,7 +211,7 @@ export function buildAlertEmailHtml(event: AlertEvent, dashboardUrl: string) {
 async function updateAlertEmailStatus(
   userDocRef: DocumentReference<DocumentData>,
   event: AlertEvent,
-  patch: Partial<AlertEvent>,
+  patch: DocumentData,
 ) {
   try {
     await userDocRef.collection("alert_events").doc(event.id).set(patch, {
@@ -128,6 +232,7 @@ export async function sendAlertEmailEvents(
     resolveRecipient: (
       userDocRef: DocumentReference<DocumentData>,
     ) => Promise<string | null>;
+    preferencesUrl?: string;
     logPrefix?: string;
   },
 ) {
@@ -185,57 +290,77 @@ export async function sendAlertEmailEvents(
     return;
   }
 
-  await Promise.all(
-    events.map(async (event) => {
-      const eventAttemptedAt = new Date().toISOString();
-      try {
-        const result = await input.resend!.emails.send({
-          from: `Rank Analyzer Pro <${sender}>`,
-          to: recipient,
-          subject: getAlertEmailSubject(event),
-          html: buildAlertEmailHtml(event, input.dashboardUrl),
-        });
-        if (result.error) {
-          await updateAlertEmailStatus(userDocRef, event, {
+  const eventAttemptedAt = new Date().toISOString();
+  try {
+    const result = await input.resend!.emails.send({
+      from: `Rank Analyzer Pro <${sender}>`,
+      to: recipient,
+      subject: getBatchedAlertEmailSubject(events),
+      html:
+        events.length === 1
+          ? buildAlertEmailHtml(
+              events[0],
+              input.dashboardUrl,
+              input.preferencesUrl,
+            )
+          : buildBatchedAlertEmailHtml(
+              events,
+              input.dashboardUrl,
+              input.preferencesUrl,
+            ),
+    });
+    if (result.error) {
+      const failedAt = new Date().toISOString();
+      await Promise.all(
+        events.map((event) =>
+          updateAlertEmailStatus(userDocRef, event, {
             emailDeliveryStatus: "failed",
             emailDeliveryRecipient: recipient,
             emailDeliveryAttemptedAt: eventAttemptedAt,
-            emailDeliveryFailedAt: new Date().toISOString(),
+            emailDeliveryFailedAt: failedAt,
             emailDeliveryLastError:
               typeof result.error.message === "string" && result.error.message
                 ? result.error.message
                 : "provider-error",
-          });
-          console.warn(`${logPrefix} Failed to deliver alert email ${event.id}`, result.error);
-          return;
-        }
-        if (!getResendEmailId(result)) {
-          console.warn(`${logPrefix} Alert email ${event.id} returned no message id.`);
-        }
-        await updateAlertEmailStatus(userDocRef, event, {
+          }),
+        ),
+      );
+      console.warn(`${logPrefix} Failed to deliver alert email batch for user ${userDocRef.id}`, result.error);
+      return;
+    }
+    if (!getResendEmailId(result)) {
+      console.warn(`${logPrefix} Alert email batch for user ${userDocRef.id} returned no message id.`);
+    }
+    const deliveredAt = new Date().toISOString();
+    await Promise.all(
+      events.map((event) =>
+        updateAlertEmailStatus(userDocRef, event, {
           emailDeliveryStatus: "delivered",
           emailDeliveryRecipient: recipient,
           emailDeliveryAttemptedAt: eventAttemptedAt,
-          emailDeliveryDeliveredAt: new Date().toISOString(),
-          emailDeliveryFailedAt: undefined,
-          emailDeliveryLastError: undefined,
-        });
-      } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : String(error);
-        await updateAlertEmailStatus(userDocRef, event, {
+          emailDeliveryDeliveredAt: deliveredAt,
+          emailDeliveryFailedAt: FieldValue.delete(),
+          emailDeliveryLastError: FieldValue.delete(),
+        }),
+      ),
+    );
+  } catch (error) {
+    const message =
+      error instanceof Error && error.message ? error.message : String(error);
+    const failedAt = new Date().toISOString();
+    await Promise.all(
+      events.map((event) =>
+        updateAlertEmailStatus(userDocRef, event, {
           emailDeliveryStatus: "failed",
           emailDeliveryRecipient: recipient,
           emailDeliveryAttemptedAt: eventAttemptedAt,
-          emailDeliveryFailedAt: new Date().toISOString(),
+          emailDeliveryFailedAt: failedAt,
           emailDeliveryLastError: message,
-        });
-        console.warn(`${logPrefix} Failed to deliver alert email ${event.id}`, error);
-      }
-    }),
-  );
+        }),
+      ),
+    );
+    console.warn(`${logPrefix} Failed to deliver alert email batch for user ${userDocRef.id}`, error);
+  }
 }
 
 export type WeeklyTrackedKeywordSummaryInput = {
@@ -329,23 +454,15 @@ export function buildWeeklyReportEmailSummary(input: {
   competitorTrackedKeywords: WeeklyCompetitorTrackedKeywordSummaryInput[];
   competitorRankHistory: WeeklyCompetitorRankHistorySummaryInput[];
   now?: Date;
+  timeZone?: string;
 }) {
   const now = input.now || new Date();
-  const rangeStart = new Date(now);
-  rangeStart.setDate(rangeStart.getDate() - 6);
-  rangeStart.setHours(0, 0, 0, 0);
-
-  const rangeLabel = `${rangeStart.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  })} - ${now.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  })}`;
+  const timeZone = input.timeZone || GLOBAL_TRACKING_TIMEZONE;
+  const rangeStartStamp = getWeeklyReportDateStamp(now, timeZone) - 6 * 86400000;
+  const rangeLabel = formatWeeklyReportRangeLabel(now, timeZone);
 
   const trackedRankedKeywords = input.trackedKeywords.filter(
-    (entry) => entry.lastCheckStatus !== "pending" && entry.lastRank !== -1,
+    (entry) => entry.lastCheckStatus === "ok" && entry.lastRank !== -1,
   );
   const averageRank =
     trackedRankedKeywords.length > 0
@@ -354,6 +471,7 @@ export function buildWeeklyReportEmailSummary(input: {
       : null;
 
   const movementCandidates = input.trackedKeywords
+    .filter((entry) => entry.lastCheckStatus === "ok")
     .map((entry) => {
       const history = input.rankHistory
         .filter(
@@ -362,7 +480,10 @@ export function buildWeeklyReportEmailSummary(input: {
             historyEntry.keyword === entry.keyword &&
             historyEntry.store === entry.store &&
             historyEntry.country === entry.country &&
-            new Date(historyEntry.timestamp).getTime() >= rangeStart.getTime(),
+            getWeeklyReportDateStamp(
+              new Date(historyEntry.timestamp),
+              timeZone,
+            ) >= rangeStartStamp,
         )
         .sort(
           (a, b) =>
@@ -413,7 +534,7 @@ export function buildWeeklyReportEmailSummary(input: {
     (sum, record) =>
       sum +
       record.apps.filter(
-        (app) => app.lastCheckStatus !== "pending" && app.lastRank !== -1,
+        (app) => app.lastCheckStatus === "ok" && app.lastRank !== -1,
       ).length,
     0,
   );
@@ -489,7 +610,7 @@ export function buildWeeklyReportWorkspaceUrl(
   appUrl: string,
   reportMode: "my" | "competitors" = "my",
 ) {
-  const url = new URL(appUrl);
+  const url = new URL(getSafeAppUrl(appUrl));
   url.searchParams.set("viewMode", "reports");
   url.searchParams.set("period", "7d");
   url.searchParams.set("reportMode", reportMode);
@@ -502,6 +623,7 @@ export function buildWeeklyReportEmailHtml(input: {
   summary: WeeklyReportEmailSummary;
   reportUrl: string;
   weekday: WeeklyReportWeekday;
+  preferencesUrl?: string;
 }) {
   const hasTrackedData =
     input.summary.trackedKeywordCount > 0 || input.summary.rankedKeywordCount > 0;
@@ -562,6 +684,9 @@ export function buildWeeklyReportEmailHtml(input: {
         <a href="${escapeEmailHtml(input.reportUrl)}" style="display: inline-block; padding: 12px 18px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
           View full report
         </a>
+        ${input.preferencesUrl
+          ? `<p style="margin: 14px 0 0; color: #64748b; font-size: 13px;"><a href="${escapeEmailHtml(input.preferencesUrl)}" style="color: #0f766e; text-decoration: underline;">Manage weekly email preferences</a></p>`
+          : ""}
       </div>
     </div>
   `;
