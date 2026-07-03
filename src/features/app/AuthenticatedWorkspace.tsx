@@ -6422,6 +6422,12 @@ function AuthenticatedApp({
   );
   const removeTrackedKeywordGroup = React.useCallback(
     (groupId: string, keyword: string) => {
+      const confirmed = window.confirm(
+        `Stop tracking "${keyword}" and remove this tracked group?`,
+      );
+      if (!confirmed) {
+        return;
+      }
       const nextTrackedKeywords = trackedKeywords.filter(
         (trackedKeyword) => resolveTrackingGroupId(trackedKeyword) !== groupId,
       );
@@ -7540,12 +7546,24 @@ function AuthenticatedApp({
   );
   const removeCompetitorDraftApp = React.useCallback(
     (appKey: string) => {
+      const appToRemove =
+        competitorDraftApps.find(
+          (entry) => getCompareAppKey(entry, storeType) === appKey,
+        ) || null;
+      const confirmed = window.confirm(
+        appToRemove
+          ? `Remove "${appToRemove.title}" from this competitor draft?`
+          : "Remove this app from the competitor draft?",
+      );
+      if (!confirmed) {
+        return;
+      }
       clearCompetitorDraftAnalysis();
       setCompetitorDraftApps((prev) =>
         prev.filter((entry) => getCompareAppKey(entry, storeType) !== appKey),
       );
     },
-    [clearCompetitorDraftAnalysis, storeType],
+    [clearCompetitorDraftAnalysis, competitorDraftApps, storeType],
   );
   const addCompetitorDraftKeywords = React.useCallback((keywords: string[]) => {
     setCompetitorDraftSelectedKeywords((prev) =>
@@ -7621,6 +7639,12 @@ function AuthenticatedApp({
     );
   }
   const removeCompetitorDraftKeyword = React.useCallback((keyword: string) => {
+    const confirmed = window.confirm(
+      `Remove "${keyword}" from this competitor draft?`,
+    );
+    if (!confirmed) {
+      return;
+    }
     const normalized = keyword.trim().toLowerCase();
     setCompetitorDraftSelectedKeywords((prev) =>
       prev.filter((entry) => entry.keyword.trim().toLowerCase() !== normalized),
@@ -8216,6 +8240,16 @@ function AuthenticatedApp({
     trackedKeywords,
   ]);
   const removeCompetitorGroup = React.useCallback((groupId: string) => {
+    const groupToRemove =
+      competitorGroups.find((group) => group.groupId === groupId) || null;
+    const confirmed = window.confirm(
+      groupToRemove
+        ? `Remove competitor group "${getCompetitorGroupLabel(groupToRemove)}"?`
+        : "Remove this competitor group?",
+    );
+    if (!confirmed) {
+      return;
+    }
     setCompetitorGroups((prev) => prev.filter((group) => group.groupId !== groupId));
     setCompetitorGroupSnapshots((prev) =>
       prev.filter((snapshot) => snapshot.groupId !== groupId),
@@ -8238,7 +8272,7 @@ function AuthenticatedApp({
       prev.filter((entry) => entry !== groupId),
     );
     toast.success("Competitor group removed.");
-  }, [competitorTrackedKeywords]);
+  }, [competitorGroups, competitorTrackedKeywords]);
   const removeCompetitorTrackedKeywordFromGroup = React.useCallback(
     (
       groupId: string,
@@ -8246,6 +8280,17 @@ function AuthenticatedApp({
       keyword: string,
       trackedCountry?: string,
     ) => {
+      const countryLabel = trackedCountry
+        ? findCountryName(trackedCountry) || trackedCountry.toUpperCase()
+        : null;
+      const confirmed = window.confirm(
+        countryLabel
+          ? `Remove "${keyword}" in ${countryLabel} from this competitor group?`
+          : `Remove "${keyword}" from this competitor group?`,
+      );
+      if (!confirmed) {
+        return;
+      }
       setCompetitorTrackedKeywords((prev) =>
         prev.filter((record) => record.trackedKeywordId !== trackedKeywordId),
       );
@@ -9312,6 +9357,12 @@ function AuthenticatedApp({
     }
   };
   const removeCompareApp = (appToRemove: AppDetails) => {
+    const confirmed = window.confirm(
+      `Remove "${appToRemove.title}" from this compare set?`,
+    );
+    if (!confirmed) {
+      return;
+    }
     setComparedApps((prev) =>
       prev.filter(
         (app) => !areSameStoreApps(app, appToRemove, storeType),
@@ -10752,18 +10803,16 @@ function AuthenticatedApp({
           className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
-          {" "}
-          <div className="bg-orb bg-orb-1" />{" "}
-          <div className="bg-orb bg-orb-2" />{" "}
-          <div className="bg-orb bg-orb-3" />{" "}
+          <div className="bg-orb bg-orb-1" />
+          <div className="bg-orb bg-orb-2" />
+          <div className="bg-orb bg-orb-3" />
           <div className="card-glow relative z-10 px-8 py-10 text-center">
-            {" "}
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />{" "}
+            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
             <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
               Loading account data
-            </p>{" "}
-          </div>{" "}
-        </div>{" "}
+            </p>
+          </div>
+        </div>
       </ErrorBoundary>
     );
   }

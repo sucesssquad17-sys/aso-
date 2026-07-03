@@ -4012,18 +4012,16 @@ function AuthenticatedApp({
           className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
-          {" "}
-          <div className="bg-orb bg-orb-1" />{" "}
-          <div className="bg-orb bg-orb-2" />{" "}
-          <div className="bg-orb bg-orb-3" />{" "}
+          <div className="bg-orb bg-orb-1" />
+          <div className="bg-orb bg-orb-2" />
+          <div className="bg-orb bg-orb-3" />
           <div className="card-glow relative z-10 px-8 py-10 text-center">
-            {" "}
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />{" "}
+            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
             <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
               Loading account data
-            </p>{" "}
-          </div>{" "}
-        </div>{" "}
+            </p>
+          </div>
+        </div>
       </ErrorBoundary>
     );
   }
@@ -7651,19 +7649,16 @@ export default function App() {
   if (!authReady) {
     return (
       <div className="auth-shell">
-        {" "}
-        <div className="auth-orb auth-orb-cyan" />{" "}
-        <div className="auth-orb auth-orb-indigo" />{" "}
+        <div className="auth-orb auth-orb-cyan" />
+        <div className="auth-orb auth-orb-indigo" />
         <div className="auth-panel flex items-center justify-center min-h-[320px]">
-          {" "}
           <div className="flex flex-col items-center gap-4 text-app-text-muted">
-            {" "}
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />{" "}
+            <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />
             <p className="text-sm tracking-[0.18em] uppercase text-app-text-muted">
               Checking session
-            </p>{" "}
-          </div>{" "}
-        </div>{" "}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
