@@ -3790,6 +3790,8 @@ function AuthenticatedApp({
   const userStateBaseVersionRef = React.useRef(0);
   const lastPersistedUserStateSignatureRef = React.useRef<string | null>(null);
   const billingActivationPollRunRef = React.useRef(0);
+  const seenAlertEventIdsRef = React.useRef<Set<string>>(new Set());
+  const pendingAlertFetchAnnouncementRef = React.useRef(false);
   const deleteAccountConfirmationPhrase = "delete my account";
   const paywallDismissStorageKey = `aso-paywall-dismissed:${currentUser.uid}`;
   useEffect(() => {
@@ -4975,6 +4977,16 @@ function AuthenticatedApp({
   }, [alertRefreshNonce, isDemoMode, loadAlertEvents, userStateHydrated]);
   useEffect(() => {
     if (isDemoMode || !userStateHydrated) return;
+    const intervalId = window.setInterval(() => {
+      pendingAlertFetchAnnouncementRef.current = true;
+      void loadAlertEvents();
+    }, 60_000);
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [isDemoMode, loadAlertEvents, userStateHydrated]);
+  useEffect(() => {
+    if (isDemoMode || !userStateHydrated) return;
     void loadCompetitorAsoHistory();
   }, [isDemoMode, loadCompetitorAsoHistory, userStateHydrated]);
   useEffect(() => {
@@ -5289,6 +5301,27 @@ function AuthenticatedApp({
     },
     [alertRules],
   );
+  useEffect(() => {
+    if (!alertEvents.length) {
+      pendingAlertFetchAnnouncementRef.current = false;
+      return;
+    }
+    const unseenUnreadEvents = alertEvents.filter(
+      (event) =>
+        !seenAlertEventIdsRef.current.has(event.id) &&
+        !event.readAt,
+    );
+    if (
+      pendingAlertFetchAnnouncementRef.current &&
+      unseenUnreadEvents.length
+    ) {
+      announceInAppAlertEvents(unseenUnreadEvents);
+    }
+    alertEvents.forEach((event) => {
+      seenAlertEventIdsRef.current.add(event.id);
+    });
+    pendingAlertFetchAnnouncementRef.current = false;
+  }, [alertEvents, announceInAppAlertEvents]);
   const bookmarkedAppKeys = React.useMemo(
     () => new Set(bookmarks.map((bookmark) => getBookmarkKey(bookmark))),
     [bookmarks],

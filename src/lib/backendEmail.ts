@@ -1,4 +1,4 @@
-import type { AlertEvent } from "./alerts";
+import { ALERT_CONDITION_LABELS, type AlertEvent } from "./alerts";
 import { GLOBAL_TRACKING_TIMEZONE } from "./trackingTime";
 import {
   formatWeeklyReportRangeLabel,
@@ -93,21 +93,11 @@ export function getAlertEmailSubject(event: AlertEvent) {
     : `Keyword alert: ${event.keyword}`;
 }
 
-function getBatchedAlertEmailSubject(events: AlertEvent[]) {
+export function getAlertBatchEmailSubject(events: AlertEvent[]) {
   if (events.length === 1) {
     return getAlertEmailSubject(events[0]);
   }
-  const competitorCount = events.filter(
-    (event) => event.scope === "competitor_aso",
-  ).length;
-  const keywordCount = events.length - competitorCount;
-  if (competitorCount > 0 && keywordCount > 0) {
-    return `${events.length} ASO alerts triggered`;
-  }
-  if (competitorCount > 0) {
-    return `${events.length} competitor ASO alert${events.length === 1 ? "" : "s"} triggered`;
-  }
-  return `${events.length} keyword alert${events.length === 1 ? "" : "s"} triggered`;
+  return `Rank Analyzer Pro: ${events.length} alerts triggered`;
 }
 
 export function buildAlertEmailHtml(
@@ -191,12 +181,71 @@ function buildBatchedAlertEmailHtml(
 
   return `
     <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
-      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeEmailHtml(getBatchedAlertEmailSubject(events))}</h2>
+      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeEmailHtml(getAlertBatchEmailSubject(events))}</h2>
       <p style="margin: 0 0 18px; color: #334155;">${escapeEmailHtml(
         events.length === 1
           ? "One alert triggered in your workspace."
           : `${events.length} alerts triggered in your workspace.`,
       )}</p>
+      <div style="display: grid; gap: 10px;">${rows}</div>
+      <a href="${escapeEmailHtml(dashboardUrl)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
+        Open Workspace
+      </a>
+      ${preferencesUrl
+        ? `<p style="margin: 18px 0 0; color: #64748b; font-size: 13px;"><a href="${escapeEmailHtml(preferencesUrl)}" style="color: #0f766e; text-decoration: underline;">Manage alert email preferences</a></p>`
+        : ""}
+    </div>
+  `;
+}
+
+export function buildAlertBatchEmailHtml(
+  events: AlertEvent[],
+  dashboardUrl: string,
+  preferencesUrl?: string,
+) {
+  const rows = events
+    .slice()
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() -
+        new Date(left.createdAt).getTime(),
+    )
+    .map((event) => {
+      const scopeLabel =
+        event.scope === "competitor_aso" ? "Competitor ASO" : "Keyword";
+      const heading =
+        event.scope === "competitor_aso"
+          ? event.changedAppTitle || event.keyword
+          : event.keyword;
+      const changedFields =
+        Array.isArray(event.changedFields) && event.changedFields.length
+          ? event.changedFields
+              .map((field) => formatAlertChangedFieldLabel(field))
+              .join(", ")
+          : null;
+      return `
+        <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #ffffff;">
+          <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline;">
+            <strong style="color: #0f172a;">${escapeEmailHtml(heading)}</strong>
+            <span style="color: #64748b; font-size: 12px;">${escapeEmailHtml(formatEmailTimestamp(event.createdAt))}</span>
+          </div>
+          <div style="margin-top: 6px; color: #334155; font-size: 13px; line-height: 1.55;">
+            <div><strong>Scope:</strong> ${escapeEmailHtml(scopeLabel)}</div>
+            <div><strong>Alert type:</strong> ${escapeEmailHtml(ALERT_CONDITION_LABELS[event.eventType])}</div>
+            <div><strong>Store:</strong> ${escapeEmailHtml(event.store === "ios" ? "iOS" : "Android")}</div>
+            <div><strong>Country:</strong> ${escapeEmailHtml(event.country.toUpperCase())}</div>
+            <div style="margin-top: 4px;">${escapeEmailHtml(event.message)}</div>
+            ${changedFields ? `<div style="margin-top: 4px;"><strong>Changed fields:</strong> ${escapeEmailHtml(changedFields)}</div>` : ""}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
+      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeEmailHtml(getAlertBatchEmailSubject(events))}</h2>
+      <p style="margin: 0 0 18px; color: #334155;">${escapeEmailHtml(`${events.length} alerts triggered`)}</p>
       <div style="display: grid; gap: 10px;">${rows}</div>
       <a href="${escapeEmailHtml(dashboardUrl)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
         Open Workspace
@@ -222,6 +271,18 @@ async function updateAlertEmailStatus(
   }
 }
 
+export async function updateAlertEmailStatuses(
+  userDocRef: DocumentReference<DocumentData>,
+  events: AlertEvent[],
+  patchFactory: (event: AlertEvent) => DocumentData,
+) {
+  await Promise.all(
+    events.map((event) =>
+      updateAlertEmailStatus(userDocRef, event, patchFactory(event)),
+    ),
+  );
+}
+
 export async function sendAlertEmailEvents(
   userDocRef: DocumentReference<DocumentData>,
   events: AlertEvent[],
@@ -244,48 +305,36 @@ export async function sendAlertEmailEvents(
   const attemptedAt = new Date().toISOString();
 
   if (!input.resend) {
-    await Promise.all(
-      events.map((event) =>
-        updateAlertEmailStatus(userDocRef, event, {
+    await updateAlertEmailStatuses(userDocRef, events, () => ({
           emailDeliveryStatus: "failed",
           emailDeliveryAttemptedAt: attemptedAt,
           emailDeliveryFailedAt: attemptedAt,
           emailDeliveryLastError: "resend-not-configured",
-        }),
-      ),
-    );
+        }));
     console.info(`${logPrefix} Skipping alert email because Resend is not configured.`);
     return;
   }
 
   const sender = input.fromEmail.trim();
   if (!sender) {
-    await Promise.all(
-      events.map((event) =>
-        updateAlertEmailStatus(userDocRef, event, {
+    await updateAlertEmailStatuses(userDocRef, events, () => ({
           emailDeliveryStatus: "failed",
           emailDeliveryAttemptedAt: attemptedAt,
           emailDeliveryFailedAt: attemptedAt,
           emailDeliveryLastError: "sender-not-configured",
-        }),
-      ),
-    );
+        }));
     console.info(`${logPrefix} Skipping alert email because sender email is not configured.`);
     return;
   }
 
   const recipient = await input.resolveRecipient(userDocRef);
   if (!recipient) {
-    await Promise.all(
-      events.map((event) =>
-        updateAlertEmailStatus(userDocRef, event, {
+    await updateAlertEmailStatuses(userDocRef, events, () => ({
           emailDeliveryStatus: "failed",
           emailDeliveryAttemptedAt: attemptedAt,
           emailDeliveryFailedAt: attemptedAt,
           emailDeliveryLastError: "no-account-email",
-        }),
-      ),
-    );
+        }));
     console.info(`${logPrefix} Skipping alert email for user ${userDocRef.id} because no account email is available.`);
     return;
   }
@@ -295,7 +344,7 @@ export async function sendAlertEmailEvents(
     const result = await input.resend!.emails.send({
       from: `Rank Analyzer Pro <${sender}>`,
       to: recipient,
-      subject: getBatchedAlertEmailSubject(events),
+      subject: getAlertBatchEmailSubject(events),
       html:
         events.length === 1
           ? buildAlertEmailHtml(
@@ -303,7 +352,7 @@ export async function sendAlertEmailEvents(
               input.dashboardUrl,
               input.preferencesUrl,
             )
-          : buildBatchedAlertEmailHtml(
+          : buildAlertBatchEmailHtml(
               events,
               input.dashboardUrl,
               input.preferencesUrl,
@@ -311,9 +360,7 @@ export async function sendAlertEmailEvents(
     });
     if (result.error) {
       const failedAt = new Date().toISOString();
-      await Promise.all(
-        events.map((event) =>
-          updateAlertEmailStatus(userDocRef, event, {
+      await updateAlertEmailStatuses(userDocRef, events, () => ({
             emailDeliveryStatus: "failed",
             emailDeliveryRecipient: recipient,
             emailDeliveryAttemptedAt: eventAttemptedAt,
@@ -322,9 +369,7 @@ export async function sendAlertEmailEvents(
               typeof result.error.message === "string" && result.error.message
                 ? result.error.message
                 : "provider-error",
-          }),
-        ),
-      );
+          }));
       console.warn(`${logPrefix} Failed to deliver alert email batch for user ${userDocRef.id}`, result.error);
       return;
     }
@@ -332,33 +377,25 @@ export async function sendAlertEmailEvents(
       console.warn(`${logPrefix} Alert email batch for user ${userDocRef.id} returned no message id.`);
     }
     const deliveredAt = new Date().toISOString();
-    await Promise.all(
-      events.map((event) =>
-        updateAlertEmailStatus(userDocRef, event, {
+    await updateAlertEmailStatuses(userDocRef, events, () => ({
           emailDeliveryStatus: "delivered",
           emailDeliveryRecipient: recipient,
           emailDeliveryAttemptedAt: eventAttemptedAt,
           emailDeliveryDeliveredAt: deliveredAt,
           emailDeliveryFailedAt: FieldValue.delete(),
           emailDeliveryLastError: FieldValue.delete(),
-        }),
-      ),
-    );
+        }));
   } catch (error) {
     const message =
       error instanceof Error && error.message ? error.message : String(error);
     const failedAt = new Date().toISOString();
-    await Promise.all(
-      events.map((event) =>
-        updateAlertEmailStatus(userDocRef, event, {
+    await updateAlertEmailStatuses(userDocRef, events, () => ({
           emailDeliveryStatus: "failed",
           emailDeliveryRecipient: recipient,
           emailDeliveryAttemptedAt: eventAttemptedAt,
           emailDeliveryFailedAt: failedAt,
           emailDeliveryLastError: message,
-        }),
-      ),
-    );
+        }));
     console.warn(`${logPrefix} Failed to deliver alert email batch for user ${userDocRef.id}`, error);
   }
 }

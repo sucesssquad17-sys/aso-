@@ -14,6 +14,7 @@
     "backfill:tracking-schedules": "tsx scripts/backfill-enable-tracking-schedules.ts",
     "preview": "vite preview",
     "clean": "node -e \"require('fs').rmSync('dist', { recursive: true, force: true })\"",
+    "test:backend-email": "node --import tsx --test tests/backend-email.test.ts",
     "test:tracking-schedule": "node --import tsx --test tests/tracking-schedule.test.ts",
     "lint": "tsc --noEmit",
     "lint:strict": "tsc -p tsconfig.strict.json --noEmit",

@@ -127,10 +127,10 @@ test('frontend tracking schedule helpers also normalize to enabled', () => {
   assert.equal(normalized.lastRunKey, '2026-06-21T09:00');
 });
 
-test('frontend weekly report settings default to enabled sunday with caller timezone', () => {
+test('frontend weekly report settings default to disabled sunday with caller timezone', () => {
   const normalized = normalizeWeeklyReportSettingsState(undefined, 'America/New_York');
 
-  assert.equal(normalized.enabled, true);
+  assert.equal(normalized.enabled, false);
   assert.equal(normalized.weekday, 'sun');
   assert.equal(normalized.timezone, 'America/New_York');
   assert.equal(normalized.lastSentWeekKey, undefined);
