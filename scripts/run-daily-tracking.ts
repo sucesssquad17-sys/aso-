@@ -1607,6 +1607,7 @@ async function evaluateAndDispatchAlertRules(
 
     for (const country of rule.countries) {
       const trackedKey = getComparableTrackedKey({
+        groupId: rule.groupId,
         appId: rule.appId,
         keyword: rule.keyword,
         store: rule.store,
