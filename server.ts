@@ -5262,7 +5262,9 @@ function parsePlayStoreAppDetails(html: string, appId: string) {
   const titleMatch = html.match(/<span class="AfwdI" itemprop="name">([^<]+)<\/span>/i) || html.match(/<meta property="og:title" content="([^"]+?) - Apps on Google Play"/i);
   const developerMatch = html.match(/<a href="\/store\/apps\/dev\?id=[^"]+">\s*<span>([^<]+)<\/span><\/a>/i);
   const scoreMatch = html.match(/aria-label="Rated ([\d.]+) stars out of five stars"/i);
-  const descriptionMatch = html.match(/<meta name="description" property="og:description" content="([^"]*)"/i);
+  const descriptionMatch =
+    html.match(/<meta[^>]+name="description"[^>]+content="([^"]*)"/i)
+    || html.match(/<meta[^>]+property="og:description"[^>]+content="([^"]*)"/i);
   const imageMatch = html.match(/<meta property="og:image" content="([^"]+)"/i);
   const installsMatch = html.match(/"(\d[\d,+]*)",null,""/i);
   const genreMatch = html.match(/\],"([^"]+)",null,null,\[null,\[\[0,"USD"/i);
