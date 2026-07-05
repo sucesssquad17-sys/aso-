@@ -30,6 +30,7 @@ import {
   getTrackedAppUsageCountForOverview,
   getTrackedViewAppCountForOverview,
   isTrackedKeywordKeyWithinActiveLimit,
+  syncOwnTrackedAppsWithTrackedKeywords,
 } from '../src/features/app/AuthenticatedWorkspace';
 import {
   countPlanUsage,
@@ -804,6 +805,76 @@ test('tracked workspace app count follows visible app cards instead of global tr
 
   assert.equal(visibleAppCount, 1);
   assert.equal(visibleExpandedAppCount, 2);
+});
+
+test('syncOwnTrackedAppsWithTrackedKeywords drops discovery-only tracked app rows', () => {
+  const nextTrackedApps = syncOwnTrackedAppsWithTrackedKeywords(
+    [
+      {
+        appKey: 'android:app.vercel.rizzmaster',
+        appId: 'app.vercel.rizzmaster',
+        store: 'android',
+        title: 'Rizz Master',
+        developer: '',
+        icon: '',
+        kind: 'own',
+        source: 'manual',
+        countries: ['us'],
+        createdAt: '2026-07-05T00:00:00.000Z',
+        updatedAt: '2026-07-05T00:00:00.000Z',
+      },
+      {
+        appKey: 'android:com.character.ai',
+        appId: 'com.character.ai',
+        store: 'android',
+        title: 'Character AI',
+        developer: '',
+        icon: '',
+        kind: 'own',
+        source: 'discovery',
+        countries: ['us'],
+        createdAt: '2026-07-05T00:00:00.000Z',
+        updatedAt: '2026-07-05T00:00:00.000Z',
+      },
+    ],
+    [
+      {
+        groupId: 'track-rizz-master',
+        appId: 'app.vercel.rizzmaster',
+        appTitle: 'Rizz Master',
+        keyword: 'rizz master',
+        store: 'android',
+        country: 'us',
+        lastRank: 12,
+        lastChecked: '2026-07-05T00:00:00.000Z',
+      },
+      {
+        groupId: 'track-rizz-master',
+        appId: 'app.vercel.rizzmaster',
+        appTitle: 'Rizz Master',
+        keyword: 'rizz wingman',
+        store: 'android',
+        country: 'ca',
+        lastRank: 9,
+        lastChecked: '2026-07-05T00:00:00.000Z',
+      },
+    ],
+  );
+
+  assert.deepEqual(
+    nextTrackedApps.map((trackedApp) => ({
+      appKey: trackedApp.appKey,
+      source: trackedApp.source,
+      countries: trackedApp.countries,
+    })),
+    [
+      {
+        appKey: 'android:app.vercel.rizzmaster',
+        source: 'manual',
+        countries: ['ca', 'us'],
+      },
+    ],
+  );
 });
 
 test('discovery sanitizer allows broader exploratory terms while rejecting obvious junk', () => {

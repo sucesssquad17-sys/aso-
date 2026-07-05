@@ -497,7 +497,7 @@ export function isTrackedKeywordKeyWithinActiveLimit(
   return activity.activeKeys.has(trackedKeywordKey);
 }
 
-function syncOwnTrackedAppsWithTrackedKeywords(
+export function syncOwnTrackedAppsWithTrackedKeywords(
   trackedApps: TrackedAppRecord[],
   trackedKeywords: TrackedKeyword[],
 ) {
@@ -6059,7 +6059,8 @@ function AuthenticatedApp({
         currentStore,
       );
       const existingTrackedApp = trackedAppsByKey.get(appKey);
-      if (existingTrackedApp || options?.kind) {
+      const shouldUpdateTrackedApp = Boolean(existingTrackedApp || options?.kind);
+      if (shouldUpdateTrackedApp) {
         upsertTrackedApp(
           app,
           currentStore,
@@ -6067,9 +6068,6 @@ function AuthenticatedApp({
           options?.source || existingTrackedApp?.source || "discovery",
           [currentCountry],
         );
-      }
-      if (!existingTrackedApp && !options?.kind) {
-        return;
       }
 
       const snapshot = createAppAnalysisSnapshot(
@@ -6085,6 +6083,9 @@ function AuthenticatedApp({
             .concat(snapshot),
         ),
       );
+      if (!shouldUpdateTrackedApp) {
+        return;
+      }
       setTrackedApps((prev) =>
         normalizeTrackedApps(
           prev.map((trackedApp) =>
@@ -7136,13 +7137,7 @@ function AuthenticatedApp({
       if (!payload) return;
       setAutoRankings(payload.rankings);
       setKeywordSuggestions(payload.suggestions);
-      updateTrackedAppAnalysisSnapshot(
-        app,
-        currentStore,
-        currentCountry,
-        payload,
-        { kind: "own", source: "discovery" },
-      );
+      updateTrackedAppAnalysisSnapshot(app, currentStore, currentCountry, payload);
       if (options?.force) {
         const summary =
           `${activeMode === "deep" ? "Deep" : "Fast"} discovery found ${payload.rankings.length} ranking keyword${payload.rankings.length === 1 ? "" : "s"}` +
