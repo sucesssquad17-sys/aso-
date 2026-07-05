@@ -9359,16 +9359,34 @@ async function startServer() {
       const userSnapshot = await userDocRef.get();
       const userData = userSnapshot.data() as UserTrackingDocument | undefined;
       const state = normalizeUserTrackingDocument(userData);
-      const trackedKeywordKey = getTrackedKeywordKey({
-        groupId,
+      const requestedTrackedKeywordIdentityKey = getTrackedKeywordIdentityKey({
         appId,
         keyword,
         store,
         country,
       });
-      const existingTrackedKeyword = state.trackedKeywords.find(
-        (entry) => getTrackedKeywordKey(entry) === trackedKeywordKey,
-      );
+      const existingTrackedKeyword =
+        state.trackedKeywords.find(
+          (entry) =>
+            getTrackedKeywordIdentityKey(entry) === requestedTrackedKeywordIdentityKey,
+        ) ||
+        state.trackedKeywords.find((entry) =>
+          getTrackedKeywordKey(entry) ===
+            getTrackedKeywordKey({
+              groupId,
+              appId,
+              keyword,
+              store,
+              country,
+            }),
+        );
+      const trackedKeywordKey = getTrackedKeywordKey({
+        groupId: existingTrackedKeyword?.groupId || groupId,
+        appId,
+        keyword,
+        store,
+        country,
+      });
       const refreshTrackedKeywordRecordInput =
         existingTrackedKeyword ||
         ({

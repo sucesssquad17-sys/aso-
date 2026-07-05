@@ -100,6 +100,19 @@ test('shared schedule normalization defaults missing enabled to true', () => {
   assert.equal(normalized.timezone, 'Asia/Kolkata');
 });
 
+test('shared schedule normalization rejects invalid timezone values', () => {
+  const normalized = normalizeTrackingSchedule(
+    {
+      enabled: true,
+      time: '09:00',
+      timezone: 'Mars/Olympus',
+    },
+    fallback,
+  );
+
+  assert.equal(normalized.timezone, 'Asia/Kolkata');
+});
+
 test('global watchdog window stays closed at midnight and opens at the due time', () => {
   const midnightIst = new Date('2026-06-22T18:30:00.000Z');
 
@@ -159,6 +172,19 @@ test('frontend weekly report settings default to disabled sunday with caller tim
   assert.equal(normalized.weekday, 'sun');
   assert.equal(normalized.timezone, 'America/New_York');
   assert.equal(normalized.lastSentWeekKey, undefined);
+});
+
+test('frontend weekly report settings reject invalid timezone values', () => {
+  const normalized = normalizeWeeklyReportSettingsState(
+    {
+      enabled: true,
+      weekday: 'mon',
+      timezone: 'Mars/Olympus',
+    },
+    'America/New_York',
+  );
+
+  assert.equal(normalized.timezone, 'America/New_York');
 });
 
 test('weekly report delivery eligibility matches local weekday and suppresses same-week duplicates', () => {
@@ -745,7 +771,7 @@ test('plan usage and tracked app overview count own apps separately from keyword
     competitorTrackedKeywords: [],
   });
 
-  assert.equal(staleUsage.trackedApps, 1);
+  assert.equal(staleUsage.trackedApps, 3);
 
   const overviewCount = getTrackedAppUsageCountForOverview([
     {

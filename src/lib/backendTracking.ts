@@ -10,6 +10,7 @@ import {
   DEFAULT_GLOBAL_TRACKING_TIME,
   GLOBAL_TRACKING_UTC_OFFSET_MINUTES,
   GLOBAL_TRACKING_TIMEZONE,
+  normalizeValidTimeZone,
 } from './trackingTime';
 
 export type StoreType = 'android' | 'ios';
@@ -184,10 +185,7 @@ export function normalizeTrackingSchedule(
       typeof input?.time === 'string' && /^\d{2}:\d{2}$/.test(input.time.trim())
         ? input.time.trim()
         : fallback.time,
-    timezone:
-      typeof input?.timezone === 'string' && input.timezone.trim()
-        ? input.timezone.trim()
-        : fallback.timezone,
+    timezone: normalizeValidTimeZone(input?.timezone, fallback.timezone),
     lastRunAt: typeof input?.lastRunAt === 'string' ? input.lastRunAt : undefined,
     lastRunKey: typeof input?.lastRunKey === 'string' ? input.lastRunKey : undefined,
   };

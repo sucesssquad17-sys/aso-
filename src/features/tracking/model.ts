@@ -10,6 +10,7 @@ import {
   DEFAULT_GLOBAL_TRACKING_TIME,
   GLOBAL_TRACKING_TIMEZONE,
   TRACKING_CHART_TIMEZONE,
+  normalizeValidTimeZone,
 } from "../../lib/trackingTime";
 import {
   getDefaultWeeklyReportSettings,
@@ -2238,10 +2239,7 @@ export function normalizeTrackingScheduleState(
       /^\d{2}:\d{2}$/.test(schedule.time.trim())
         ? schedule.time.trim()
         : defaults.time,
-    timezone:
-      typeof schedule?.timezone === "string" && schedule.timezone.trim()
-        ? schedule.timezone.trim()
-        : defaults.timezone,
+    timezone: normalizeValidTimeZone(schedule?.timezone, defaults.timezone),
     lastRunAt: schedule?.lastRunAt,
     lastRunKey: schedule?.lastRunKey,
   };

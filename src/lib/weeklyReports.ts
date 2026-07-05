@@ -1,3 +1,5 @@
+import { normalizeValidTimeZone } from "./trackingTime";
+
 export const WEEKLY_REPORT_WEEKDAYS = [
   "sun",
   "mon",
@@ -51,10 +53,7 @@ export function getDefaultWeeklyReportSettings(
   return {
     enabled: false,
     weekday: DEFAULT_WEEKLY_REPORT_WEEKDAY,
-    timezone:
-      typeof fallbackTimezone === "string" && fallbackTimezone.trim()
-        ? fallbackTimezone.trim()
-        : "UTC",
+    timezone: normalizeValidTimeZone(fallbackTimezone, "UTC"),
   };
 }
 
@@ -66,10 +65,7 @@ export function normalizeWeeklyReportSettings(
   return {
     enabled: typeof input?.enabled === "boolean" ? input.enabled : false,
     weekday: normalizeWeeklyReportWeekday(input?.weekday),
-    timezone:
-      typeof input?.timezone === "string" && input.timezone.trim()
-        ? input.timezone.trim()
-        : defaults.timezone,
+    timezone: normalizeValidTimeZone(input?.timezone, defaults.timezone),
     lastSentWeekKey:
       typeof input?.lastSentWeekKey === "string" && input.lastSentWeekKey.trim()
         ? input.lastSentWeekKey.trim()

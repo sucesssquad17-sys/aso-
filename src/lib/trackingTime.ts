@@ -3,6 +3,33 @@ export const DEFAULT_GLOBAL_TRACKING_TIME = "09:00";
 export const TRACKING_CHART_TIMEZONE = GLOBAL_TRACKING_TIMEZONE;
 export const GLOBAL_TRACKING_UTC_OFFSET_MINUTES = 330;
 
+export function isValidTimeZone(timeZone: string) {
+  if (!timeZone.trim()) {
+    return false;
+  }
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function normalizeValidTimeZone(
+  timeZone: string | null | undefined,
+  fallbackTimeZone = "UTC",
+) {
+  if (typeof timeZone === "string") {
+    const trimmed = timeZone.trim();
+    if (trimmed && isValidTimeZone(trimmed)) {
+      return trimmed;
+    }
+  }
+
+  return isValidTimeZone(fallbackTimeZone) ? fallbackTimeZone : "UTC";
+}
+
 function getZonedDateParts(date: Date, timeZone: string) {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone,

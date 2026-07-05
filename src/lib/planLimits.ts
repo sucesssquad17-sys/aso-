@@ -165,17 +165,15 @@ export function getTrackedAppIdentityKeysForPlanUsage(
     trackedKeywords: Array<Pick<TrackedKeywordLike, "appId" | "store">>;
   },
 ) {
-  const keywordBackedKeys = getTrackedAppIdentityKeysFromTrackedKeywords(
-    state.trackedKeywords,
-  );
-  if (keywordBackedKeys.size > 0) {
-    return keywordBackedKeys;
-  }
-
   return new Set(
     state.trackedApps
       .filter((trackedApp) => trackedApp.kind !== "competitor")
-      .map((trackedApp) => getTrackedAppIdentityKey(trackedApp)),
+      .map((trackedApp) => getTrackedAppIdentityKey(trackedApp))
+      .concat(
+        Array.from(
+          getTrackedAppIdentityKeysFromTrackedKeywords(state.trackedKeywords),
+        ),
+      ),
   );
 }
 
