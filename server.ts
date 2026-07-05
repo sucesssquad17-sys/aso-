@@ -7485,7 +7485,13 @@ const groqClient = process.env.GROQ_API_KEY
       baseURL: 'https://api.groq.com/openai/v1',
     })
   : null;
-const DISCOVERY_PRIMARY_MODEL = process.env.DISCOVERY_PRIMARY_MODEL || 'openai/gpt-oss-20b';
+const DISCOVERY_PRIMARY_MODEL_FAST =
+  process.env.DISCOVERY_PRIMARY_MODEL_FAST ||
+  process.env.DISCOVERY_PRIMARY_MODEL ||
+  'openai/gpt-oss-20b';
+const DISCOVERY_PRIMARY_MODEL_DEEP =
+  process.env.DISCOVERY_PRIMARY_MODEL_DEEP ||
+  'openai/gpt-oss-20b';
 const DISCOVERY_FALLBACK_MODEL = process.env.DISCOVERY_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
 const DISCOVERY_REFINEMENT_RETRY_DELAYS_MS = [600, 1500] as const;
 const DISCOVERY_REFINEMENT_LIMITS = {
@@ -7692,16 +7698,23 @@ function sanitizeRefinedKeywords(
   ).slice(0, DISCOVERY_REFINEMENT_LIMITS[mode].outputKeywordLimit);
 }
 
+function getDiscoveryPrimaryModel(mode: DiscoveryMode) {
+  return mode === 'deep'
+    ? DISCOVERY_PRIMARY_MODEL_DEEP
+    : DISCOVERY_PRIMARY_MODEL_FAST;
+}
+
 async function generateGroqKeywordList(prompt: string, mode: DiscoveryMode) {
   if (!groqClient) {
     return null;
   }
 
   let lastError: unknown = null;
+  const model = getDiscoveryPrimaryModel(mode);
   for (let attempt = 0; attempt <= DISCOVERY_REFINEMENT_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
       const response = await groqClient.chat.completions.create({
-        model: DISCOVERY_PRIMARY_MODEL,
+        model,
         messages: [
           {
             role: 'system',
@@ -7786,7 +7799,7 @@ async function runDiscoveryProviderAttempt(input: {
         result: {
           keywords,
           provider: 'groq',
-          model: DISCOVERY_PRIMARY_MODEL,
+          model: getDiscoveryPrimaryModel(input.mode),
         },
         failureReason: null,
       };
