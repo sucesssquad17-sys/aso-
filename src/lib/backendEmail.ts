@@ -263,10 +263,15 @@ async function updateAlertEmailStatus(
   patch: DocumentData,
 ) {
   try {
-    await userDocRef.collection("alert_events").doc(event.id).set(patch, {
-      merge: true,
-    });
+    await userDocRef.collection("alert_events").doc(event.id).update(patch);
   } catch (error) {
+    const code =
+      typeof error === "object" && error && "code" in error
+        ? (error as { code?: unknown }).code
+        : undefined;
+    if (code === 5 || code === "not-found") {
+      return;
+    }
     console.warn(`[email] Failed to persist delivery status for alert ${event.id}`, error);
   }
 }

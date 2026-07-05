@@ -4281,13 +4281,23 @@ async function maybeSendWeeklyReportEmail(
     status: 'delivered' | 'failed',
     error?: string,
     sentAt?: string,
-  ): WeeklyReportSettings => ({
-    ...settings,
-    ...(sentAt ? { lastSentWeekKey: eligibility.deliveryKey, lastSentAt: sentAt } : {}),
-    lastAttemptedAt: sentAt || attemptedAt,
-    lastDeliveryStatus: status,
-    ...(error ? { lastDeliveryError: error } : { lastDeliveryError: undefined }),
-  });
+  ): WeeklyReportSettings => {
+    const update: WeeklyReportSettings = {
+      ...settings,
+      lastAttemptedAt: sentAt || attemptedAt,
+      lastDeliveryStatus: status,
+    };
+    if (sentAt) {
+      update.lastSentWeekKey = eligibility.deliveryKey;
+      update.lastSentAt = sentAt;
+    }
+    if (error) {
+      update.lastDeliveryError = error;
+    } else {
+      delete update.lastDeliveryError;
+    }
+    return update;
+  };
   if (!resend) {
     console.info('[email] Skipping weekly report email because Resend is not configured.');
     return buildDeliveryUpdate('failed', 'resend-not-configured');

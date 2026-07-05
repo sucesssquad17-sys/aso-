@@ -32,11 +32,10 @@ function createAlertEvent(
 }
 
 function createMockUserDocRef() {
-  const setCalls: Array<{
+  const updateCalls: Array<{
     collectionName: string;
     docId: string;
     patch: Record<string, unknown>;
-    options: Record<string, unknown>;
   }> = [];
 
   return {
@@ -46,15 +45,15 @@ function createMockUserDocRef() {
         return {
           doc(docId: string) {
             return {
-              async set(patch: Record<string, unknown>, options: Record<string, unknown>) {
-                setCalls.push({ collectionName, docId, patch, options });
+              async update(patch: Record<string, unknown>) {
+                updateCalls.push({ collectionName, docId, patch });
               },
             };
           },
         };
       },
     },
-    setCalls,
+    updateCalls,
   };
 }
 
@@ -74,7 +73,7 @@ test("batch subject keeps single-event style and uses combined multi-event subje
 });
 
 test("three alert events call resend once and mark all delivered", async () => {
-  const { ref, setCalls } = createMockUserDocRef();
+  const { ref, updateCalls } = createMockUserDocRef();
   const sendCalls: Array<Record<string, unknown>> = [];
   const events = [
     createAlertEvent({ id: "evt-1", keyword: "hinge dating" }),
@@ -118,10 +117,9 @@ test("three alert events call resend once and mark all delivered", async () => {
   assert.match(String(sendCalls[0].html), /Alert type:/);
   assert.match(String(sendCalls[0].html), /Changed fields:/);
   assert.doesNotMatch(String(sendCalls[0].html), /Â·/);
-  assert.equal(setCalls.length, 3);
-  for (const call of setCalls) {
+  assert.equal(updateCalls.length, 3);
+  for (const call of updateCalls) {
     assert.equal(call.collectionName, "alert_events");
-    assert.equal(call.options.merge, true);
     assert.equal(call.patch.emailDeliveryStatus, "delivered");
     assert.equal(call.patch.emailDeliveryRecipient, "user@example.com");
     assert.ok(call.patch.emailDeliveryAttemptedAt);
@@ -132,7 +130,7 @@ test("three alert events call resend once and mark all delivered", async () => {
 });
 
 test("all alert events are marked failed when resend returns an error", async () => {
-  const { ref, setCalls } = createMockUserDocRef();
+  const { ref, updateCalls } = createMockUserDocRef();
   const events = [
     createAlertEvent({ id: "evt-1" }),
     createAlertEvent({ id: "evt-2" }),
@@ -153,8 +151,8 @@ test("all alert events are marked failed when resend returns an error", async ()
     resolveRecipient: async () => "user@example.com",
   });
 
-  assert.equal(setCalls.length, 3);
-  for (const call of setCalls) {
+  assert.equal(updateCalls.length, 3);
+  for (const call of updateCalls) {
     assert.equal(call.patch.emailDeliveryStatus, "failed");
     assert.equal(call.patch.emailDeliveryRecipient, "user@example.com");
     assert.equal(call.patch.emailDeliveryLastError, "provider-error");
@@ -164,7 +162,7 @@ test("all alert events are marked failed when resend returns an error", async ()
 });
 
 test("single-event behavior still uses the current subject style", async () => {
-  const { ref, setCalls } = createMockUserDocRef();
+  const { ref, updateCalls } = createMockUserDocRef();
   const sendCalls: Array<Record<string, unknown>> = [];
   const event = createAlertEvent({
     id: "evt-1",
@@ -189,8 +187,8 @@ test("single-event behavior still uses the current subject style", async () => {
   assert.equal(sendCalls.length, 1);
   assert.equal(sendCalls[0].subject, "Keyword alert: instagram");
   assert.match(String(sendCalls[0].html), /Instagram entered top 10\./);
-  assert.equal(setCalls.length, 1);
-  assert.equal(setCalls[0].patch.emailDeliveryStatus, "delivered");
+  assert.equal(updateCalls.length, 1);
+  assert.equal(updateCalls[0].patch.emailDeliveryStatus, "delivered");
 });
 
 test("sender email is trimmed before sending", async () => {
