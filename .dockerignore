@@ -20,9 +20,14 @@ prod-check.log
 firebase-debug.log
 
 # Environment files (secrets must be injected via Cloud Run env vars or Secret Manager)
-.env
-.env.local
-.env.*.local
+.env*
+!.env.example
+env.json
+job_env.json
+service-account*.json
+firebase-applet-config.json
+*.pem
+*.key
 
 # Scripts for theme dev only
 theme-script*.cjs

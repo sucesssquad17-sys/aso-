@@ -2232,7 +2232,7 @@ export function normalizeTrackingScheduleState(
 ): TrackingSchedule {
   const defaults = getDefaultTrackingSchedule();
   return {
-    enabled: true,
+    enabled: schedule?.enabled !== false,
     time:
       typeof schedule?.time === "string" &&
       /^\d{2}:\d{2}$/.test(schedule.time.trim())

@@ -18,7 +18,6 @@ RUN npx esbuild scripts/run-daily-tracking.ts \
       --platform=node \
       --format=cjs \
       --packages=external \
-      --sourcemap \
       --outfile=dist/tracking-job.cjs
 
 # ────────────────────────────────────────────────
@@ -34,7 +33,6 @@ RUN npm ci --omit=dev --ignore-scripts
 
 # Copy compiled job
 COPY --from=builder /app/dist/tracking-job.cjs ./dist/tracking-job.cjs
-COPY --from=builder /app/dist/tracking-job.cjs.map ./dist/tracking-job.cjs.map
 
 ENV NODE_ENV=production
 

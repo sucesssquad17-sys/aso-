@@ -43,7 +43,10 @@ async function main() {
   for (const userDoc of snapshot.docs) {
     scanned += 1;
     const current = userDoc.data()?.trackingSchedule as Partial<TrackingSchedule> | undefined;
-    const next = normalizeTrackingSchedule(current, DEFAULT_TRACKING_SCHEDULE);
+    const next = {
+      ...normalizeTrackingSchedule(current, DEFAULT_TRACKING_SCHEDULE),
+      enabled: true,
+    } satisfies TrackingSchedule;
 
     if (schedulesEqual(current, next)) {
       unchanged += 1;

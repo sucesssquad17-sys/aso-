@@ -71,7 +71,7 @@ const fallback: TrackingSchedule = {
   timezone: 'Asia/Kolkata',
 };
 
-test('shared schedule normalization always enables tracking and preserves timing metadata', () => {
+test('shared schedule normalization preserves explicit disabled state and timing metadata', () => {
   const normalized = normalizeTrackingSchedule(
     {
       enabled: false,
@@ -84,7 +84,7 @@ test('shared schedule normalization always enables tracking and preserves timing
   );
 
   assert.deepEqual(normalized, {
-    enabled: true,
+    enabled: false,
     time: '11:15',
     timezone: 'UTC',
     lastRunAt: '2026-06-21T03:30:00.000Z',
@@ -113,24 +113,28 @@ test('global watchdog window stays closed at midnight and opens at the due time'
 
 test('tracking refresh eligibility requires tracked data and respects lastRunKey unless forced', () => {
   assert.equal(
-    shouldRunTrackingRefresh({ lastRunKey: undefined }, { hasTrackedData: false, runKey: '2026-06-22T09:00' }),
+    shouldRunTrackingRefresh({ enabled: false, lastRunKey: undefined }, { hasTrackedData: true, runKey: '2026-06-22T09:00' }),
     false,
   );
   assert.equal(
-    shouldRunTrackingRefresh({ lastRunKey: '2026-06-22T09:00' }, { hasTrackedData: true, runKey: '2026-06-22T09:00' }),
+    shouldRunTrackingRefresh({ enabled: true, lastRunKey: undefined }, { hasTrackedData: false, runKey: '2026-06-22T09:00' }),
     false,
   );
   assert.equal(
-    shouldRunTrackingRefresh({ lastRunKey: '2026-06-22T09:00' }, { hasTrackedData: true, runKey: '2026-06-22T09:00', force: true }),
+    shouldRunTrackingRefresh({ enabled: true, lastRunKey: '2026-06-22T09:00' }, { hasTrackedData: true, runKey: '2026-06-22T09:00' }),
+    false,
+  );
+  assert.equal(
+    shouldRunTrackingRefresh({ enabled: true, lastRunKey: '2026-06-22T09:00' }, { hasTrackedData: true, runKey: '2026-06-22T09:00', force: true }),
     true,
   );
   assert.equal(
-    shouldRunTrackingRefresh({ lastRunKey: '2026-06-21T09:00' }, { hasTrackedData: true, runKey: '2026-06-22T09:00' }),
+    shouldRunTrackingRefresh({ enabled: true, lastRunKey: '2026-06-21T09:00' }, { hasTrackedData: true, runKey: '2026-06-22T09:00' }),
     true,
   );
 });
 
-test('frontend tracking schedule helpers also normalize to enabled', () => {
+test('frontend tracking schedule helpers preserve explicit disabled state', () => {
   assert.equal(getDefaultTrackingSchedule().enabled, true);
 
   const normalized = normalizeTrackingScheduleState({
@@ -141,7 +145,7 @@ test('frontend tracking schedule helpers also normalize to enabled', () => {
     lastRunKey: '2026-06-21T09:00',
   });
 
-  assert.equal(normalized.enabled, true);
+  assert.equal(normalized.enabled, false);
   assert.equal(normalized.time, '11:15');
   assert.equal(normalized.timezone, 'UTC');
   assert.equal(normalized.lastRunAt, '2026-06-21T03:30:00.000Z');

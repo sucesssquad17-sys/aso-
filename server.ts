@@ -6837,6 +6837,21 @@ async function deleteCollectionDocuments(
   }
 }
 
+async function patchDocumentRefsInBatches(
+  adminDb: Firestore,
+  docRefs: DocumentReference<DocumentData>[],
+  patch: DocumentData,
+  batchSize = 400,
+) {
+  for (let index = 0; index < docRefs.length; index += batchSize) {
+    const batch = adminDb.batch();
+    docRefs.slice(index, index + batchSize).forEach((docRef) => {
+      batch.set(docRef, patch, { merge: true });
+    });
+    await batch.commit();
+  }
+}
+
 function hasRetainedAccountState(data: UserTrackingDocument | undefined) {
   if (!data) {
     return false;
@@ -8336,7 +8351,7 @@ async function discoverRankedKeywords(input: {
 
 async function startServer() {
   const app = express();
-  app.set('trust proxy', true);
+  app.set('trust proxy', 1);
   const PORT = Number(process.env.PORT || 3000);
   const isBundledServer = (process.argv[1] || '').includes(`${path.sep}dist${path.sep}server.cjs`);
   const isDevelopment = process.env.NODE_ENV !== 'production' && !isBundledServer;
@@ -9392,7 +9407,11 @@ async function startServer() {
 
       if (markAll) {
         const snapshot = await userEventsRef.where('readAt', '==', null).get();
-        await Promise.all(snapshot.docs.map((doc) => doc.ref.set({ readAt: nowIso }, { merge: true })));
+        await patchDocumentRefsInBatches(
+          adminDb,
+          snapshot.docs.map((doc) => doc.ref),
+          { readAt: nowIso },
+        );
         res.json({ ok: true, success: true, updated: snapshot.size });
         return;
       }
@@ -9412,8 +9431,10 @@ async function startServer() {
       const eventRefs = eventIds.map((eventId) => userEventsRef.doc(eventId));
       const snapshots = await adminDb.getAll(...eventRefs);
       const existingRefs = snapshots.filter((snapshot) => snapshot.exists).map((snapshot) => snapshot.ref);
-      await Promise.all(
-        existingRefs.map((eventRef) => eventRef.set({ readAt: nowIso }, { merge: true })),
+      await patchDocumentRefsInBatches(
+        adminDb,
+        existingRefs,
+        { readAt: nowIso },
       );
       res.json({
         ok: true,

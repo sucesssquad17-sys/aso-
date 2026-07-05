@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tsx server.ts",
     "start": "node dist/server.cjs",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
-    "build:job": "esbuild scripts/run-daily-tracking.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/tracking-job.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/server.cjs",
+    "build:job": "esbuild scripts/run-daily-tracking.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/tracking-job.cjs",
     "build:all": "npm run build && npm run build:job",
     "metrics:evaluate": "tsx scripts/evaluate-keyword-metrics.ts",
     "tracking:daily": "tsx scripts/run-daily-tracking.ts",

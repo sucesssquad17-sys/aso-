@@ -179,7 +179,7 @@ export function normalizeTrackingSchedule(
   fallback: TrackingSchedule,
 ): TrackingSchedule {
   return {
-    enabled: true,
+    enabled: input?.enabled !== false,
     time:
       typeof input?.time === 'string' && /^\d{2}:\d{2}$/.test(input.time.trim())
         ? input.time.trim()
@@ -194,13 +194,17 @@ export function normalizeTrackingSchedule(
 }
 
 export function shouldRunTrackingRefresh(
-  schedule: Pick<TrackingSchedule, 'lastRunKey'>,
+  schedule: Pick<TrackingSchedule, 'enabled' | 'lastRunKey'>,
   options: {
     hasTrackedData: boolean;
     runKey?: string;
     force?: boolean;
   },
 ) {
+  if (schedule.enabled === false) {
+    return false;
+  }
+
   if (!options.hasTrackedData) {
     return false;
   }

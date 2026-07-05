@@ -41,13 +41,13 @@ assert.deepEqual(
     fallbackSchedule,
   ),
   {
-    enabled: true,
+    enabled: false,
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
     lastRunAt: undefined,
     lastRunKey: undefined,
   },
-  "Invalid schedule timezones or times should fall back to the shared enabled defaults.",
+  "Invalid schedule timezones or times should fall back to shared defaults without forcing tracking back on.",
 );
 
 console.log(

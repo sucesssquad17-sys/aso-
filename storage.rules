@@ -2,14 +2,37 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function hasAllowedUserUploadType() {
+      return request.resource.contentType.matches('image/(png|jpeg|webp|gif)') ||
+        request.resource.contentType.matches('application/pdf') ||
+        request.resource.contentType.matches('application/json') ||
+        request.resource.contentType.matches('text/plain') ||
+        request.resource.contentType.matches('text/csv');
+    }
+
+    function isSafeUserUpload() {
+      return request.resource != null &&
+        request.resource.size <= 10 * 1024 * 1024 &&
+        hasAllowedUserUploadType();
+    }
+
     // By default, deny all access
     match /{allPaths=**} {
       allow read, write: if false;
     }
-    
-    // Example: Allow users to read and write their own files in a "users/{userId}" folder
+
+    // Owner-scoped uploads remain private and must stay within a small safe allowlist.
     match /users/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isSafeUserUpload();
     }
   }
 }

@@ -649,7 +649,7 @@ function normalizeTrackingScheduleState(
 ): TrackingSchedule {
   const defaults = getDefaultTrackingSchedule();
   return {
-    enabled: true,
+    enabled: schedule?.enabled !== false,
     time: schedule?.time || defaults.time,
     timezone: schedule?.timezone || defaults.timezone,
     lastRunAt: schedule?.lastRunAt,
