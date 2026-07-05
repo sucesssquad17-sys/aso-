@@ -166,7 +166,7 @@ const upstreamFailureCache = new NodeCache({ useClones: false });
 const dodoWebhookEventCache = new NodeCache({ stdTTL: 60 * 60 * 24, useClones: false });
 const billingPricingCache = new NodeCache({ stdTTL: 15 * 60, useClones: false });
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'updates@rankanalyzerpro.com';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || '';
 const CRON_FAILURE_EMAIL_RECIPIENTS = (process.env.CRON_FAILURE_EMAIL || '')
   .split(',')
   .map((value) => value.trim().toLowerCase())
@@ -178,6 +178,7 @@ const ADMIN_EMAIL_ALLOWLIST = (process.env.ADMIN_EMAIL_ALLOWLIST || '')
 const EMAIL_UNSUBSCRIBE_SECRET = process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim() || '';
 const ANNOUNCEMENT_EMAIL_CAMPAIGNS_COLLECTION = 'admin_email_campaigns';
 const ALERT_EMAIL_APP_URL = getSafeAppUrl(process.env.APP_URL);
+const ANNOUNCEMENT_SEND_STALE_AFTER_MS = 30 * 60 * 1000;
 const PLAY_STORE_FETCH_TIMEOUT_MS = 60000;
 const UPSTREAM_REQUEST_TIMEOUT_MS = 60000;
 const UPSTREAM_FAILURE_CACHE_TTL_SECONDS = 15;
@@ -445,6 +446,8 @@ type UserTrackingDocument = {
   weeklyReportSettings?: WeeklyReportSettings;
   alertRules?: AlertRule[];
   notificationSettings?: NotificationSettings;
+  alertEmailsEnabled?: boolean;
+  alertEmailsUpdatedAt?: string;
   announcementEmailsEnabled?: boolean;
   announcementEmailsUpdatedAt?: string;
   lastAnnouncementEmailSentAt?: string;
@@ -489,6 +492,7 @@ type AnnouncementEmailCampaignDocument = {
   buttonLabel?: string;
   buttonUrl?: string;
   status: AnnouncementCampaignStatus;
+  sendingStartedAt?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -1732,6 +1736,37 @@ function getConfiguredResendSender() {
   return sender && isValidEmailAddress(sender) ? sender : null;
 }
 
+type EmailPreferenceKind = 'announcement' | 'alert' | 'weekly';
+
+function buildEmailPreferenceToken(
+  kind: EmailPreferenceKind,
+  userId: string,
+  email: string,
+) {
+  if (!EMAIL_UNSUBSCRIBE_SECRET) {
+    throw createConfigurationError('EMAIL_UNSUBSCRIBE_SECRET is not configured on the server.');
+  }
+  return crypto
+    .createHmac('sha256', EMAIL_UNSUBSCRIBE_SECRET)
+    .update(`${kind}:${userId}:${email}`)
+    .digest('hex');
+}
+
+function verifyEmailPreferenceToken(
+  kind: EmailPreferenceKind,
+  userId: string,
+  email: string,
+  token: string,
+) {
+  const expectedToken = buildEmailPreferenceToken(kind, userId, email);
+  const providedBuffer = Buffer.from(token, 'hex');
+  const expectedBuffer = Buffer.from(expectedToken, 'hex');
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+}
+
 function assertAdminEmailAccess(email: string | null | undefined) {
   const normalizedEmail = normalizeEmailAddress(email);
   if (!ADMIN_EMAIL_ALLOWLIST.length) {
@@ -1882,7 +1917,11 @@ function createRateLimiter(name: string, limit: number, windowMs: number): expre
     if (current.count >= limit) {
       const retryAfterSeconds = Math.max(1, Math.ceil((current.resetAt - now) / 1000));
       res.setHeader('Retry-After', String(retryAfterSeconds));
-      return next(createRateLimitedError('Rate limit exceeded. Please try again shortly.'));
+      return res.status(429).json({
+        error: 'Rate limit exceeded. Please try again shortly.',
+        code: 'RATE_LIMITED',
+        retryable: true,
+      });
     }
 
     current.count += 1;
@@ -3200,6 +3239,9 @@ function mergeEditableWeeklyReportSettings(
     timezone: normalizedNext.timezone,
     lastSentWeekKey: current.lastSentWeekKey,
     lastSentAt: current.lastSentAt,
+    lastAttemptedAt: current.lastAttemptedAt,
+    lastDeliveryStatus: current.lastDeliveryStatus,
+    lastDeliveryError: current.lastDeliveryError,
   };
 }
 
@@ -3856,11 +3898,13 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           createdAt: diff.detectedAt,
           readAt: null,
         };
-        const created = await persistAlertEvent(userDocRef, event);
-        if (!created) {
-          continue;
+        if (rule.channels.inApp) {
+          const created = await persistAlertEvent(userDocRef, event);
+          if (!created) {
+            continue;
+          }
+          createdEvents.push(event);
         }
-        createdEvents.push(event);
         if (rule.channels.push) {
           browserPushEvents.push(event);
         }
@@ -4054,6 +4098,9 @@ async function resolveAlertEmailRecipient(
     ) {
       return null;
     }
+    if (userData?.alertEmailsEnabled === false) {
+      return null;
+    }
     const billingEmail = normalizeEmailAddress(userData?.billingEmail);
     if (billingEmail && isValidEmailAddress(billingEmail)) {
       return billingEmail;
@@ -4081,12 +4128,19 @@ async function sendEmailAlertEvents(
   userDocRef: DocumentReference<DocumentData>,
   events: AlertEvent[],
 ) {
+  const recipient = await resolveAlertEmailRecipient(userDocRef);
   await sendSharedAlertEmailEvents(userDocRef, events, {
     resend,
     fromEmail: RESEND_FROM_EMAIL,
     dashboardUrl: ALERT_EMAIL_APP_URL,
-    preferencesUrl: ALERT_EMAIL_APP_URL,
-    resolveRecipient: resolveAlertEmailRecipient,
+    preferencesUrl: recipient
+      ? getEmailPreferenceUrl({
+          kind: 'alert',
+          userId: userDocRef.id,
+          email: recipient,
+        })
+      : ALERT_EMAIL_APP_URL,
+    resolveRecipient: async () => recipient,
   });
 }
 
@@ -4222,21 +4276,33 @@ async function maybeSendWeeklyReportEmail(
   if (!eligibility.matchesWeekday || eligibility.alreadySent) {
     return null;
   }
+  const attemptedAt = new Date().toISOString();
+  const buildDeliveryUpdate = (
+    status: 'delivered' | 'failed',
+    error?: string,
+    sentAt?: string,
+  ): WeeklyReportSettings => ({
+    ...settings,
+    ...(sentAt ? { lastSentWeekKey: eligibility.deliveryKey, lastSentAt: sentAt } : {}),
+    lastAttemptedAt: sentAt || attemptedAt,
+    lastDeliveryStatus: status,
+    ...(error ? { lastDeliveryError: error } : { lastDeliveryError: undefined }),
+  });
   if (!resend) {
     console.info('[email] Skipping weekly report email because Resend is not configured.');
-    return null;
+    return buildDeliveryUpdate('failed', 'resend-not-configured');
   }
 
   const sender = getConfiguredResendSender();
   if (!sender) {
     console.info('[email] Skipping weekly report email because sender email is not configured.');
-    return null;
+    return buildDeliveryUpdate('failed', 'sender-not-configured');
   }
 
   const recipient = await resolveAlertEmailRecipient(userDocRef);
   if (!recipient) {
     console.info(`[email] Skipping weekly report email for user ${userDocRef.id} because no account email is available.`);
-    return null;
+    return buildDeliveryUpdate('failed', 'no-account-email');
   }
 
   const hydratedState = await hydrateWeeklyReportStateWithArchive(
@@ -4264,12 +4330,21 @@ async function maybeSendWeeklyReportEmail(
         summary,
         reportUrl,
         weekday: settings.weekday,
-        preferencesUrl: reportUrl,
+        preferencesUrl: getEmailPreferenceUrl({
+          kind: 'weekly',
+          userId: userDocRef.id,
+          email: recipient,
+        }),
       }),
     });
     if (result.error) {
       console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, result.error);
-      return null;
+      return buildDeliveryUpdate(
+        'failed',
+        typeof result.error.message === 'string' && result.error.message.trim()
+          ? result.error.message.trim()
+          : 'provider-error',
+      );
     }
     if (!getResendEmailId(result)) {
       console.warn(`[email] Weekly report email for user ${userDocRef.id} returned no message id.`);
@@ -4277,14 +4352,15 @@ async function maybeSendWeeklyReportEmail(
 
     const sentAt = new Date().toISOString();
     console.info(`[email] Delivered weekly report email to ${recipient}.`);
-    return {
-      ...settings,
-      lastSentWeekKey: eligibility.deliveryKey,
-      lastSentAt: sentAt,
-    } satisfies WeeklyReportSettings;
+    return buildDeliveryUpdate('delivered', undefined, sentAt);
   } catch (error) {
     console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, error);
-    return null;
+    return buildDeliveryUpdate(
+      'failed',
+      error instanceof Error && error.message.trim()
+        ? error.message.trim().slice(0, 500)
+        : 'unknown-delivery-failure',
+    );
   }
 }
 
@@ -4340,45 +4416,6 @@ function getAnnouncementEmailCampaignsCollection(adminDb: Firestore) {
   return adminDb.collection(ANNOUNCEMENT_EMAIL_CAMPAIGNS_COLLECTION);
 }
 
-function buildAnnouncementUnsubscribeToken(userId: string, email: string) {
-  if (!EMAIL_UNSUBSCRIBE_SECRET) {
-    throw createConfigurationError('EMAIL_UNSUBSCRIBE_SECRET is not configured on the server.');
-  }
-  return crypto
-    .createHmac('sha256', EMAIL_UNSUBSCRIBE_SECRET)
-    .update(`${userId}:${email}`)
-    .digest('hex');
-}
-
-function verifyAnnouncementUnsubscribeToken(userId: string, email: string, token: string) {
-  if (!EMAIL_UNSUBSCRIBE_SECRET) {
-    throw createConfigurationError('EMAIL_UNSUBSCRIBE_SECRET is not configured on the server.');
-  }
-  const expectedToken = buildAnnouncementUnsubscribeToken(userId, email);
-  const providedBuffer = Buffer.from(token, 'hex');
-  const expectedBuffer = Buffer.from(expectedToken, 'hex');
-  if (providedBuffer.length !== expectedBuffer.length) {
-    return false;
-  }
-  return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
-}
-
-function getAnnouncementUnsubscribeUrl(input: {
-  campaignId: string;
-  userId: string;
-  email: string;
-}) {
-  const unsubscribeUrl = new URL('/api/email/unsubscribe', ALERT_EMAIL_APP_URL);
-  unsubscribeUrl.searchParams.set('campaignId', input.campaignId);
-  unsubscribeUrl.searchParams.set('uid', input.userId);
-  unsubscribeUrl.searchParams.set('email', input.email);
-  unsubscribeUrl.searchParams.set(
-    'token',
-    buildAnnouncementUnsubscribeToken(input.userId, input.email),
-  );
-  return unsubscribeUrl.toString();
-}
-
 function buildAnnouncementEmailHtml(
   campaign: AnnouncementEmailCampaignDocument,
   unsubscribeUrl: string,
@@ -4399,6 +4436,23 @@ function buildAnnouncementEmailHtml(
       </div>
     </div>
   `;
+}
+
+function getEmailPreferenceUrl(input: {
+  kind: EmailPreferenceKind;
+  userId: string;
+  email: string;
+  campaignId?: string;
+}) {
+  const unsubscribeUrl = new URL('/api/email/unsubscribe', ALERT_EMAIL_APP_URL);
+  unsubscribeUrl.searchParams.set('kind', input.kind);
+  unsubscribeUrl.searchParams.set('uid', input.userId);
+  unsubscribeUrl.searchParams.set('email', input.email);
+  if (input.campaignId) {
+    unsubscribeUrl.searchParams.set('campaignId', input.campaignId);
+  }
+  unsubscribeUrl.searchParams.set('token', buildEmailPreferenceToken(input.kind, input.userId, input.email));
+  return unsubscribeUrl.toString();
 }
 
 async function resolveAnnouncementRecipientEmail(
@@ -4503,7 +4557,16 @@ async function sendAnnouncementCampaign(
     }
     const latestCampaign = snapshot.data() as AnnouncementEmailCampaignDocument;
     if (latestCampaign.status === 'sending') {
-      throw createBadRequestError('Announcement campaign is already sending.');
+      const sendingStartedAtMs =
+        typeof latestCampaign.sendingStartedAt === 'string'
+          ? Date.parse(latestCampaign.sendingStartedAt)
+          : Number.NaN;
+      if (
+        !Number.isFinite(sendingStartedAtMs) ||
+        sendingStartedAtMs > Date.now() - ANNOUNCEMENT_SEND_STALE_AFTER_MS
+      ) {
+        throw createBadRequestError('Announcement campaign is already sending.');
+      }
     }
     if (latestCampaign.status === 'sent') {
       throw createBadRequestError('Announcement campaign has already been sent.');
@@ -4511,6 +4574,7 @@ async function sendAnnouncementCampaign(
 
     transaction.set(campaignDocRef, {
       status: 'sending',
+      sendingStartedAt: sendingAt,
       updatedAt: sendingAt,
       lastError: FieldValue.delete(),
     } satisfies DocumentData, { merge: true });
@@ -4518,73 +4582,88 @@ async function sendAnnouncementCampaign(
     return latestCampaign;
   });
 
-  const recipients = await loadAnnouncementCampaignRecipients(adminDb, claimedCampaign.audience);
-  let deliveredCount = 0;
-  let failedCount = 0;
-  const failureMessages: string[] = [];
+  try {
+    const recipients = await loadAnnouncementCampaignRecipients(adminDb, claimedCampaign.audience);
+    let deliveredCount = 0;
+    let failedCount = 0;
+    const failureMessages: string[] = [];
 
-  await mapWithConcurrency(recipients, 5, async (recipient) => {
-    try {
-      const result = await resend.emails.send({
-        from: `Rank Analyzer Pro <${sender}>`,
-        to: recipient.email,
-        subject: claimedCampaign.subject,
-        html: buildAnnouncementEmailHtml(
-          claimedCampaign,
-          getAnnouncementUnsubscribeUrl({
-            campaignId: claimedCampaign.campaignId,
-            userId: recipient.userDocRef.id,
-            email: recipient.email,
-          }),
-        ),
-      });
-      if (result.error) {
-        throw new Error(result.error.message || 'Resend rejected the message.');
+    await mapWithConcurrency(recipients, 5, async (recipient) => {
+      try {
+        const result = await resend.emails.send({
+          from: `Rank Analyzer Pro <${sender}>`,
+          to: recipient.email,
+          subject: claimedCampaign.subject,
+          html: buildAnnouncementEmailHtml(
+            claimedCampaign,
+            getEmailPreferenceUrl({
+              kind: 'announcement',
+              campaignId: claimedCampaign.campaignId,
+              userId: recipient.userDocRef.id,
+              email: recipient.email,
+            }),
+          ),
+        });
+        if (result.error) {
+          throw new Error(result.error.message || 'Resend rejected the message.');
+        }
+        if (!getResendEmailId(result)) {
+          console.warn(`[email] Announcement email for campaign ${claimedCampaign.campaignId} to ${recipient.email} returned no message id.`);
+        }
+
+        deliveredCount += 1;
+        await recipient.userDocRef.set({
+          lastAnnouncementEmailSentAt: sendingAt,
+          lastAnnouncementEmailCampaignId: claimedCampaign.campaignId,
+          updatedAt: new Date().toISOString(),
+        } satisfies Partial<UserTrackingDocument>, { merge: true });
+      } catch (error) {
+        failedCount += 1;
+        if (failureMessages.length < 10) {
+          failureMessages.push(
+            `${recipient.email}: ${error instanceof Error ? error.message : 'Unknown delivery failure.'}`,
+          );
+        }
       }
-      if (!getResendEmailId(result)) {
-        console.warn(`[email] Announcement email for campaign ${claimedCampaign.campaignId} to ${recipient.email} returned no message id.`);
-      }
+    });
 
-      deliveredCount += 1;
-      await recipient.userDocRef.set({
-        lastAnnouncementEmailSentAt: sendingAt,
-        lastAnnouncementEmailCampaignId: claimedCampaign.campaignId,
-        updatedAt: new Date().toISOString(),
-      } satisfies Partial<UserTrackingDocument>, { merge: true });
-    } catch (error) {
-      failedCount += 1;
-      if (failureMessages.length < 10) {
-        failureMessages.push(
-          `${recipient.email}: ${error instanceof Error ? error.message : 'Unknown delivery failure.'}`,
-        );
-      }
-    }
-  });
+    const completedAt = new Date().toISOString();
+    const nextStatus: AnnouncementCampaignStatus =
+      failedCount > 0 && deliveredCount === 0 ? 'failed' : 'sent';
+    const completionPayload: DocumentData = {
+      status: nextStatus,
+      sentAt: completedAt,
+      sendingStartedAt: FieldValue.delete(),
+      recipientCount: recipients.length,
+      deliveredCount,
+      failedCount,
+      updatedAt: completedAt,
+      ...(failureMessages.length
+        ? { lastError: failureMessages.join(' | ').slice(0, 1800) }
+        : { lastError: FieldValue.delete() }),
+    };
+    await campaignDocRef.set(completionPayload, { merge: true });
 
-  const completedAt = new Date().toISOString();
-  const nextStatus: AnnouncementCampaignStatus =
-    failedCount > 0 && deliveredCount === 0 ? 'failed' : 'sent';
-  const completionPayload: DocumentData = {
-    status: nextStatus,
-    sentAt: completedAt,
-    recipientCount: recipients.length,
-    deliveredCount,
-    failedCount,
-    updatedAt: completedAt,
-    ...(failureMessages.length
-      ? { lastError: failureMessages.join(' | ').slice(0, 1800) }
-      : { lastError: FieldValue.delete() }),
-  };
-  await campaignDocRef.set(completionPayload, { merge: true });
-
-  return {
-    campaignId: claimedCampaign.campaignId,
-    status: nextStatus,
-    recipientCount: recipients.length,
-    deliveredCount,
-    failedCount,
-    sentAt: completedAt,
-  };
+    return {
+      campaignId: claimedCampaign.campaignId,
+      status: nextStatus,
+      recipientCount: recipients.length,
+      deliveredCount,
+      failedCount,
+      sentAt: completedAt,
+    };
+  } catch (error) {
+    const failedAt = new Date().toISOString();
+    await campaignDocRef.set({
+      status: 'failed',
+      sendingStartedAt: FieldValue.delete(),
+      updatedAt: failedAt,
+      lastError: error instanceof Error && error.message.trim()
+        ? error.message.trim().slice(0, 1800)
+        : 'Announcement campaign failed before completion.',
+    } satisfies DocumentData, { merge: true });
+    throw error;
+  }
 }
 
 async function sendCronFailureEmail(input: {
@@ -4725,11 +4804,13 @@ async function evaluateAndDispatchAlertRules(
           createdAt: new Date().toISOString(),
           readAt: null,
         };
-        const created = await persistAlertEvent(userDocRef, event);
-        if (!created) {
-          continue;
+        if (rule.channels.inApp) {
+          const created = await persistAlertEvent(userDocRef, event);
+          if (!created) {
+            continue;
+          }
+          createdEvents.push(event);
         }
-        createdEvents.push(event);
         if (rule.channels.push) {
           browserPushEvents.push(event);
         }
@@ -9166,9 +9247,6 @@ async function startServer() {
       }
 
       const campaign = snapshot.data() as AnnouncementEmailCampaignDocument;
-      if (campaign.status === 'sending') {
-        throw createBadRequestError('Announcement campaign is already sending.');
-      }
       if (campaign.status === 'sent') {
         throw createBadRequestError('Announcement campaign has already been sent.');
       }
@@ -9201,15 +9279,38 @@ async function startServer() {
       const uid = readRequiredString(req.query.uid, 'uid', 200);
       const email = normalizeEmailAddress(readRequiredString(req.query.email, 'email', 320));
       const token = readRequiredString(req.query.token, 'token', 300);
+      const kind: EmailPreferenceKind =
+        req.query.kind === 'alert' || req.query.kind === 'weekly'
+          ? req.query.kind
+          : 'announcement';
       const campaignId = readOptionalString(req.query.campaignId, 'campaignId', 120).trim();
       if (!email || !isValidEmailAddress(email)) {
         throw createBadRequestError('A valid email address is required.');
       }
-      if (!verifyAnnouncementUnsubscribeToken(uid, email, token)) {
+      if (!verifyEmailPreferenceToken(kind, uid, email, token)) {
         throw createForbiddenError('This unsubscribe link is invalid or has expired.');
       }
 
       const updatedAt = new Date().toISOString();
+      if (kind === 'alert') {
+        await adminDb.collection('users').doc(uid).set({
+          alertEmailsEnabled: false,
+          alertEmailsUpdatedAt: updatedAt,
+          updatedAt,
+        } satisfies Partial<UserTrackingDocument>, { merge: true });
+
+        return sendHtml(200, 'Alert emails turned off', 'Alert email delivery has been turned off for this account.');
+      }
+      if (kind === 'weekly') {
+        await adminDb.collection('users').doc(uid).set({
+          'weeklyReportSettings.enabled': false,
+          'weeklyReportSettings.lastAttemptedAt': updatedAt,
+          updatedAt,
+        }, { merge: true });
+
+        return sendHtml(200, 'Weekly emails turned off', 'Weekly report emails have been turned off for this account.');
+      }
+
       await adminDb.collection('users').doc(uid).set({
         announcementEmailsEnabled: false,
         announcementEmailsUpdatedAt: updatedAt,

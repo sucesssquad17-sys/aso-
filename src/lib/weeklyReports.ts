@@ -16,6 +16,9 @@ export type WeeklyReportSettings = {
   timezone: string;
   lastSentWeekKey?: string;
   lastSentAt?: string;
+  lastAttemptedAt?: string;
+  lastDeliveryStatus?: "delivered" | "failed";
+  lastDeliveryError?: string;
 };
 
 export const DEFAULT_WEEKLY_REPORT_WEEKDAY: WeeklyReportWeekday = "sun";
@@ -74,6 +77,20 @@ export function normalizeWeeklyReportSettings(
     lastSentAt:
       typeof input?.lastSentAt === "string" && input.lastSentAt.trim()
         ? input.lastSentAt.trim()
+        : undefined,
+    lastAttemptedAt:
+      typeof input?.lastAttemptedAt === "string" && input.lastAttemptedAt.trim()
+        ? input.lastAttemptedAt.trim()
+        : undefined,
+    lastDeliveryStatus:
+      input?.lastDeliveryStatus === "delivered" ||
+      input?.lastDeliveryStatus === "failed"
+        ? input.lastDeliveryStatus
+        : undefined,
+    lastDeliveryError:
+      typeof input?.lastDeliveryError === "string" &&
+      input.lastDeliveryError.trim()
+        ? input.lastDeliveryError.trim()
         : undefined,
   };
 }

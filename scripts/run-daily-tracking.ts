@@ -251,6 +251,7 @@ type UserTrackingDocument = {
   notificationSettings?: NotificationSettings;
   trackingSchedule?: TrackingSchedule;
   weeklyReportSettings?: WeeklyReportSettings;
+  alertEmailsEnabled?: boolean;
   billingEmail?: string;
   accountStatus?: 'active' | 'deleting' | 'deleted';
   updatedAt?: string;
@@ -278,12 +279,13 @@ const RANKING_FETCH_TIMEOUT_MS = 20000;
 // ─── Email Provider (Resend) ──────────────────────────────────────────────────
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'updates@rankanalyzerpro.com';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL?.trim() || '';
 const CRON_FAILURE_EMAIL_RECIPIENTS = (process.env.CRON_FAILURE_EMAIL || '')
   .split(',')
   .map((value) => value.trim().toLowerCase())
   .filter(Boolean);
 const ALERT_EMAIL_APP_URL = getSafeAppUrl(process.env.APP_URL);
+const EMAIL_UNSUBSCRIBE_SECRET = process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim() || '';
 const EMBEDDED_TRACKING_HISTORY_LIMIT = 1200;
 const USER_RANK_HISTORY_ARCHIVE_COLLECTION = 'rank_history';
 const USER_COMPETITOR_RANK_HISTORY_ARCHIVE_COLLECTION = 'competitor_rank_history';
@@ -1128,6 +1130,39 @@ function getConfiguredResendSender() {
   return sender && isValidEmailAddress(sender) ? sender : null;
 }
 
+type EmailPreferenceKind = 'alert' | 'weekly';
+
+function buildEmailPreferenceToken(
+  kind: EmailPreferenceKind,
+  userId: string,
+  email: string,
+) {
+  if (!EMAIL_UNSUBSCRIBE_SECRET) {
+    return null;
+  }
+  return crypto
+    .createHmac('sha256', EMAIL_UNSUBSCRIBE_SECRET)
+    .update(`${kind}:${userId}:${email}`)
+    .digest('hex');
+}
+
+function getEmailPreferenceUrl(input: {
+  kind: EmailPreferenceKind;
+  userId: string;
+  email: string;
+}) {
+  const token = buildEmailPreferenceToken(input.kind, input.userId, input.email);
+  if (!token) {
+    return ALERT_EMAIL_APP_URL;
+  }
+  const unsubscribeUrl = new URL('/api/email/unsubscribe', ALERT_EMAIL_APP_URL);
+  unsubscribeUrl.searchParams.set('kind', input.kind);
+  unsubscribeUrl.searchParams.set('uid', input.userId);
+  unsubscribeUrl.searchParams.set('email', input.email);
+  unsubscribeUrl.searchParams.set('token', token);
+  return unsubscribeUrl.toString();
+}
+
 function formatAlertEmailTimestamp(timestamp: string) {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
@@ -1150,12 +1185,19 @@ async function sendEmailAlertEvents(
   userDocRef: DocumentReference<DocumentData>,
   events: AlertEvent[],
 ) {
+  const recipient = await resolveAlertEmailRecipient(userDocRef);
   await sendSharedAlertEmailEvents(userDocRef, events, {
     resend,
     fromEmail: RESEND_FROM_EMAIL,
     dashboardUrl: ALERT_EMAIL_APP_URL,
-    preferencesUrl: ALERT_EMAIL_APP_URL,
-    resolveRecipient: resolveAlertEmailRecipient,
+    preferencesUrl: recipient
+      ? getEmailPreferenceUrl({
+          kind: 'alert',
+          userId: userDocRef.id,
+          email: recipient,
+        })
+      : ALERT_EMAIL_APP_URL,
+    resolveRecipient: async () => recipient,
     logPrefix: '[email]',
   });
 }
@@ -1171,6 +1213,9 @@ async function resolveAlertEmailRecipient(
       userData?.accountStatus === 'deleted' ||
       userData?.accountStatus === 'deleting'
     ) {
+      return null;
+    }
+    if (userData?.alertEmailsEnabled === false) {
       return null;
     }
     const billingEmail = normalizeEmailAddress(userData?.billingEmail);
@@ -1326,21 +1371,33 @@ async function maybeSendWeeklyReportEmail(
   if (!eligibility.matchesWeekday || eligibility.alreadySent) {
     return null;
   }
+  const attemptedAt = new Date().toISOString();
+  const buildDeliveryUpdate = (
+    status: 'delivered' | 'failed',
+    error?: string,
+    sentAt?: string,
+  ): WeeklyReportSettings => ({
+    ...settings,
+    ...(sentAt ? { lastSentWeekKey: eligibility.deliveryKey, lastSentAt: sentAt } : {}),
+    lastAttemptedAt: sentAt || attemptedAt,
+    lastDeliveryStatus: status,
+    ...(error ? { lastDeliveryError: error } : { lastDeliveryError: undefined }),
+  });
   if (!resend) {
     log('[email] Skipping weekly report email because Resend is not configured.');
-    return null;
+    return buildDeliveryUpdate('failed', 'resend-not-configured');
   }
 
   const sender = getConfiguredResendSender();
   if (!sender) {
     log('[email] Skipping weekly report email because sender email is not configured.');
-    return null;
+    return buildDeliveryUpdate('failed', 'sender-not-configured');
   }
 
   const recipient = await resolveAlertEmailRecipient(userDocRef);
   if (!recipient) {
     log(`[email] Skipping weekly report email for user ${userDocRef.id} because no account email is available.`);
-    return null;
+    return buildDeliveryUpdate('failed', 'no-account-email');
   }
 
   const hydratedState = await hydrateWeeklyReportStateWithArchive(
@@ -1368,12 +1425,21 @@ async function maybeSendWeeklyReportEmail(
         summary,
         reportUrl,
         weekday: settings.weekday,
-        preferencesUrl: reportUrl,
+        preferencesUrl: getEmailPreferenceUrl({
+          kind: 'weekly',
+          userId: userDocRef.id,
+          email: recipient,
+        }),
       }),
     });
     if (result.error) {
       console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, result.error);
-      return null;
+      return buildDeliveryUpdate(
+        'failed',
+        typeof result.error.message === 'string' && result.error.message.trim()
+          ? result.error.message.trim()
+          : 'provider-error',
+      );
     }
     if (!getResendEmailId(result)) {
       console.warn(`[email] Weekly report email for user ${userDocRef.id} returned no message id.`);
@@ -1381,14 +1447,15 @@ async function maybeSendWeeklyReportEmail(
 
     const sentAt = new Date().toISOString();
     log(`[email] Delivered weekly report email to ${recipient}.`);
-    return {
-      ...settings,
-      lastSentWeekKey: eligibility.deliveryKey,
-      lastSentAt: sentAt,
-    } satisfies WeeklyReportSettings;
+    return buildDeliveryUpdate('delivered', undefined, sentAt);
   } catch (error) {
     console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, error);
-    return null;
+    return buildDeliveryUpdate(
+      'failed',
+      error instanceof Error && error.message.trim()
+        ? error.message.trim().slice(0, 500)
+        : 'unknown-delivery-failure',
+    );
   }
 }
 
@@ -1669,11 +1736,13 @@ async function evaluateAndDispatchAlertRules(
           createdAt: new Date().toISOString(),
           readAt: null,
         };
-        const created = await persistAlertEvent(userDocRef, event);
-        if (!created) {
-          continue;
+        if (rule.channels.inApp) {
+          const created = await persistAlertEvent(userDocRef, event);
+          if (!created) {
+            continue;
+          }
+          createdEvents.push(event);
         }
-        createdEvents.push(event);
         if (rule.channels.push) {
           browserPushEvents.push(event);
         }
@@ -1768,11 +1837,13 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           createdAt: diff.detectedAt,
           readAt: null,
         };
-        const created = await persistAlertEvent(userDocRef, event);
-        if (!created) {
-          continue;
+        if (rule.channels.inApp) {
+          const created = await persistAlertEvent(userDocRef, event);
+          if (!created) {
+            continue;
+          }
+          createdEvents.push(event);
         }
-        createdEvents.push(event);
         if (rule.channels.push) {
           browserPushEvents.push(event);
         }
