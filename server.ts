@@ -1727,6 +1727,11 @@ function isValidEmailAddress(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function getConfiguredResendSender() {
+  const sender = normalizeEmailAddress(RESEND_FROM_EMAIL);
+  return sender && isValidEmailAddress(sender) ? sender : null;
+}
+
 function assertAdminEmailAccess(email: string | null | undefined) {
   const normalizedEmail = normalizeEmailAddress(email);
   if (!ADMIN_EMAIL_ALLOWLIST.length) {
@@ -4222,7 +4227,7 @@ async function maybeSendWeeklyReportEmail(
     return null;
   }
 
-  const sender = RESEND_FROM_EMAIL.trim();
+  const sender = getConfiguredResendSender();
   if (!sender) {
     console.info('[email] Skipping weekly report email because sender email is not configured.');
     return null;
@@ -4254,7 +4259,7 @@ async function maybeSendWeeklyReportEmail(
     const result = await resend.emails.send({
       from: `Rank Analyzer Pro <${sender}>`,
       to: recipient,
-      subject: `Your weekly ASO report · ${summary.rangeLabel}`,
+      subject: `Your weekly ASO report - ${summary.rangeLabel}`,
       html: buildWeeklyReportEmailHtml({
         summary,
         reportUrl,
@@ -4482,6 +4487,10 @@ async function sendAnnouncementCampaign(
   if (!resend) {
     throw createConfigurationError('Resend is not configured on the server.');
   }
+  const sender = getConfiguredResendSender();
+  if (!sender) {
+    throw createConfigurationError('RESEND_FROM_EMAIL is not configured as a valid email address.');
+  }
   if (!EMAIL_UNSUBSCRIBE_SECRET) {
     throw createConfigurationError('EMAIL_UNSUBSCRIBE_SECRET is not configured on the server.');
   }
@@ -4517,7 +4526,7 @@ async function sendAnnouncementCampaign(
   await mapWithConcurrency(recipients, 5, async (recipient) => {
     try {
       const result = await resend.emails.send({
-        from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+        from: `Rank Analyzer Pro <${sender}>`,
         to: recipient.email,
         subject: claimedCampaign.subject,
         html: buildAnnouncementEmailHtml(
@@ -4590,6 +4599,11 @@ async function sendCronFailureEmail(input: {
     console.info('[email] Skipping cron failure email because Resend is not configured.');
     return;
   }
+  const sender = getConfiguredResendSender();
+  if (!sender) {
+    console.info('[email] Skipping cron failure email because sender email is not configured.');
+    return;
+  }
   if (!CRON_FAILURE_EMAIL_RECIPIENTS.length) {
     console.info('[email] Skipping cron failure email because CRON_FAILURE_EMAIL is not configured.');
     return;
@@ -4597,7 +4611,7 @@ async function sendCronFailureEmail(input: {
 
   try {
     const result = await resend.emails.send({
-      from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+      from: `Rank Analyzer Pro <${sender}>`,
       to: CRON_FAILURE_EMAIL_RECIPIENTS,
       subject: `Cron job failed: ${input.runKey}`,
       html: buildCronFailureEmailHtml(input),
@@ -9011,6 +9025,10 @@ async function startServer() {
       if (!isValidEmailAddress(recipient)) {
         throw createBadRequestError('A valid recipient email address is required.');
       }
+      const sender = getConfiguredResendSender();
+      if (!sender) {
+        throw createConfigurationError('RESEND_FROM_EMAIL is not configured as a valid email address.');
+      }
 
       const subjectInput = readOptionalString(req.body?.subject, 'subject', 200).trim();
       const messageInput = readOptionalString(req.body?.message, 'message', 2000).trim();
@@ -9019,7 +9037,7 @@ async function startServer() {
       const sentAt = new Date().toISOString();
 
       const result = await resend.emails.send({
-        from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+        from: `Rank Analyzer Pro <${sender}>`,
         to: recipient,
         subject,
         html: buildTestEmailHtml({
@@ -9029,7 +9047,10 @@ async function startServer() {
         }),
       });
       if (result.error) {
-        throw new ApiError('Failed to deliver test email.', {
+        const resendMessage = typeof result.error.message === 'string' && result.error.message.trim()
+          ? result.error.message.trim()
+          : 'Resend rejected the message.';
+        throw new ApiError(`Failed to deliver test email: ${resendMessage}`, {
           status: 502,
           code: 'UPSTREAM_UNAVAILABLE',
           retryable: true,

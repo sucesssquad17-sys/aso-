@@ -110,9 +110,14 @@ test("three alert events call resend once and mark all delivered", async () => {
     sendCalls[0].subject,
     "Rank Analyzer Pro: 3 alerts triggered",
   );
+  assert.equal(
+    sendCalls[0].from,
+    "Rank Analyzer Pro <alerts@rankanalyzerpro.com>",
+  );
   assert.match(String(sendCalls[0].html), /3 alerts triggered/);
   assert.match(String(sendCalls[0].html), /Alert type:/);
   assert.match(String(sendCalls[0].html), /Changed fields:/);
+  assert.doesNotMatch(String(sendCalls[0].html), /Â·/);
   assert.equal(setCalls.length, 3);
   for (const call of setCalls) {
     assert.equal(call.collectionName, "alert_events");
@@ -186,4 +191,29 @@ test("single-event behavior still uses the current subject style", async () => {
   assert.match(String(sendCalls[0].html), /Instagram entered top 10\./);
   assert.equal(setCalls.length, 1);
   assert.equal(setCalls[0].patch.emailDeliveryStatus, "delivered");
+});
+
+test("sender email is trimmed before sending", async () => {
+  const { ref } = createMockUserDocRef();
+  const sendCalls: Array<Record<string, unknown>> = [];
+
+  await sendAlertEmailEvents(ref as never, [createAlertEvent({ id: "evt-trim" })], {
+    resend: {
+      emails: {
+        send: async (payload: Record<string, unknown>) => {
+          sendCalls.push(payload);
+          return { data: { id: "email-trim" }, error: null };
+        },
+      },
+    } as never,
+    fromEmail: "  ALERTS@rankanalyzerpro.com  ",
+    dashboardUrl: "https://rankanalyzerpro.com",
+    resolveRecipient: async () => "user@example.com",
+  });
+
+  assert.equal(sendCalls.length, 1);
+  assert.equal(
+    sendCalls[0].from,
+    "Rank Analyzer Pro <ALERTS@rankanalyzerpro.com>",
+  );
 });

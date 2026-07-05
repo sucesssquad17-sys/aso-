@@ -1123,6 +1123,11 @@ function isValidEmailAddress(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function getConfiguredResendSender() {
+  const sender = normalizeEmailAddress(RESEND_FROM_EMAIL);
+  return sender && isValidEmailAddress(sender) ? sender : null;
+}
+
 function formatAlertEmailTimestamp(timestamp: string) {
   const date = new Date(timestamp);
   if (Number.isNaN(date.getTime())) {
@@ -1326,7 +1331,7 @@ async function maybeSendWeeklyReportEmail(
     return null;
   }
 
-  const sender = RESEND_FROM_EMAIL.trim();
+  const sender = getConfiguredResendSender();
   if (!sender) {
     log('[email] Skipping weekly report email because sender email is not configured.');
     return null;
@@ -1358,7 +1363,7 @@ async function maybeSendWeeklyReportEmail(
     const result = await resend.emails.send({
       from: `Rank Analyzer Pro <${sender}>`,
       to: recipient,
-      subject: `Your weekly ASO report · ${summary.rangeLabel}`,
+      subject: `Your weekly ASO report - ${summary.rangeLabel}`,
       html: buildWeeklyReportEmailHtml({
         summary,
         reportUrl,
@@ -1426,6 +1431,11 @@ async function sendCronFailureEmail(input: {
     log('[email] Skipping cron failure email because Resend is not configured.');
     return;
   }
+  const sender = getConfiguredResendSender();
+  if (!sender) {
+    log('[email] Skipping cron failure email because sender email is not configured.');
+    return;
+  }
   if (!CRON_FAILURE_EMAIL_RECIPIENTS.length) {
     log('[email] Skipping cron failure email because CRON_FAILURE_EMAIL is not configured.');
     return;
@@ -1433,7 +1443,7 @@ async function sendCronFailureEmail(input: {
 
   try {
     const result = await resend.emails.send({
-      from: `Rank Analyzer Pro <${RESEND_FROM_EMAIL}>`,
+      from: `Rank Analyzer Pro <${sender}>`,
       to: CRON_FAILURE_EMAIL_RECIPIENTS,
       subject: `Cron job failed: ${input.runKey}`,
       html: buildCronFailureEmailHtml(input),
