@@ -43,6 +43,27 @@ import {
   getDiscoveryCacheKey,
   trimDiscoveryPayloadForMode,
 } from '../src/lib/discoveryCache';
+import {
+  buildDiscoveryPromptSections,
+  buildDiscoveryRefinementPrompt,
+  extractDiscoveryFeatureSummary,
+  type DiscoveryPromptLimits,
+} from '../src/lib/discoveryPromptContext';
+
+const discoveryPromptLimits: DiscoveryPromptLimits = {
+  promptCandidateLimit: 40,
+  featureSummaryLimit: 10,
+  outputKeywordLimit: 28,
+  outputTokenLimit: 384,
+  minimumUsableCount: 10,
+  appPurposeLimit: 2,
+  targetUsersLimit: 2,
+  coreFeaturesLimit: 4,
+  useCasesLimit: 3,
+  painPointsLimit: 2,
+  competitorRepeatedTermsLimit: 8,
+  rawDescriptionExcerptChars: 220,
+};
 
 const fallback: TrackingSchedule = {
   enabled: true,
@@ -873,6 +894,96 @@ test('discovery cache keys use compact metadata fingerprints', () => {
 
   assert.equal(cacheKey.includes('social app social app'), false);
   assert.ok(cacheKey.length < 120);
+});
+
+test('discovery feature summary skips release-note noise and keeps stable high-signal phrases', () => {
+  const summary = extractDiscoveryFeatureSummary(
+    'Build routines with a simple daily habit streak tracker. Stay focused with reminders and morning checklist flows. Bug fixes and performance improvements in this update.',
+    6,
+  );
+
+  assert.ok(summary.includes('build routines with simple daily habit streak tracker'));
+  assert.ok(summary.includes('stay focused with reminders and morning checklist flows'));
+  assert.equal(summary.some((line) => line.includes('bug fixes')), false);
+  assert.equal(summary.some((line) => line.includes('performance improvements')), false);
+});
+
+test('discovery prompt sections cap repeated competitor terms and strip excluded brands', () => {
+  const { sections, counts } = buildDiscoveryPromptSections({
+    context: {
+      title: 'Habit Flow',
+      description: 'Build routines, stay focused, and follow a morning checklist designed for busy adults with ADHD.',
+      category: 'productivity',
+      developer: 'Flow Labs',
+      store: 'android',
+      country: 'us',
+    },
+    limits: {
+      ...discoveryPromptLimits,
+      competitorRepeatedTermsLimit: 2,
+    },
+    candidateKeywords: ['habit tracker', 'daily routine planner', 'morning checklist'],
+    competitorRepeatedTerms: ['habit tracker', 'fabulous routines', 'habit tracker', 'daily planner'],
+    excludedBrandTokens: ['fabulous'],
+  });
+
+  assert.deepEqual(sections.competitorRepeatedTerms, ['habit tracker', 'daily planner']);
+  assert.equal(counts.competitorRepeatedTermCount, 2);
+  assert.equal(sections.rawDescriptionExcerpt.includes('busy adults with adhd'), true);
+});
+
+test('discovery refinement prompt uses structured sections in order and omits empty sections', () => {
+  const { sections } = buildDiscoveryPromptSections({
+    context: {
+      title: 'Habit Flow',
+      description: 'Build routines with reminders and a morning checklist for busy adults who want consistent streaks without overwhelm.',
+      category: 'productivity',
+      developer: 'Flow Labs',
+      store: 'android',
+      country: 'us',
+    },
+    limits: discoveryPromptLimits,
+    candidateKeywords: ['habit tracker', 'daily routine planner', 'goal reminder app'],
+    competitorRepeatedTerms: ['habit streak', 'routine planner'],
+    excludedBrandTokens: ['fabulous'],
+  });
+  const prompt = buildDiscoveryRefinementPrompt({
+    context: {
+      title: 'Habit Flow',
+      description: 'Build routines with reminders and a morning checklist for busy adults who want consistent streaks without overwhelm.',
+      category: 'productivity',
+      developer: 'Flow Labs',
+      store: 'android',
+      country: 'us',
+    },
+    limits: discoveryPromptLimits,
+    mode: 'fast',
+    sections: {
+      ...sections,
+      excludedBrandTokens: [],
+    },
+  });
+
+  assert.ok(prompt.includes('App purpose:'));
+  assert.ok(prompt.includes('Target users:'));
+  assert.ok(prompt.includes('Core features:'));
+  assert.ok(prompt.includes('Use cases:'));
+  assert.ok(prompt.includes('Pain points solved:'));
+  assert.ok(prompt.includes('High-signal phrases from description:'));
+  assert.ok(prompt.includes('Raw description excerpt:'));
+  assert.ok(prompt.includes('Competitor repeated terms:'));
+  assert.ok(prompt.includes('Candidate keywords:'));
+  assert.equal(prompt.includes('Avoid competitor brands:'), false);
+  assert.equal(prompt.indexOf('App purpose:'), prompt.search(/App purpose:/));
+  assert.ok(prompt.indexOf('App purpose:') < prompt.indexOf('Target users:'));
+  assert.ok(prompt.indexOf('Target users:') < prompt.indexOf('Core features:'));
+  assert.ok(prompt.indexOf('Core features:') < prompt.indexOf('Use cases:'));
+  assert.ok(prompt.indexOf('Use cases:') < prompt.indexOf('Pain points solved:'));
+  assert.ok(prompt.indexOf('Pain points solved:') < prompt.indexOf('High-signal phrases from description:'));
+  assert.ok(prompt.indexOf('High-signal phrases from description:') < prompt.indexOf('Raw description excerpt:'));
+  assert.ok(prompt.indexOf('Raw description excerpt:') < prompt.indexOf('Competitor repeated terms:'));
+  assert.ok(prompt.indexOf('Competitor repeated terms:') < prompt.indexOf('Candidate keywords:'));
+  assert.ok(prompt.includes('Return only a JSON array of strings. No markdown. No commentary.'));
 });
 
 test('active-limit helper always allows tracking when no keywords are paused', () => {

@@ -142,6 +142,11 @@ import {
   isDiscoveryKeywordCandidate,
   shouldAdmitDiscoveryCandidate,
 } from './src/lib/discoveryKeywordGating';
+import {
+  buildDiscoveryPromptSections as buildSharedDiscoveryPromptSections,
+  buildDiscoveryRefinementPrompt as buildSharedDiscoveryRefinementPrompt,
+  compactDiscoveryPromptCandidates as compactSharedDiscoveryPromptCandidates,
+} from './src/lib/discoveryPromptContext';
 
 if (process.env.NODE_ENV !== 'production') {
   process.env.DISABLE_HMR = 'true';
@@ -6857,6 +6862,7 @@ async function mineCompetitorTerms(
   options?: { force?: boolean },
 ): Promise<{
   terms: { term: string; weight: number }[];
+  repeatedTerms: { term: string; weight: number; appHits: number }[];
   competitorBrandTokens: string[];
 }> {
   const storeType = context.store;
@@ -6864,6 +6870,7 @@ async function mineCompetitorTerms(
   if (!storeType) {
     return {
       terms: [],
+      repeatedTerms: [],
       competitorBrandTokens: [],
     };
   }
@@ -6878,6 +6885,7 @@ async function mineCompetitorTerms(
   });
   const cached = keywordSourceCache.get<{
     terms: { term: string; weight: number }[];
+    repeatedTerms: { term: string; weight: number; appHits: number }[];
     competitorBrandTokens: string[];
   }>(cacheKey);
   if (!options?.force && cached) return cached;
@@ -7057,8 +7065,32 @@ async function mineCompetitorTerms(
     .slice(0, profile.competitorTermLimit)
     .map(([term, weight]) => ({ term, weight }));
 
+  const repeatedTerms = Array.from(termAppHits.entries())
+    .map(([term, appHits]) => ({
+      term,
+      appHits: appHits.size,
+      weight: competitorTerms.get(term) || 0,
+    }))
+    .filter(({ appHits, term, weight }) => {
+      if (appHits < 2 || weight <= 0) {
+        return false;
+      }
+      const normalized = normalizeKeyword(term);
+      if (!normalized) {
+        return false;
+      }
+      const parts = normalized.split(' ');
+      return !parts.every((part) => ownTokens.has(part));
+    })
+    .sort((left, right) => {
+      if (right.appHits !== left.appHits) return right.appHits - left.appHits;
+      return right.weight - left.weight;
+    })
+    .map(({ term, weight, appHits }) => ({ term: normalizeKeyword(term), weight, appHits }));
+
   const payload = {
     terms: mined,
+    repeatedTerms,
     competitorBrandTokens: Array.from(competitorBrandTokens).sort((a, b) => a.localeCompare(b)),
   };
 
@@ -7074,6 +7106,7 @@ async function buildKeywordSignals(
 ): Promise<{
   candidateWeights: Map<string, number>;
   competitorWeights: Map<string, number>;
+  competitorRepeatedTerms: string[];
   competitorBrandTokens: Set<string>;
   ownTitleTokens: Set<string>;
 }> {
@@ -7100,6 +7133,7 @@ async function buildKeywordSignals(
   return {
     candidateWeights: candidates,
     competitorWeights,
+    competitorRepeatedTerms: (competitorSource.repeatedTerms || []).map(({ term }) => term),
     competitorBrandTokens: new Set(competitorSource.competitorBrandTokens),
     ownTitleTokens,
   };
@@ -7305,9 +7339,10 @@ async function buildKeywordCandidates(
   options?: { force?: boolean },
 ): Promise<{
   keywords: string[];
+  competitorRepeatedTerms: string[];
   competitorBrandTokens: string[];
 }> {
-  const { candidateWeights, competitorBrandTokens, ownTitleTokens } = await buildKeywordSignals(
+  const { candidateWeights, competitorRepeatedTerms, competitorBrandTokens, ownTitleTokens } = await buildKeywordSignals(
     context,
     mode,
     profile,
@@ -7317,6 +7352,7 @@ async function buildKeywordCandidates(
   return {
     keywords: getSortedCandidateTerms(candidateWeights, ownTitleTokens)
       .map(([term]) => term),
+    competitorRepeatedTerms,
     competitorBrandTokens: Array.from(competitorBrandTokens).sort((a, b) => a.localeCompare(b)),
   };
 }
@@ -7334,18 +7370,32 @@ const DISCOVERY_FALLBACK_MODEL = process.env.DISCOVERY_FALLBACK_MODEL || 'gemini
 const DISCOVERY_REFINEMENT_RETRY_DELAYS_MS = [600, 1500] as const;
 const DISCOVERY_REFINEMENT_LIMITS = {
   fast: {
-    promptCandidateLimit: 28,
-    featureSummaryLimit: 8,
-    outputKeywordLimit: 24,
-    outputTokenLimit: 320,
-    minimumUsableCount: 8,
+    promptCandidateLimit: 40,
+    featureSummaryLimit: 10,
+    outputKeywordLimit: 28,
+    outputTokenLimit: 384,
+    minimumUsableCount: 10,
+    appPurposeLimit: 2,
+    targetUsersLimit: 2,
+    coreFeaturesLimit: 4,
+    useCasesLimit: 3,
+    painPointsLimit: 2,
+    competitorRepeatedTermsLimit: 8,
+    rawDescriptionExcerptChars: 220,
   },
   deep: {
-    promptCandidateLimit: 56,
-    featureSummaryLimit: 12,
-    outputKeywordLimit: 40,
-    outputTokenLimit: 640,
-    minimumUsableCount: 14,
+    promptCandidateLimit: 90,
+    featureSummaryLimit: 18,
+    outputKeywordLimit: 50,
+    outputTokenLimit: 800,
+    minimumUsableCount: 18,
+    appPurposeLimit: 3,
+    targetUsersLimit: 4,
+    coreFeaturesLimit: 6,
+    useCasesLimit: 5,
+    painPointsLimit: 4,
+    competitorRepeatedTermsLimit: 12,
+    rawDescriptionExcerptChars: 420,
   },
 } as const;
 
@@ -7503,6 +7553,14 @@ type DiscoveryRefinementCacheEntry = {
   modelUsed: string | null;
   promptCandidateCount: number;
   featureLineCount: number;
+  appPurposeCount: number;
+  targetUsersCount: number;
+  coreFeatureCount: number;
+  useCaseCount: number;
+  painPointCount: number;
+  competitorRepeatedTermCount: number;
+  promptSectionCount: number;
+  rawDescriptionExcerptLength: number;
   fallbackReason: DiscoveryProviderAttemptFailureReason | null;
 };
 
@@ -7667,13 +7725,6 @@ function parseKeywordArrayResponse(text: string) {
   } catch {
     return null;
   }
-}
-
-function compactDiscoveryPromptCandidates(rawKeywords: string[], mode: DiscoveryMode) {
-  return dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate)).slice(
-    0,
-    DISCOVERY_REFINEMENT_LIMITS[mode].promptCandidateLimit,
-  );
 }
 
 function extractDiscoveryFeatureSummary(
@@ -7909,22 +7960,31 @@ async function refineKeywordsWithModel(
   context: DiscoveryRefinementContext,
   rawKeywords: string[],
   mode: DiscoveryMode,
+  competitorRepeatedTerms: string[],
   excludedBrandTokens?: string[],
   options?: { force?: boolean },
 ): Promise<DiscoveryRefinementCacheEntry> {
   const refinementPoolLimit = DISCOVERY_PROFILES[mode].keywordLimit;
-  const promptKeywords = compactDiscoveryPromptCandidates(rawKeywords, mode);
-  const featureSummary = extractDiscoveryFeatureSummary(context.description, mode);
+  const promptKeywords = compactSharedDiscoveryPromptCandidates(
+    rawKeywords,
+    DISCOVERY_REFINEMENT_LIMITS[mode].promptCandidateLimit,
+  );
+  const normalizedExcludedBrandTokens = (excludedBrandTokens || []).slice().sort((a, b) => a.localeCompare(b));
+  const { sections, counts } = buildSharedDiscoveryPromptSections({
+    context,
+    limits: DISCOVERY_REFINEMENT_LIMITS[mode],
+    candidateKeywords: promptKeywords,
+    competitorRepeatedTerms,
+    excludedBrandTokens: normalizedExcludedBrandTokens,
+  });
   const normalizedContext = {
     title: normalizeKeyword(context.title),
     category: normalizeKeyword(context.category || ''),
     developer: normalizeKeyword(context.developer || ''),
     store: context.store,
     country: normalizeCountryCode(context.country, 'us'),
-    featureSummary,
-    excludedBrandTokens: (excludedBrandTokens || []).slice().sort((a, b) => a.localeCompare(b)),
+    sections,
     mode,
-    promptKeywords,
   };
   const cacheKey = JSON.stringify({
     cacheVersion: DISCOVERY_CACHE_VERSION,
@@ -7934,18 +7994,17 @@ async function refineKeywordsWithModel(
   const cached = keywordRefinementCache.get<DiscoveryRefinementCacheEntry>(cacheKey);
   if (!options?.force && cached) {
     console.log(
-      `[keyword-refine] cache=hit mode=${mode} provider=${cached.providerUsed || 'local'} model=${cached.modelUsed || 'none'} raw=${cached.rawCount} prompt=${cached.promptCandidateCount} features=${cached.featureLineCount} modelOut=${cached.modelCount} sanitized=${cached.sanitizedModelCount} fallbackReason=${cached.fallbackReason || 'none'} fallbackAdded=${cached.fallbackAddedCount}`,
+      `[keyword-refine] cache=hit mode=${mode} provider=${cached.providerUsed || 'local'} model=${cached.modelUsed || 'none'} raw=${cached.rawCount} prompt=${cached.promptCandidateCount} sections=${cached.promptSectionCount} purpose=${cached.appPurposeCount} users=${cached.targetUsersCount} features=${cached.featureLineCount} core=${cached.coreFeatureCount} useCases=${cached.useCaseCount} pain=${cached.painPointCount} competitorTerms=${cached.competitorRepeatedTermCount} rawExcerpt=${cached.rawDescriptionExcerptLength} modelOut=${cached.modelCount} sanitized=${cached.sanitizedModelCount} fallbackReason=${cached.fallbackReason || 'none'} fallbackAdded=${cached.fallbackAddedCount}`,
     );
     return cached;
   }
 
-  const excludedBrandTokenSet = new Set(normalizedContext.excludedBrandTokens);
-  const prompt = buildDiscoveryRefinementPrompt({
+  const excludedBrandTokenSet = new Set(sections.excludedBrandTokens);
+  const prompt = buildSharedDiscoveryRefinementPrompt({
     context,
     mode,
-    candidateKeywords: promptKeywords,
-    excludedBrandTokens: normalizedContext.excludedBrandTokens,
-    featureSummary,
+    limits: DISCOVERY_REFINEMENT_LIMITS[mode],
+    sections,
   });
 
   let providerUsed: DiscoveryProviderName | null = null;
@@ -8029,12 +8088,20 @@ async function refineKeywordsWithModel(
     providerUsed,
     modelUsed,
     promptCandidateCount: promptKeywords.length,
-    featureLineCount: featureSummary.length,
+    featureLineCount: counts.featureLineCount,
+    appPurposeCount: counts.appPurposeCount,
+    targetUsersCount: counts.targetUsersCount,
+    coreFeatureCount: counts.coreFeatureCount,
+    useCaseCount: counts.useCaseCount,
+    painPointCount: counts.painPointCount,
+    competitorRepeatedTermCount: counts.competitorRepeatedTermCount,
+    promptSectionCount: counts.promptSectionCount,
+    rawDescriptionExcerptLength: counts.rawDescriptionExcerptLength,
     fallbackReason,
   };
 
   console.log(
-    `[keyword-refine] cache=miss mode=${mode} provider=${providerUsed || 'local'} model=${modelUsed || 'none'} raw=${rawKeywords.length} prompt=${promptKeywords.length} features=${featureSummary.length} modelOut=${modelKeywords.length} sanitized=${modelKeywords.length} fallbackReason=${fallbackReason || 'none'} fallbackAdded=${fallbackKeywords.length}`,
+    `[keyword-refine] cache=miss mode=${mode} provider=${providerUsed || 'local'} model=${modelUsed || 'none'} raw=${rawKeywords.length} prompt=${promptKeywords.length} sections=${counts.promptSectionCount} purpose=${counts.appPurposeCount} users=${counts.targetUsersCount} features=${counts.featureLineCount} core=${counts.coreFeatureCount} useCases=${counts.useCaseCount} pain=${counts.painPointCount} competitorTerms=${counts.competitorRepeatedTermCount} rawExcerpt=${counts.rawDescriptionExcerptLength} modelOut=${modelKeywords.length} sanitized=${modelKeywords.length} fallbackReason=${fallbackReason || 'none'} fallbackAdded=${fallbackKeywords.length}`,
   );
 
   keywordRefinementCache.set(cacheKey, payload);
@@ -8227,6 +8294,7 @@ async function buildRankedDiscoveryCandidates(
     },
     rawKeywords,
     input.mode,
+    candidateSource.competitorRepeatedTerms,
     candidateSource.competitorBrandTokens,
     options,
   );
@@ -10184,6 +10252,7 @@ async function startServer() {
         },
         rawKeywords,
         'deep',
+        candidateSource.competitorRepeatedTerms,
         candidateSource.competitorBrandTokens,
       );
 

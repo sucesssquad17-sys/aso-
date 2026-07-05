@@ -14,3 +14,5 @@ google-cloud-sdk/
 *.mjs
 firebase-applet-config.json
 service-account*.json
+env.json
+job_env.json
