@@ -29,6 +29,7 @@ type TrackedAppLike = {
   appId: string;
   store: StoreType;
   kind?: string;
+  source?: string;
 };
 
 type CompetitorGroupLike = {
@@ -167,7 +168,10 @@ export function getTrackedAppIdentityKeysForPlanUsage(
 ) {
   return new Set(
     state.trackedApps
-      .filter((trackedApp) => trackedApp.kind !== "competitor")
+      .filter(
+        (trackedApp) =>
+          trackedApp.kind !== "competitor" && trackedApp.source !== "discovery",
+      )
       .map((trackedApp) => getTrackedAppIdentityKey(trackedApp))
       .concat(
         Array.from(

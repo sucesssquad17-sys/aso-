@@ -774,6 +774,38 @@ test('plan usage and tracked app overview count own apps separately from keyword
 
   assert.equal(staleUsage.trackedApps, 3);
 
+  const discoveryOnlyUsage = countPlanUsage({
+    trackedApps: [
+      {
+        appKey: 'android:app.own',
+        appId: 'app.own',
+        store: 'android',
+        kind: 'own',
+        source: 'discovery',
+      },
+      {
+        appKey: 'android:discovery-only',
+        appId: 'discovery-only',
+        store: 'android',
+        kind: 'own',
+        source: 'discovery',
+      },
+    ],
+    competitorGroups: [],
+    trackedKeywords: [
+      {
+        groupId: 'own-group',
+        appId: 'app.own',
+        keyword: 'rizz',
+        store: 'android',
+        country: 'us',
+      },
+    ],
+    competitorTrackedKeywords: [],
+  });
+
+  assert.equal(discoveryOnlyUsage.trackedApps, 1);
+
   const overviewCount = getTrackedAppUsageCountForOverview([
     {
       appId: 'app.own',
