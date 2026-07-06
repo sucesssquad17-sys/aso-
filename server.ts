@@ -147,6 +147,11 @@ import {
   buildDiscoveryRefinementPrompt as buildSharedDiscoveryRefinementPrompt,
   compactDiscoveryPromptCandidates as compactSharedDiscoveryPromptCandidates,
 } from './src/lib/discoveryPromptContext';
+import {
+  buildDiscoveryWarnings,
+  resolveDiscoveryResponseStatus,
+  type DiscoveryCompetitorMiningStatus,
+} from './src/lib/discoveryResponse';
 
 if (process.env.NODE_ENV !== 'production') {
   process.env.DISABLE_HMR = 'true';
@@ -599,6 +604,9 @@ type DiscoveryProfile = {
   extendedDepthCandidateLimit: number;
   competitorSeedLimit: number;
   competitorResultsPerSeed: number;
+  competitorMiningTimeoutMs: number;
+  competitorProxyFallbackOnEmpty: boolean;
+  verificationTimeoutMs: number;
   competitorTermLimit: number;
   finalRankingLimit: number;
 };
@@ -606,31 +614,37 @@ type DiscoveryProfile = {
 const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
   fast: {
     keywordLimit: 40,
-    batchSize: 12,
-    earlyExitRankings: 10,
-    minCheckedKeywords: 12,
+    batchSize: 2,
+    earlyExitRankings: 6,
+    minCheckedKeywords: 6,
     searchDepth: 100,
     initialSearchDepth: 100,
-    rankingCheckLimit: 24,
-    proxyVerificationLimit: 5,
+    rankingCheckLimit: 8,
+    proxyVerificationLimit: 1,
     extendedDepthCandidateLimit: 0,
-    competitorSeedLimit: 3,
-    competitorResultsPerSeed: 12,
+    competitorSeedLimit: 2,
+    competitorResultsPerSeed: 3,
+    competitorMiningTimeoutMs: 2000,
+    competitorProxyFallbackOnEmpty: false,
+    verificationTimeoutMs: 3500,
     competitorTermLimit: 40,
     finalRankingLimit: 10,
   },
   deep: {
     keywordLimit: 80,
-    batchSize: 10,
-    earlyExitRankings: 20,
-    minCheckedKeywords: 20,
+    batchSize: 3,
+    earlyExitRankings: 12,
+    minCheckedKeywords: 12,
     searchDepth: 150,
     initialSearchDepth: 100,
-    rankingCheckLimit: 40,
-    proxyVerificationLimit: 10,
-    extendedDepthCandidateLimit: 8,
-    competitorSeedLimit: 5,
-    competitorResultsPerSeed: 16,
+    rankingCheckLimit: 18,
+    proxyVerificationLimit: 3,
+    extendedDepthCandidateLimit: 4,
+    competitorSeedLimit: 4,
+    competitorResultsPerSeed: 5,
+    competitorMiningTimeoutMs: 5000,
+    competitorProxyFallbackOnEmpty: false,
+    verificationTimeoutMs: 4500,
     competitorTermLimit: 72,
     finalRankingLimit: 20,
   },
@@ -7266,19 +7280,25 @@ async function mineCompetitorTerms(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
-  options?: { force?: boolean },
+  options?: {
+    force?: boolean;
+    skipCompetitorMining?: boolean;
+    deadlineAt?: number;
+  },
 ): Promise<{
   terms: { term: string; weight: number }[];
   repeatedTerms: { term: string; weight: number; appHits: number }[];
   competitorBrandTokens: string[];
+  status: DiscoveryCompetitorMiningStatus;
 }> {
   const storeType = context.store;
   const country = context.country || 'us';
-  if (!storeType) {
+  if (!storeType || options?.skipCompetitorMining) {
     return {
       terms: [],
       repeatedTerms: [],
       competitorBrandTokens: [],
+      status: options?.skipCompetitorMining ? 'skipped' : 'ok',
     };
   }
 
@@ -7294,8 +7314,14 @@ async function mineCompetitorTerms(
     terms: { term: string; weight: number }[];
     repeatedTerms: { term: string; weight: number; appHits: number }[];
     competitorBrandTokens: string[];
+    status?: DiscoveryCompetitorMiningStatus;
   }>(cacheKey);
-  if (!options?.force && cached) return cached;
+  if (!options?.force && cached) {
+    return {
+      ...cached,
+      status: cached.status || 'ok',
+    };
+  }
 
   const seeds = new Set<string>();
   const titleSegments = collectTitleSegments(context.title);
@@ -7317,46 +7343,12 @@ async function mineCompetitorTerms(
   const termAppHits = new Map<string, Set<string>>();
   const seedList = Array.from(seeds).slice(0, profile.competitorSeedLimit);
 
-  const seedResults: any[][] = await Promise.all(
-    seedList.map(async (seed) => {
-      try {
-        const allowProxyFallbackOnEmpty = mode === 'deep';
-        return await searchStore(
-          seed,
-          storeType,
-          country,
-          profile.competitorResultsPerSeed,
-          {
-            useFailureCache: false,
-            preferDirectFirst: true,
-            proxyFallbackOnError: true,
-            proxyFallbackOnEmpty: allowProxyFallbackOnEmpty,
-          },
-        );
-      } catch (error) {
-        console.warn(`Competitor keyword mining failed for "${seed}"`, error);
-        return [];
-      }
-    }),
-  );
-
-  if (mode === 'fast') {
-    const totalSeedResults = seedResults.reduce((sum, results) => sum + results.length, 0);
-    const sparseSeedIndexes = seedResults
-      .map((results, index) => ({ index, results }))
-      .filter(({ results }) => results.length === 0)
-      .map(({ index }) => index);
-    const shouldRetrySparseSeeds =
-      sparseSeedIndexes.length > 0 &&
-      (
-        totalSeedResults < Math.max(profile.competitorResultsPerSeed, 10) ||
-        sparseSeedIndexes.length >= Math.ceil(seedList.length / 2)
-      );
-
-    if (shouldRetrySparseSeeds) {
-      const fallbackResults = await Promise.all(
-        sparseSeedIndexes.map(async (seedIndex) => {
-          const seed = seedList[seedIndex];
+  const competitorDeadlineAt = options?.deadlineAt || getUpstreamDeadline(profile.competitorMiningTimeoutMs);
+  let seedResults: any[][];
+  try {
+    seedResults = await runWithDeadline(
+      () => Promise.all(
+        seedList.map(async (seed) => {
           try {
             return await searchStore(
               seed,
@@ -7366,21 +7358,28 @@ async function mineCompetitorTerms(
               {
                 useFailureCache: false,
                 preferDirectFirst: true,
-                proxyFallbackOnError: true,
-                proxyFallbackOnEmpty: true,
+                proxyFallbackOnError: mode === 'deep',
+                proxyFallbackOnEmpty: profile.competitorProxyFallbackOnEmpty,
               },
+              competitorDeadlineAt,
             );
           } catch (error) {
-            console.warn(`Competitor keyword fallback mining failed for "${seed}"`, error);
+            console.warn(`Competitor keyword mining failed for "${seed}"`, error);
             return [];
           }
         }),
-      );
-
-      fallbackResults.forEach((results, resultIndex) => {
-        seedResults[sparseSeedIndexes[resultIndex]] = results;
-      });
-    }
+      ),
+      competitorDeadlineAt,
+      'Competitor keyword discovery is taking too long.',
+    );
+  } catch (error) {
+    console.warn('[discovery] Competitor mining skipped after failure.', error);
+    return {
+      terms: [],
+      repeatedTerms: [],
+      competitorBrandTokens: [],
+      status: isTimeoutLikeError(error) ? 'timeout' : 'failed',
+    };
   }
 
   const competitorBrandTokens = new Set<string>();
@@ -7499,6 +7498,7 @@ async function mineCompetitorTerms(
     terms: mined,
     repeatedTerms,
     competitorBrandTokens: Array.from(competitorBrandTokens).sort((a, b) => a.localeCompare(b)),
+    status: 'ok' as const,
   };
 
   keywordSourceCache.set(cacheKey, payload);
@@ -7509,13 +7509,18 @@ async function buildKeywordSignals(
   context: KeywordContext,
   mode: DiscoveryMode,
   profile: DiscoveryProfile,
-  options?: { force?: boolean },
+  options?: {
+    force?: boolean;
+    skipCompetitorMining?: boolean;
+    competitorDeadlineAt?: number;
+  },
 ): Promise<{
   candidateWeights: Map<string, number>;
   competitorWeights: Map<string, number>;
   competitorRepeatedTerms: string[];
   competitorBrandTokens: Set<string>;
   ownTitleTokens: Set<string>;
+  competitorMiningStatus: DiscoveryCompetitorMiningStatus;
 }> {
   const candidates = new Map<string, number>();
   const titleSegments = collectTitleSegments(context.title);
@@ -7530,7 +7535,11 @@ async function buildKeywordSignals(
   deriveCategoryHints(context.category).forEach((hint) => addWeightedTerm(candidates, hint, 8));
   tokenize(context.developer).forEach((token) => addWeightedTerm(candidates, token, 2));
 
-  const competitorSource = await mineCompetitorTerms(context, mode, profile, options);
+  const competitorSource = await mineCompetitorTerms(context, mode, profile, {
+    force: options?.force,
+    skipCompetitorMining: options?.skipCompetitorMining,
+    deadlineAt: options?.competitorDeadlineAt,
+  });
   const competitorWeights = new Map<string, number>();
   competitorSource.terms.forEach(({ term, weight }) => {
     competitorWeights.set(term, weight);
@@ -7543,6 +7552,7 @@ async function buildKeywordSignals(
     competitorRepeatedTerms: (competitorSource.repeatedTerms || []).map(({ term }) => term),
     competitorBrandTokens: new Set(competitorSource.competitorBrandTokens),
     ownTitleTokens,
+    competitorMiningStatus: competitorSource.status,
   };
 }
 
@@ -7865,6 +7875,8 @@ type DiscoveryCandidateCacheEntry = {
   promptCandidateCount?: number;
   featureLineCount?: number;
   fallbackReason?: string | null;
+  competitorMiningStatus?: DiscoveryCompetitorMiningStatus;
+  candidateBuildMs?: number;
 };
 
 type DiscoveryResultCacheEntry = {
@@ -7875,7 +7887,9 @@ type DiscoveryResultCacheEntry = {
   candidateCount: number;
   searchDepth: number;
   failedLookups: number;
+  timedOutLookups?: number;
   loadedAt: string;
+  competitorMiningStatus?: DiscoveryCompetitorMiningStatus;
 };
 
 type DiscoveryRefinementContext = {
@@ -8338,6 +8352,75 @@ function toDiscoveryFeatureQuality(
   };
 }
 
+function rankDiscoveryMetricCandidates(
+  input: {
+    title: string;
+    description?: string;
+    category?: string;
+    developer?: string;
+    store: StoreType;
+    country: string;
+    mode: DiscoveryMode;
+  },
+  profile: DiscoveryProfile,
+  signalContext: Awaited<ReturnType<typeof buildKeywordSignals>>,
+  refinedKeywords: string[],
+) {
+  const seen = new Set<string>();
+  const uniqueKeywords = [input.title, ...refinedKeywords].filter((keyword) => {
+    const normalized = normalizeKeyword(keyword);
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
+
+  const metricCandidates: DiscoveryMetricCandidate[] = uniqueKeywords.map((keyword, index) => {
+    const features = extractKeywordFeatures(
+      input,
+      keyword,
+      signalContext,
+    );
+    const baseline = scoreKeywordMetrics(features);
+
+    let displayQuality = 0;
+    displayQuality += features.exactTitleMatch * 50;
+    displayQuality += features.exactTitleSegment * 30;
+    displayQuality += features.orderedTitleCoverage * 20;
+    displayQuality += features.titleCoverage * 10;
+    displayQuality += features.categorySemanticCoverage * 20;
+    displayQuality += features.semanticCoverage * 15;
+    displayQuality += features.categoryCoverage * 10;
+    displayQuality += features.genericCoverage * 10;
+    displayQuality -= features.weakModifierCoverage * 30;
+    if (features.mostlyGeneric) displayQuality -= 15;
+    displayQuality = Math.max(0, Math.min(100, displayQuality));
+
+    return {
+      id: index,
+      keyword,
+      features,
+      baseline,
+      displayQuality,
+    };
+  });
+
+  return metricCandidates
+    .filter((candidate) =>
+      shouldAdmitDiscoveryCandidate(
+        input.mode,
+        candidate.features,
+        candidate.displayQuality,
+      ),
+    )
+    .sort((a, b) => {
+      if (b.baseline.relevance !== a.baseline.relevance) return b.baseline.relevance - a.baseline.relevance;
+      if (a.baseline.difficulty !== b.baseline.difficulty) return a.baseline.difficulty - b.baseline.difficulty;
+      if (b.baseline.demand !== a.baseline.demand) return b.baseline.demand - a.baseline.demand;
+      return a.keyword.length - b.keyword.length;
+    })
+    .slice(0, profile.keywordLimit);
+}
+
 function buildDiscoveryPayloadFromCacheEntry(
   entry: DiscoveryResultCacheEntry,
   mode: DiscoveryMode,
@@ -8396,8 +8479,27 @@ function buildDiscoveryPayloadFromCacheEntry(
     candidateCount: candidatePool.length,
     searchDepth: profile.searchDepth,
     failedLookups: entry.failedLookups,
+    timedOutLookups: entry.timedOutLookups || 0,
     rankings,
     suggestions,
+    status: resolveDiscoveryResponseStatus({
+      warnings: buildDiscoveryWarnings({
+        competitorMiningStatus: entry.competitorMiningStatus,
+        failedLookups: entry.failedLookups,
+        timedOutLookups: entry.timedOutLookups || 0,
+      }),
+    }),
+    warnings: buildDiscoveryWarnings({
+      competitorMiningStatus: entry.competitorMiningStatus,
+      failedLookups: entry.failedLookups,
+      timedOutLookups: entry.timedOutLookups || 0,
+    }),
+    verification: {
+      attempted: Math.min(entry.checkedKeywords, candidatePool.length),
+      succeeded: Math.max(0, Math.min(entry.checkedKeywords, candidatePool.length) - (entry.failedLookups || 0)),
+      failed: Math.max(0, (entry.failedLookups || 0) - (entry.timedOutLookups || 0)),
+      timedOut: entry.timedOutLookups || 0,
+    },
   };
 }
 
@@ -8442,6 +8544,7 @@ async function buildRankedDiscoveryCandidates(
   profile: DiscoveryProfile,
   options?: { force?: boolean },
 ) {
+  const candidateBuildStartedAt = Date.now();
   const cacheIdentity = getDiscoveryCacheIdentity(input);
   const cacheKey = getDiscoveryCandidateCacheKey(cacheIdentity);
   const cached = discoveryCandidateCache.get<DiscoveryCandidateCacheEntry>(cacheKey);
@@ -8449,15 +8552,21 @@ async function buildRankedDiscoveryCandidates(
     return trimDiscoveryCandidateCacheEntry(cached, input.mode);
   }
 
-  const candidateSource = await buildKeywordCandidates({
+  const signalContext = await buildKeywordSignals({
     title: input.title,
     description: input.description,
     category: input.category,
     developer: input.developer,
     store: input.store,
     country: input.country,
-  }, input.mode, profile, options);
-  const rawKeywords = candidateSource.keywords;
+  }, input.mode, profile, {
+    force: options?.force,
+    competitorDeadlineAt: getUpstreamDeadline(profile.competitorMiningTimeoutMs),
+  });
+  const rawKeywords = getSortedCandidateTerms(
+    signalContext.candidateWeights,
+    signalContext.ownTitleTokens,
+  ).map(([term]) => term);
 
   const refined = await refineKeywordsWithModel(
     {
@@ -8470,66 +8579,16 @@ async function buildRankedDiscoveryCandidates(
     },
     rawKeywords,
     input.mode,
-    candidateSource.competitorRepeatedTerms,
-    candidateSource.competitorBrandTokens,
+    signalContext.competitorRepeatedTerms,
+    Array.from(signalContext.competitorBrandTokens).sort((a, b) => a.localeCompare(b)),
     options,
   );
-  const refinedKeywords = refined.keywords;
-
-  const seen = new Set<string>();
-  const uniqueKeywords = [input.title, ...refinedKeywords].filter((keyword) => {
-    const normalized = normalizeKeyword(keyword);
-    if (!normalized || seen.has(normalized)) return false;
-    seen.add(normalized);
-    return true;
-  });
-
-  const signalContext = await buildKeywordSignals(input, input.mode, profile, options);
-  const metricCandidates: DiscoveryMetricCandidate[] = uniqueKeywords.map((keyword, index) => {
-    const features = extractKeywordFeatures(
-      input,
-      keyword,
-      signalContext,
-    );
-    const baseline = scoreKeywordMetrics(features);
-
-    let displayQuality = 0;
-    displayQuality += features.exactTitleMatch * 50;
-    displayQuality += features.exactTitleSegment * 30;
-    displayQuality += features.orderedTitleCoverage * 20;
-    displayQuality += features.titleCoverage * 10;
-    displayQuality += features.categorySemanticCoverage * 20;
-    displayQuality += features.semanticCoverage * 15;
-    displayQuality += features.categoryCoverage * 10;
-    displayQuality += features.genericCoverage * 10;
-    displayQuality -= features.weakModifierCoverage * 30;
-    if (features.mostlyGeneric) displayQuality -= 15;
-    displayQuality = Math.max(0, Math.min(100, displayQuality));
-
-    return {
-      id: index,
-      keyword,
-      features,
-      baseline,
-      displayQuality,
-    };
-  });
-
-  const rankedCandidates = metricCandidates
-    .filter((candidate) =>
-      shouldAdmitDiscoveryCandidate(
-        input.mode,
-        candidate.features,
-        candidate.displayQuality,
-      ),
-    )
-    .sort((a, b) => {
-      if (b.baseline.relevance !== a.baseline.relevance) return b.baseline.relevance - a.baseline.relevance;
-      if (a.baseline.difficulty !== b.baseline.difficulty) return a.baseline.difficulty - b.baseline.difficulty;
-      if (b.baseline.demand !== a.baseline.demand) return b.baseline.demand - a.baseline.demand;
-      return a.keyword.length - b.keyword.length;
-    })
-    .slice(0, profile.keywordLimit);
+  const rankedCandidates = rankDiscoveryMetricCandidates(
+    input,
+    profile,
+    signalContext,
+    refined.keywords,
+  );
 
   const payload: DiscoveryCandidateCacheEntry = {
     completeness: input.mode,
@@ -8543,14 +8602,83 @@ async function buildRankedDiscoveryCandidates(
     promptCandidateCount: refined.promptCandidateCount,
     featureLineCount: refined.featureLineCount,
     fallbackReason: refined.fallbackReason,
+    competitorMiningStatus: signalContext.competitorMiningStatus,
+    candidateBuildMs: Date.now() - candidateBuildStartedAt,
   };
 
   console.log(
-    `[discovery-candidates] mode=${input.mode} provider=${refined.providerUsed || 'local'} model=${refined.modelUsed || 'none'} raw=${refined.rawCount} prompt=${refined.promptCandidateCount} features=${refined.featureLineCount} modelOut=${refined.modelCount} sanitized=${refined.sanitizedModelCount} admitted=${rankedCandidates.length} fallbackReason=${refined.fallbackReason || 'none'}`,
+    `[discovery-candidates] mode=${input.mode} provider=${refined.providerUsed || 'local'} model=${refined.modelUsed || 'none'} raw=${refined.rawCount} prompt=${refined.promptCandidateCount} features=${refined.featureLineCount} modelOut=${refined.modelCount} sanitized=${refined.sanitizedModelCount} admitted=${rankedCandidates.length} competitorMining=${signalContext.competitorMiningStatus} buildMs=${payload.candidateBuildMs} fallbackReason=${refined.fallbackReason || 'none'}`,
   );
 
   discoveryCandidateCache.set(cacheKey, payload);
   return trimDiscoveryCandidateCacheEntry(payload, input.mode);
+}
+
+async function buildLocalDiscoveryFallbackPayload(input: {
+  appId: string;
+  title: string;
+  description?: string;
+  category?: string;
+  developer?: string;
+  store: StoreType;
+  country: string;
+  mode: DiscoveryMode;
+  force?: boolean;
+}) {
+  const profile = DISCOVERY_PROFILES[input.mode];
+  const signalContext = await buildKeywordSignals(input, input.mode, profile, {
+    force: input.force,
+    skipCompetitorMining: true,
+  });
+  const rawKeywords = getSortedCandidateTerms(
+    signalContext.candidateWeights,
+    signalContext.ownTitleTokens,
+  ).map(([term]) => term);
+  const rankedCandidates = rankDiscoveryMetricCandidates(
+    input,
+    profile,
+    signalContext,
+    rawKeywords,
+  );
+  const suggestions = selectDiscoveryDiverseSuggestions(
+    rankedCandidates,
+    input.mode,
+    profile.finalRankingLimit,
+  ).map(({ keyword, baseline }) => ({
+    keyword,
+    demand: baseline.demand,
+    volume: baseline.volume,
+    difficulty: baseline.difficulty,
+    relevance: baseline.relevance,
+    confidence: baseline.confidence,
+    verificationStatus: 'unverified' as const,
+  }));
+  const warnings = buildDiscoveryWarnings({
+    fallback: true,
+    competitorMiningStatus: 'skipped',
+  });
+
+  return {
+    mode: input.mode,
+    checkedKeywords: 0,
+    candidateCount: rankedCandidates.length,
+    searchDepth: profile.searchDepth,
+    failedLookups: 0,
+    timedOutLookups: 0,
+    rankings: [],
+    suggestions,
+    status: resolveDiscoveryResponseStatus({
+      fallback: true,
+      warnings,
+    }),
+    warnings,
+    verification: {
+      attempted: 0,
+      succeeded: 0,
+      failed: 0,
+      timedOut: 0,
+    },
+  };
 }
 
 async function discoverRankedKeywords(input: {
@@ -8564,6 +8692,7 @@ async function discoverRankedKeywords(input: {
   mode: DiscoveryMode;
   force?: boolean;
 }) {
+  const startedAt = Date.now();
   const profile = DISCOVERY_PROFILES[input.mode];
   const cacheIdentity = getDiscoveryCacheIdentity(input);
   const cacheKey = getDiscoveryRankedResultCacheKey(cacheIdentity);
@@ -8599,6 +8728,8 @@ async function discoverRankedKeywords(input: {
 
   let checkedKeywords = 0;
   let failedLookups = 0;
+  let timedOutLookups = 0;
+  const verificationStartedAt = Date.now();
 
   for (let i = 0; i < candidatesToCheck.length; i += profile.batchSize) {
     const batch = candidatesToCheck.slice(i, i + profile.batchSize);
@@ -8614,6 +8745,7 @@ async function discoverRankedKeywords(input: {
 
           let rank: number;
           const candidateIndex = i + batchIndex;
+          const verificationDeadlineAt = getUpstreamDeadline(profile.verificationTimeoutMs);
 
           if (input.store === 'android') {
             const allowProxyVerification = shouldUseDiscoveryProxyVerification(
@@ -8621,44 +8753,56 @@ async function discoverRankedKeywords(input: {
               candidateIndex,
               profile,
             );
-            rank = await getGooglePlayRankWithFallback(
-              candidate.keyword,
-              input.appId,
-              input.country,
-              profile.initialSearchDepth,
-              getUpstreamDeadline(RANKING_FETCH_TIMEOUT_MS),
+            rank = await runWithDeadline(
+              () => getGooglePlayRankWithFallback(
+                candidate.keyword,
+                input.appId,
+                input.country,
+                profile.initialSearchDepth,
+                verificationDeadlineAt,
+                'The app store search is taking too long. Please try again.',
+                'discovery',
+                {
+                  proxyFallbackOnNotRanked: allowProxyVerification,
+                },
+              ),
+              verificationDeadlineAt,
               'The app store search is taking too long. Please try again.',
-              'discovery',
-              {
-                proxyFallbackOnNotRanked: allowProxyVerification,
-              },
             );
 
             if (
               rank === -1 &&
               shouldExtendDiscoveryDepth(candidate, candidateIndex, profile)
             ) {
-              rank = await getGooglePlayRankWithFallback(
-                candidate.keyword,
-                input.appId,
-                input.country,
-                profile.searchDepth,
-                getUpstreamDeadline(RANKING_FETCH_TIMEOUT_MS),
+              rank = await runWithDeadline(
+                () => getGooglePlayRankWithFallback(
+                  candidate.keyword,
+                  input.appId,
+                  input.country,
+                  profile.searchDepth,
+                  verificationDeadlineAt,
+                  'The app store search is taking too long. Please try again.',
+                  'discovery',
+                  {
+                    proxyFallbackOnNotRanked: allowProxyVerification,
+                  },
+                ),
+                verificationDeadlineAt,
                 'The app store search is taking too long. Please try again.',
-                'discovery',
-                {
-                  proxyFallbackOnNotRanked: allowProxyVerification,
-                },
               );
             }
           } else {
-            // iOS: use store.search which supports deep pagination
-            const results: any[] = await searchStore(
-              candidate.keyword,
-              input.store,
-              input.country,
-              profile.searchDepth,
-              { useFailureCache: false, webFallbackOnEmpty: true, webFallbackOnError: true },
+            const results: any[] = await runWithDeadline(
+              () => searchStore(
+                candidate.keyword,
+                input.store,
+                input.country,
+                profile.searchDepth,
+                { useFailureCache: false, webFallbackOnEmpty: true, webFallbackOnError: true },
+                verificationDeadlineAt,
+              ),
+              verificationDeadlineAt,
+              'The app store search is taking too long. Please try again.',
             );
             const index = results.findIndex((app) =>
               String(app.appId) === String(input.appId) || String(app.id) === String(input.appId),
@@ -8683,6 +8827,9 @@ async function discoverRankedKeywords(input: {
           };
         } catch (error) {
           console.warn(`Discovery ranking lookup failed for "${candidate.keyword}"`, error);
+          if (isTimeoutLikeError(error)) {
+            timedOutLookups += 1;
+          }
           failedLookups += 1;
           return null;
         }
@@ -8731,6 +8878,7 @@ async function discoverRankedKeywords(input: {
       difficulty,
       relevance,
       confidence,
+      verificationStatus: 'verified' as const,
     }));
 
   // Always show unranked candidates as suggestions (not just when rankings=0)
@@ -8749,7 +8897,20 @@ async function discoverRankedKeywords(input: {
       difficulty: baseline.difficulty,
       relevance: baseline.relevance,
       confidence: baseline.confidence,
+      verificationStatus: 'unverified' as const,
     }));
+
+  const warnings = buildDiscoveryWarnings({
+    competitorMiningStatus: candidateSet.competitorMiningStatus,
+    failedLookups,
+    timedOutLookups,
+  });
+  const verification = {
+    attempted: checkedKeywords,
+    succeeded: checkedOutcomes.length,
+    failed: Math.max(0, failedLookups - timedOutLookups),
+    timedOut: timedOutLookups,
+  };
 
   const payload = {
     mode: input.mode,
@@ -8757,12 +8918,21 @@ async function discoverRankedKeywords(input: {
     candidateCount: candidateSet.candidateCount,
     searchDepth: profile.searchDepth,
     failedLookups,
+    timedOutLookups,
     rankings,
     suggestions,
+    status: resolveDiscoveryResponseStatus({ warnings }),
+    warnings,
+    verification,
+    timings: {
+      candidateMs: candidateSet.candidateBuildMs || 0,
+      verificationMs: Date.now() - verificationStartedAt,
+      totalMs: Date.now() - startedAt,
+    },
   };
 
   console.log(
-    `[discovery-result] mode=${input.mode} checked=${checkedKeywords} checkedLimit=${candidatesToCheck.length} candidates=${rankedCandidates.length} rankings=${rankings.length} suggestions=${suggestions.length} failed=${failedLookups}`,
+    `[discovery-result] mode=${input.mode} checked=${checkedKeywords} checkedLimit=${candidatesToCheck.length} candidates=${rankedCandidates.length} rankings=${rankings.length} suggestions=${suggestions.length} verificationSucceeded=${verification.succeeded} failed=${verification.failed} timedOut=${verification.timedOut} competitorMining=${candidateSet.competitorMiningStatus || 'ok'} status=${payload.status} totalMs=${payload.timings.totalMs}`,
   );
 
   discoveryCache.set(cacheKey, {
@@ -8773,7 +8943,9 @@ async function discoverRankedKeywords(input: {
     candidateCount: candidateSet.candidateCount,
     searchDepth: profile.searchDepth,
     failedLookups,
+    timedOutLookups,
     loadedAt: new Date().toISOString(),
+    competitorMiningStatus: candidateSet.competitorMiningStatus,
   } satisfies DiscoveryResultCacheEntry);
   return payload;
 }
@@ -10527,6 +10699,17 @@ async function startServer() {
   app.post('/api/discover', discoverRateLimit, async (req, res) => {
     let appId = 'unknown';
     let storeType: StoreType | 'unknown' = 'unknown';
+    let discoveryInput: {
+      appId: string;
+      title: string;
+      description?: string;
+      category?: string;
+      developer?: string;
+      store: StoreType;
+      country: string;
+      mode: DiscoveryMode;
+      force?: boolean;
+    } | null = null;
     try {
       await requireAuthenticatedBillingAccess(req);
       appId = readRequiredString(req.body?.appId, 'appId', 160);
@@ -10538,7 +10721,7 @@ async function startServer() {
       const country = readOptionalString(req.body?.country, 'country', 12) || 'us';
       const discoveryMode: DiscoveryMode = req.body?.mode === 'fast' ? 'fast' : 'deep';
       const force = req.body?.force === true;
-      const data = await discoverRankedKeywords({
+      discoveryInput = {
         appId,
         title,
         description,
@@ -10548,7 +10731,25 @@ async function startServer() {
         country: normalizeCountryCode(country, 'us'),
         mode: discoveryMode,
         force,
-      });
+      };
+      let data;
+      try {
+        data = await discoverRankedKeywords(discoveryInput);
+      } catch (error) {
+        console.error(`Discovery error [appId=${appId}, store=${storeType}]:`, error);
+        if (
+          discoveryInput &&
+          discoveryInput.title &&
+          !(
+            isApiError(error) &&
+            (error.status === 400 || error.status === 401 || error.status === 403)
+          )
+        ) {
+          const fallback = await buildLocalDiscoveryFallbackPayload(discoveryInput);
+          return res.json(fallback);
+        }
+        throw error;
+      }
 
       res.json(data);
     } catch (error) {

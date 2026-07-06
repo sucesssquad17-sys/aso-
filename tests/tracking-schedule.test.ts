@@ -50,6 +50,10 @@ import {
   extractDiscoveryFeatureSummary,
   type DiscoveryPromptLimits,
 } from '../src/lib/discoveryPromptContext';
+import {
+  buildDiscoveryWarnings,
+  resolveDiscoveryResponseStatus,
+} from '../src/lib/discoveryResponse';
 
 const discoveryPromptLimits: DiscoveryPromptLimits = {
   promptCandidateLimit: 40,
@@ -1117,6 +1121,33 @@ test('discovery refinement prompt uses structured sections in order and omits em
   assert.ok(prompt.indexOf('Raw description excerpt:') < prompt.indexOf('Competitor repeated terms:'));
   assert.ok(prompt.indexOf('Competitor repeated terms:') < prompt.indexOf('Candidate keywords:'));
   assert.ok(prompt.includes('Return only a JSON array of strings. No markdown. No commentary.'));
+});
+
+test('discovery response metadata marks partial verification and fallback states clearly', () => {
+  const partialWarnings = buildDiscoveryWarnings({
+    competitorMiningStatus: 'timeout',
+    timedOutLookups: 2,
+  });
+  assert.deepEqual(partialWarnings, [
+    'Competitor mining timed out, so discovery used app metadata only.',
+    'Rank verification timed out for some keywords, so unverified suggestions are shown.',
+  ]);
+  assert.equal(
+    resolveDiscoveryResponseStatus({ warnings: partialWarnings }),
+    'partial',
+  );
+
+  const fallbackWarnings = buildDiscoveryWarnings({
+    fallback: true,
+    competitorMiningStatus: 'skipped',
+  });
+  assert.deepEqual(fallbackWarnings, [
+    'Showing fallback discovery suggestions.',
+  ]);
+  assert.equal(
+    resolveDiscoveryResponseStatus({ fallback: true, warnings: fallbackWarnings }),
+    'fallback',
+  );
 });
 
 test('active-limit helper always allows tracking when no keywords are paused', () => {
