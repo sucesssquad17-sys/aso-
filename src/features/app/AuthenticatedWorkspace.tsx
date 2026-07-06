@@ -12415,7 +12415,7 @@ function AuthenticatedApp({
                       </div>
 
                         <div className={cn(
-                          "rounded-2xl border border-app-border/70 bg-app-surface-muted/45 p-4 transition-all",
+                          `rounded-2xl border border-app-border/70 bg-app-surface-muted/45 transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
                           !competitorDraftOwnApp ? "hidden md:block opacity-40 pointer-events-none" : "block",
                           competitorDraftApps.length > 0 ? "opacity-60 md:opacity-100" : "opacity-100"
                         )}>
@@ -12470,7 +12470,7 @@ function AuthenticatedApp({
                       </div>
 
                       <div className={cn(
-                        "rounded-2xl border border-app-border/60 bg-app-surface/40 p-4 transition-all",
+                        `rounded-2xl border border-app-border/60 bg-app-surface/40 transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
                         competitorDraftApps.length === 0 ? "hidden md:block opacity-40 pointer-events-none" : "block"
                       )}>
                         <div className="md:hidden mb-4 border-b border-app-border pb-3">
@@ -12484,18 +12484,18 @@ function AuthenticatedApp({
                         </div>
                       )}
                       {competitorDraftAnalysis ? (
-                        <div className="space-y-4">
-                          <div className="grid gap-3 md:grid-cols-2">
+                        <div className={`${isMobileViewport ? "space-y-3" : "space-y-4"}`}>
+                          <div className={`grid gap-3 ${isMobileViewport ? "grid-cols-1" : "md:grid-cols-2"}`}>
                             {competitorDraftAnalysis.appInsights.map((insight) => (
                               <div
                                 key={`draft-${insight.appKey}`}
-                                className={`rounded-2xl border p-4 ${insight.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/70 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/60 bg-app-surface-muted/60"}`}
+                                className={`rounded-2xl border ${isMobileViewport ? "p-3" : "p-4"} ${insight.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/70 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/60 bg-app-surface-muted/60"}`}
                               >
                                 <div className="flex items-start gap-3">
                                   <img
                                     src={insight.app.icon}
                                     alt={insight.app.title}
-                                    className="h-11 w-11 rounded-xl border border-app-border/60 bg-app-surface-muted/80"
+                                    className={`${isMobileViewport ? "h-9 w-9" : "h-11 w-11"} rounded-xl border border-app-border/60 bg-app-surface-muted/80`}
                                   />
                                   <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-semibold text-app-text">
@@ -12506,7 +12506,7 @@ function AuthenticatedApp({
                                     </p>
                                   </div>
                                 </div>
-                                <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                <div className={`grid grid-cols-2 gap-2 text-xs ${isMobileViewport ? "mt-2" : "mt-3"}`}>
                                   <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-2 text-app-text-muted">
                                     Top 10/30/100
                                     <div className="mt-1 font-semibold text-app-text">
@@ -12520,7 +12520,7 @@ function AuthenticatedApp({
                                     </div>
                                   </div>
                                 </div>
-                                <p className="mt-3 text-xs text-app-text-muted">
+                                <p className={`${isMobileViewport ? "mt-2 line-clamp-1" : "mt-3"} text-xs text-app-text-muted`}>
                                   Best rank:{" "}
                                   <span className="font-semibold text-app-text">
                                     {insight.strongestKeyword
@@ -12531,20 +12531,20 @@ function AuthenticatedApp({
                               </div>
                             ))}
                           </div>
-                          <div className="rounded-2xl border border-app-border/60 bg-app-surface-muted/65 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                          <div className={`rounded-2xl border border-app-border/60 bg-app-surface-muted/65 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "p-3" : "p-4"}`}>
                             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                                   Track Keywords For This Group
                                 </p>
-                                <p className="mt-2 text-sm text-app-text-muted">
+                                <p className={`${isMobileViewport ? "mt-1.5 text-xs line-clamp-2" : "mt-2 text-sm"} text-app-text-muted`}>
                                   Add from keywords both apps rank for, or search
                                   any keyword and check both apps before tracking it.
                                 </p>
-                                <p className="mt-2 text-xs text-app-text-muted">
+                                <p className={`${isMobileViewport ? "mt-1" : "mt-2"} text-xs text-app-text-muted`}>
                                   {competitorDraftSaveHint}
                                 </p>
-                                <p className="mt-1 text-xs text-cyan-200/80">
+                                <p className="mt-1 text-[11px] text-cyan-200/80">
                                   Country picks stay in draft until you save or update this group.
                                 </p>
                               </div>
@@ -12591,7 +12591,7 @@ function AuthenticatedApp({
                                 </button>
                               </div>
                             </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
+                            <div className={`flex flex-wrap gap-2 ${isMobileViewport ? "mt-3" : "mt-4"}`}>
                               {competitorDraftSelectedKeywords.length > 0 ? (
                                 competitorDraftSelectedKeywords.map((selection) => (
                                   <button
@@ -12615,7 +12615,7 @@ function AuthenticatedApp({
                                 </p>
                               )}
                             </div>
-                            <div className="mt-5 space-y-3">
+                            <div className={`${isMobileViewport ? "mt-3 space-y-2" : "mt-5 space-y-3"}`}>
                               {competitorDraftKeywordCandidates.length > 0 ? (
                                 competitorDraftKeywordCandidates.map((candidate) => {
                                   const activeSelection =
@@ -12627,9 +12627,9 @@ function AuthenticatedApp({
                                   return (
                                     <div
                                       key={`${candidate.source}:${candidate.keyword}`}
-                                      className="rounded-2xl border border-app-border/50 bg-app-surface/45 p-4"
+                                      className={`rounded-2xl border border-app-border/50 bg-app-surface/45 ${isMobileViewport ? "p-3" : "p-4"}`}
                                     >
-                                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                      <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${isMobileViewport ? "gap-2" : "gap-3"}`}>
                                         <div>
                                           <div className="flex flex-wrap items-center gap-2">
                                             <p className="text-sm font-semibold text-slate-900 dark:text-app-text">
@@ -12654,7 +12654,7 @@ function AuthenticatedApp({
                                               </span>
                                             )}
                                           </div>
-                                          <p className="mt-1 text-xs text-app-text-muted">
+                                          <p className={`text-xs text-app-text-muted ${isMobileViewport ? "mt-0.5 line-clamp-2" : "mt-1"}`}>
                                             {candidate.detail}
                                           </p>
                                         </div>
@@ -12665,14 +12665,14 @@ function AuthenticatedApp({
                                               candidate.keyword,
                                             )
                                           }
-                                          className={`rounded-lg border px-3 py-2 text-[11px] font-semibold transition-colors ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-app-border/70 bg-app-surface-muted/80 text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
+                                          className={`rounded-lg border font-semibold transition-colors ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-[11px]"} ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-app-border/70 bg-app-surface-muted/80 text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
                                         >
                                           {activeSelection
                                             ? "Edit Countries"
                                             : "Choose Countries"}
                                         </button>
                                       </div>
-                                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                                      <div className={`grid gap-2 md:grid-cols-2 ${isMobileViewport ? "mt-2" : "mt-3"}`}>
                                         {candidate.apps.map((app) => {
                                           const rankDisplay = getTrackedRankDisplay({
                                             groupId: "draft",
@@ -12689,21 +12689,21 @@ function AuthenticatedApp({
                                           return (
                                             <div
                                               key={`${candidate.keyword}:${app.appKey}`}
-                                              className={`rounded-xl border px-3 py-3 ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
+                                              className={`rounded-xl border ${isMobileViewport ? "px-2.5 py-2" : "px-3 py-3"} ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
                                             >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
-                                                  <p className="truncate text-xs font-semibold text-app-text">
+                                                  <p className={`${isMobileViewport ? "text-[11px]" : "text-xs"} truncate font-semibold text-app-text`}>
                                                     {app.title}
                                                   </p>
-                                                  <p className="mt-1 text-[10px] uppercase tracking-[0.18em] text-app-text-muted">
+                                                  <p className={`${isMobileViewport ? "mt-0.5" : "mt-1"} text-[10px] uppercase tracking-[0.18em] text-app-text-muted`}>
                                                     {app.role === "own"
                                                       ? "Your app"
                                                       : "Rival"}
                                                   </p>
                                                 </div>
                                                 <p
-                                                  className={`text-sm font-display font-bold ${rankDisplay.className}`}
+                                                  className={`${isMobileViewport ? "text-[13px]" : "text-sm"} font-display font-bold ${rankDisplay.className}`}
                                                 >
                                                   {rankDisplay.label}
                                                 </p>
