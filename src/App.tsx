@@ -5949,7 +5949,7 @@ function AuthenticatedApp({
                         {autoRankings.map((r, i) => (
                           <div
                             key={i}
-                            className="min-w-0 bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 px-4 py-2.5 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:shadow-emerald-500/10 hover:border-emerald-500/40 hover:-translate-y-0.5"
+                            className="min-w-0 bg-emerald-950/40 border border-emerald-500/20 text-emerald-300 px-4 py-2.5 pr-12 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:shadow-emerald-500/10 hover:border-emerald-500/40 hover:-translate-y-0.5"
                           >
                             {" "}
                             <div className="flex items-center gap-2">
@@ -5985,7 +5985,7 @@ function AuthenticatedApp({
                                 </span>
                               )}{" "}
                             </div>{" "}
-                            <div className="absolute -top-3 -right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-100 transition-all sm:-top-3 sm:-right-2 sm:opacity-0 sm:group-hover:opacity-100">
                               {" "}
                               <button
                                 onClick={() =>
@@ -6035,7 +6035,7 @@ function AuthenticatedApp({
                         {keywordSuggestions.map((r, i) => (
                           <div
                             key={i}
-                            className="min-w-0 bg-app-surface-muted/70 border border-cyan-500/20 text-cyan-200 px-4 py-2.5 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:shadow-cyan-500/10 hover:border-cyan-500/40 hover:-translate-y-0.5"
+                            className="min-w-0 bg-app-surface-muted/70 border border-cyan-500/20 text-cyan-200 px-4 py-2.5 pr-12 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:shadow-cyan-500/10 hover:border-cyan-500/40 hover:-translate-y-0.5"
                           >
                             {" "}
                             <div className="flex items-center gap-2">
@@ -6065,7 +6065,7 @@ function AuthenticatedApp({
                                 </span>
                               )}{" "}
                             </div>{" "}
-                            <div className="absolute -top-3 -right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <div className="absolute top-2 right-2 flex items-center gap-1 opacity-100 transition-all sm:-top-3 sm:-right-2 sm:opacity-0 sm:group-hover:opacity-100">
                               {" "}
                               <button
                                 onClick={() =>

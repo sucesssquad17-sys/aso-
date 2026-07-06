@@ -10699,7 +10699,7 @@ function AuthenticatedApp({
   ]);
   const isLightTheme = themeMode === "light";
   const discoveryCardBaseClass =
-    "px-4 py-2.5 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:-translate-y-0.5";
+    "px-4 py-2.5 pr-12 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:-translate-y-0.5";
   const rankedKeywordCardClass = isLightTheme
     ? `${discoveryCardBaseClass} border border-sky-200/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(238,247,253,0.84))] text-slate-800 hover:border-sky-400/70 hover:shadow-sky-200/60`
     : `${discoveryCardBaseClass} bg-cyan-950/40 border border-cyan-500/20 text-cyan-300 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
@@ -15260,7 +15260,13 @@ function AuthenticatedApp({
                               )}{" "}
 
                             </div>{" "}
-                            <div className="absolute -top-3 -right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <div
+                              className={`absolute top-2 right-2 flex items-center gap-1 transition-all ${
+                                isMobileViewport
+                                  ? "opacity-100"
+                                  : "-top-3 -right-2 opacity-0 group-hover:opacity-100"
+                              }`}
+                            >
                               {" "}
                               <button
                                 onClick={() =>
@@ -15358,7 +15364,13 @@ function AuthenticatedApp({
                               )}{" "}
 
                             </div>{" "}
-                            <div className="absolute -top-3 -right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                            <div
+                              className={`absolute top-2 right-2 flex items-center gap-1 transition-all ${
+                                isMobileViewport
+                                  ? "opacity-100"
+                                  : "-top-3 -right-2 opacity-0 group-hover:opacity-100"
+                              }`}
+                            >
                               {" "}
                               <button
                                 onClick={() =>
