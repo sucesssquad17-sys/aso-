@@ -593,6 +593,10 @@ type DiscoveryProfile = {
   earlyExitRankings: number | null;
   minCheckedKeywords: number;
   searchDepth: number;
+  initialSearchDepth: number;
+  rankingCheckLimit: number;
+  proxyVerificationLimit: number;
+  extendedDepthCandidateLimit: number;
   competitorSeedLimit: number;
   competitorResultsPerSeed: number;
   competitorTermLimit: number;
@@ -606,6 +610,10 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     earlyExitRankings: 10,
     minCheckedKeywords: 12,
     searchDepth: 100,
+    initialSearchDepth: 100,
+    rankingCheckLimit: 24,
+    proxyVerificationLimit: 6,
+    extendedDepthCandidateLimit: 0,
     competitorSeedLimit: 3,
     competitorResultsPerSeed: 12,
     competitorTermLimit: 40,
@@ -617,6 +625,10 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     earlyExitRankings: 20,
     minCheckedKeywords: 20,
     searchDepth: 150,
+    initialSearchDepth: 100,
+    rankingCheckLimit: 40,
+    proxyVerificationLimit: 12,
+    extendedDepthCandidateLimit: 12,
     competitorSeedLimit: 5,
     competitorResultsPerSeed: 16,
     competitorTermLimit: 72,
@@ -5562,6 +5574,52 @@ async function getGooglePlayRankWithFallback(
   }
 }
 
+function shouldUseDiscoveryProxyVerification(
+  candidate: DiscoveryMetricCandidate,
+  candidateIndex: number,
+  profile: DiscoveryProfile,
+) {
+  if (candidateIndex >= profile.proxyVerificationLimit) {
+    return false;
+  }
+
+  const { baseline, displayQuality, features } = candidate;
+  const relevance = Number(baseline.relevance || 0);
+  const confidence = Number(baseline.confidence || 0);
+  return (
+    relevance >= 55 ||
+    confidence >= 55 ||
+    displayQuality >= 50 ||
+    features.exactTitleMatch > 0 ||
+    features.exactTitleSegment > 0 ||
+    features.orderedTitleCoverage >= 2
+  );
+}
+
+function shouldExtendDiscoveryDepth(
+  candidate: DiscoveryMetricCandidate,
+  candidateIndex: number,
+  profile: DiscoveryProfile,
+) {
+  if (
+    profile.searchDepth <= profile.initialSearchDepth ||
+    candidateIndex >= profile.extendedDepthCandidateLimit
+  ) {
+    return false;
+  }
+
+  const { baseline, displayQuality, features } = candidate;
+  const relevance = Number(baseline.relevance || 0);
+  const confidence = Number(baseline.confidence || 0);
+  return (
+    relevance >= 58 ||
+    confidence >= 58 ||
+    displayQuality >= 55 ||
+    features.exactTitleMatch > 0 ||
+    features.exactTitleSegment > 0
+  );
+}
+
 async function getGooglePlayAppWeb(appId: string, country: string) {
   const { html, status } = await fetchPlayStoreHtml(`/store/apps/details?id=${encodeURIComponent(appId)}`, country);
   if (status >= 400) {
@@ -8282,6 +8340,7 @@ async function discoverRankedKeywords(input: {
 
   const candidateSet = await buildRankedDiscoveryCandidates(input, profile, { force: input.force });
   const rankedCandidates = candidateSet.rankedCandidates;
+  const candidatesToCheck = rankedCandidates.slice(0, profile.rankingCheckLimit);
   const validRankings: DiscoveryCheckedCandidateOutcome[] = [];
   const checkedOutcomes: DiscoveryCheckedCandidateOutcome[] = [];
   const reusableOutcomeByKeyword = new Map<string, DiscoveryCheckedCandidateOutcome>();
@@ -8307,10 +8366,10 @@ async function discoverRankedKeywords(input: {
   let checkedKeywords = 0;
   let failedLookups = 0;
 
-  for (let i = 0; i < rankedCandidates.length; i += profile.batchSize) {
-    const batch = rankedCandidates.slice(i, i + profile.batchSize);
+  for (let i = 0; i < candidatesToCheck.length; i += profile.batchSize) {
+    const batch = candidatesToCheck.slice(i, i + profile.batchSize);
     const batchResults = await Promise.all(
-      batch.map(async (candidate) => {
+      batch.map(async (candidate, batchIndex) => {
         try {
           const reusableOutcome = reusableOutcomeByKeyword.get(
             normalizeKeyword(candidate.keyword),
@@ -8320,17 +8379,44 @@ async function discoverRankedKeywords(input: {
           }
 
           let rank: number;
+          const candidateIndex = i + batchIndex;
 
           if (input.store === 'android') {
+            const allowProxyVerification = shouldUseDiscoveryProxyVerification(
+              candidate,
+              candidateIndex,
+              profile,
+            );
             rank = await getGooglePlayRankWithFallback(
               candidate.keyword,
               input.appId,
               input.country,
-              profile.searchDepth,
+              profile.initialSearchDepth,
               getUpstreamDeadline(RANKING_FETCH_TIMEOUT_MS),
               'The app store search is taking too long. Please try again.',
               'discovery',
+              {
+                proxyFallbackOnNotRanked: allowProxyVerification,
+              },
             );
+
+            if (
+              rank === -1 &&
+              shouldExtendDiscoveryDepth(candidate, candidateIndex, profile)
+            ) {
+              rank = await getGooglePlayRankWithFallback(
+                candidate.keyword,
+                input.appId,
+                input.country,
+                profile.searchDepth,
+                getUpstreamDeadline(RANKING_FETCH_TIMEOUT_MS),
+                'The app store search is taking too long. Please try again.',
+                'discovery',
+                {
+                  proxyFallbackOnNotRanked: allowProxyVerification,
+                },
+              );
+            }
           } else {
             // iOS: use store.search which supports deep pagination
             const results: any[] = await searchStore(
@@ -8437,7 +8523,7 @@ async function discoverRankedKeywords(input: {
   };
 
   console.log(
-    `[discovery-result] mode=${input.mode} checked=${checkedKeywords} candidates=${rankedCandidates.length} rankings=${rankings.length} suggestions=${suggestions.length} failed=${failedLookups}`,
+    `[discovery-result] mode=${input.mode} checked=${checkedKeywords} checkedLimit=${candidatesToCheck.length} candidates=${rankedCandidates.length} rankings=${rankings.length} suggestions=${suggestions.length} failed=${failedLookups}`,
   );
 
   discoveryCache.set(cacheKey, {
