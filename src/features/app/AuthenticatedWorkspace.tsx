@@ -16613,9 +16613,9 @@ function AuthenticatedApp({
               {compareAnalyzedCount > 0 ? (
                 <div className="space-y-6">
                   {" "}
-                  <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+                  <div className={`grid xl:grid-cols-[1.05fr_0.95fr] ${isMobileViewport ? "gap-3" : "gap-6"}`}>
                     {" "}
-                    <div className="card p-6">
+                    <div className={`card ${isMobileViewport ? "p-3" : "p-6"}`}>
                       {" "}
                       <h3 className="section-header mb-6">
                         {" "}
@@ -16635,7 +16635,7 @@ function AuthenticatedApp({
                         Search Footprint Snapshot{" "}
                       </h3>{" "}
                       <div
-                        className="h-72 w-full min-w-0 rounded-xl p-2"
+                        className={`${isMobileViewport ? "h-40 p-1.5" : "h-72 p-2"} w-full min-w-0 rounded-xl`}
                         style={{ background: "rgba(5,10,25,0.5)" }}
                       >
                         {" "}
@@ -16695,42 +16695,42 @@ function AuthenticatedApp({
                           </BarChart>{" "}
                         </ResponsiveContainer>{" "}
                       </div>{" "}
-                      <p className="text-sm text-app-text-muted mt-5">
+                      <p className={`${isMobileViewport ? "mt-3 text-xs line-clamp-2" : "mt-5 text-sm"} text-app-text-muted`}>
                         {" "}
                         This gives a fast read on how much ranked keyword
                         coverage each app has, not just who wins on a single
                         term.{" "}
                       </p>{" "}
-                      <div className="mt-5 grid gap-3 md:grid-cols-3">
-                        <div className="workspace-panel !px-4 !py-3">
+                      <div className={`grid md:grid-cols-3 ${isMobileViewport ? "mt-3 gap-2" : "mt-5 gap-3"}`}>
+                        <div className={`workspace-panel ${isMobileViewport ? "!px-3 !py-2.5" : "!px-4 !py-3"}`}>
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Coverage leader
                           </p>
-                          <p className="mt-2 text-sm font-semibold text-app-text">
+                          <p className={`${isMobileViewport ? "mt-1.5 text-xs" : "mt-2 text-sm"} font-semibold text-app-text`}>
                             {compareCoverageLeader?.appDetails.title || "No data"}
                           </p>
-                          <p className="mt-1 text-xs text-app-text-muted">
+                          <p className={`${isMobileViewport ? "line-clamp-2" : ""} mt-1 text-xs text-app-text-muted`}>
                             {compareCoverageLeader
                               ? `${compareCoverageLeader.top100} top-100 rankings`
                               : "Refresh compare analysis to load coverage data."}
                           </p>
                         </div>
-                        <div className="workspace-panel !px-4 !py-3">
+                        <div className={`workspace-panel ${isMobileViewport ? "!px-3 !py-2.5" : "!px-4 !py-3"}`}>
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Contested keywords
                           </p>
-                          <p className="mt-2 text-sm font-semibold text-app-text">
+                          <p className={`${isMobileViewport ? "mt-1.5 text-xs" : "mt-2 text-sm"} font-semibold text-app-text`}>
                             {compareSharedBattles.length}
                           </p>
                           <p className="mt-1 text-xs text-app-text-muted">
                             Terms where multiple compared apps already rank.
                           </p>
                         </div>
-                        <div className="workspace-panel !px-4 !py-3">
+                        <div className={`workspace-panel ${isMobileViewport ? "!px-3 !py-2.5" : "!px-4 !py-3"}`}>
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Opportunity gaps
                           </p>
-                          <p className="mt-2 text-sm font-semibold text-app-text">
+                          <p className={`${isMobileViewport ? "mt-1.5 text-xs" : "mt-2 text-sm"} font-semibold text-app-text`}>
                             {compareGapRows.length}
                           </p>
                           <p className="mt-1 text-xs text-app-text-muted">
@@ -16738,7 +16738,7 @@ function AuthenticatedApp({
                           </p>
                         </div>
                       </div>
-                      <div className="workspace-panel mt-5">
+                      <div className={`workspace-panel ${isMobileViewport ? "mt-3 !px-3 !py-2.5" : "mt-5"}`}>
                         <div className="flex items-center justify-between gap-3">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                             Coverage ladder
@@ -16747,17 +16747,17 @@ function AuthenticatedApp({
                             {compareCoverageLeaders.length} apps ranked
                           </p>
                         </div>
-                        <div className="mt-3 space-y-2">
+                        <div className={`${isMobileViewport ? "mt-2 space-y-1.5" : "mt-3 space-y-2"}`}>
                           {compareCoverageLeaders.map((insight, index) => (
                             <div
                               key={`coverage-leader-${insight.compareKey}`}
-                              className="workspace-metric-card !flex-row items-center gap-3 !px-3 !py-2.5"
+                              className={`workspace-metric-card !flex-row items-center ${isMobileViewport ? "gap-2 !px-2.5 !py-2" : "gap-3 !px-3 !py-2.5"}`}
                             >
                               <div className="w-8 text-center text-xs font-bold text-app-text-muted">
                                 #{index + 1}
                               </div>
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-semibold text-app-text">
+                                <p className={`${isMobileViewport ? "text-xs" : "text-sm"} truncate font-semibold text-app-text`}>
                                   {insight.appDetails.title}
                                 </p>
                                 <p className="truncate text-xs text-app-text-muted">
@@ -16784,7 +16784,7 @@ function AuthenticatedApp({
                         </div>
                       </div>
                     </div>{" "}
-                    <div className="card p-6">
+                    <div className={`card ${isMobileViewport ? "p-3" : "p-6"}`}>
                       {" "}
                       <h3 className="section-header mb-6">
                         {" "}
@@ -16800,23 +16800,23 @@ function AuthenticatedApp({
                         </span>{" "}
                         Highest-Value Gaps{" "}
                       </h3>{" "}
-                      <div className="space-y-3">
+                      <div className={`${isMobileViewport ? "space-y-2" : "space-y-3"}`}>
                         {" "}
                         {compareGapRows.length > 0 ? (
                           compareGapRows.slice(0, 5).map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="workspace-panel"
+                              className={`workspace-panel ${isMobileViewport ? "!px-3 !py-2.5" : ""}`}
                             >
                               {" "}
                               <div className="flex items-start justify-between gap-3">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-app-text">
+                                  <div className={`${isMobileViewport ? "text-sm" : ""} font-semibold text-app-text`}>
                                     {gapRow.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-app-text-muted">
+                                  <div className={`${isMobileViewport ? "line-clamp-2" : ""} mt-1 text-xs text-app-text-muted`}>
                                     {" "}
                                     {gapRow.isWhitespace
                                       ? `Emerging whitespace: suggested across ${gapRow.rankedApps.length + gapRow.missingApps.length} apps, but nobody ranks yet.`
@@ -16827,7 +16827,7 @@ function AuthenticatedApp({
                                   Score {gapRow.score}
                                 </span>{" "}
                               </div>{" "}
-                              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                              <div className={`flex flex-wrap text-xs ${isMobileViewport ? "mt-2 gap-1.5" : "mt-3 gap-2"}`}>
                                 {" "}
                                 <span className="metric-chip badge-cyan">
                                   Est. Vol {gapRow.averageVolume}
@@ -16850,9 +16850,9 @@ function AuthenticatedApp({
                       </div>{" "}
                     </div>{" "}
                   </div>{" "}
-                  <div className="grid gap-6 xl:grid-cols-2">
+                  <div className={`grid xl:grid-cols-2 ${isMobileViewport ? "gap-3" : "gap-6"}`}>
                     {" "}
-                    <div className="card p-6">
+                    <div className={`card ${isMobileViewport ? "p-3" : "p-6"}`}>
                       {" "}
                       <h3 className="section-header mb-6">
                         {" "}
@@ -16871,30 +16871,30 @@ function AuthenticatedApp({
                         </span>{" "}
                         Contested Keywords{" "}
                       </h3>{" "}
-                      <div className="space-y-3">
+                      <div className={`${isMobileViewport ? "space-y-2" : "space-y-3"}`}>
                         {" "}
                         {compareSharedBattles.length > 0 ? (
                           compareSharedBattles.map((battle) => (
                             <div
                               key={battle.keyword}
-                              className="workspace-panel"
+                              className={`workspace-panel ${isMobileViewport ? "!px-3 !py-2.5" : ""}`}
                             >
                               {" "}
-                              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                              <div className={`flex flex-col md:flex-row md:items-start md:justify-between ${isMobileViewport ? "gap-2" : "gap-3"}`}>
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-app-text">
+                                  <div className={`${isMobileViewport ? "text-sm" : ""} font-semibold text-app-text`}>
                                     {battle.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-app-text-muted">
+                                  <div className={`${isMobileViewport ? "line-clamp-2" : ""} mt-1 text-xs text-app-text-muted`}>
                                     {" "}
                                     {battle.leader.appTitle} leads this battle;
                                     gap to the next ranked app is {battle.gap}{" "}
                                     positions.{" "}
                                   </div>{" "}
                                 </div>{" "}
-                                <div className="flex flex-wrap gap-2 text-xs">
+                                <div className={`flex flex-wrap text-xs ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
                                   {" "}
                                   <span className="metric-chip badge-cyan">
                                     Est. Vol {battle.averageVolume}
@@ -16907,12 +16907,12 @@ function AuthenticatedApp({
                                   </span>{" "}
                                 </div>{" "}
                               </div>{" "}
-                              <div className="mt-3 flex flex-wrap gap-2">
+                              <div className={`flex flex-wrap ${isMobileViewport ? "mt-2 gap-1.5" : "mt-3 gap-2"}`}>
                                 {" "}
                                 {battle.rankedApps.map((rankedApp) => (
                                   <span
                                     key={`${battle.keyword}-${rankedApp.appKey}`}
-                                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold border ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-app-surface-muted/80 border-app-border/80 text-app-text-muted"}`}
+                                    className={`rounded-lg border text-xs font-semibold ${isMobileViewport ? "px-2.5 py-1" : "px-3 py-1.5"} ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-app-surface-muted/80 border-app-border/80 text-app-text-muted"}`}
                                   >
                                     {" "}
                                     {rankedApp.appTitle} #{rankedApp.rank}{" "}
@@ -16928,7 +16928,7 @@ function AuthenticatedApp({
                         )}{" "}
                       </div>{" "}
                     </div>{" "}
-                    <div className="card p-6">
+                    <div className={`card ${isMobileViewport ? "p-3" : "p-6"}`}>
                       {" "}
                       <h3 className="section-header mb-6">
                         {" "}
@@ -17006,7 +17006,7 @@ function AuthenticatedApp({
                       </div>{" "}
                     </div>{" "}
                   </div>{" "}
-                  <div className="card p-6 md:p-8">
+                  <div className={`card ${isMobileViewport ? "p-3" : "p-6 md:p-8"}`}>
                     {" "}
                     <h3 className="section-header mb-6">
                       {" "}
@@ -17056,13 +17056,13 @@ function AuthenticatedApp({
                         )}{" "}
                       </button>{" "}
                     </form>{" "}
-                    <p className="text-xs text-app-text-muted mb-6">
+                    <p className={`${isMobileViewport ? "mb-3 line-clamp-2" : "mb-6"} text-xs text-app-text-muted`}>
                       {" "}
                       Relevance is estimated per app, so this section is useful
                       for side-by-side fit as well as rank.{" "}
                     </p>{" "}
                     {compareRankings.length > 0 && (
-                      <div className="space-y-3">
+                      <div className={`${isMobileViewport ? "space-y-2" : "space-y-3"}`}>
                         {" "}
                         <p className="text-sm text-app-text-muted">
                           Rankings for "{compareKeyword}"
@@ -17070,15 +17070,15 @@ function AuthenticatedApp({
                         {compareRankings.map((result, index) => (
                           <div
                             key={`${result.appTitle}-${index}`}
-                            className="workspace-panel !flex-col md:!flex-row md:!items-center md:!justify-between gap-3"
+                            className={`workspace-panel !flex-col md:!flex-row md:!items-center md:!justify-between ${isMobileViewport ? "!px-3 !py-2.5 gap-2" : "gap-3"}`}
                           >
                             {" "}
                             <div>
                               {" "}
-                              <div className="font-medium text-app-text">
+                              <div className={`${isMobileViewport ? "text-sm" : ""} font-medium text-app-text`}>
                                 {result.appTitle}
                               </div>{" "}
-                              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                              <div className={`flex flex-wrap text-xs ${isMobileViewport ? "mt-1.5 gap-1.5" : "mt-2 gap-2"}`}>
                                 {" "}
                                 {getEstimatedDemand(result) !== undefined && (
                                   <span className="metric-chip badge-cyan">
