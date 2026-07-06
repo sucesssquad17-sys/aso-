@@ -16953,17 +16953,23 @@ function AuthenticatedApp({
                           compareGapRows.map((gapRow, index) => (
                             <div
                               key={`${gapRow.keyword}-${index}`}
-                              className="workspace-panel"
+                              className={`workspace-panel ${
+                                isMobileViewport ? "!px-3 !py-2.5" : ""
+                              }`}
                             >
                               {" "}
                               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                                 {" "}
                                 <div>
                                   {" "}
-                                  <div className="font-semibold text-app-text">
+                                  <div className={`${isMobileViewport ? "text-sm" : ""} font-semibold text-app-text`}>
                                     {gapRow.keyword}
                                   </div>{" "}
-                                  <div className="mt-1 text-xs text-app-text-muted">
+                                  <div
+                                    className={`mt-1 text-xs text-app-text-muted ${
+                                      isMobileViewport ? "line-clamp-2" : ""
+                                    }`}
+                                  >
                                     {" "}
                                     {gapRow.isWhitespace
                                       ? `Suggested by multiple apps, but none currently rank.`
@@ -16974,7 +16980,11 @@ function AuthenticatedApp({
                                   Priority {gapRow.score}
                                 </span>{" "}
                               </div>{" "}
-                              <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                              <div
+                                className={`flex flex-wrap text-xs ${
+                                  isMobileViewport ? "mt-2 gap-1.5" : "mt-3 gap-2"
+                                }`}
+                              >
                                 {" "}
                                 <span className="metric-chip badge-cyan">
                                   Est. Vol {gapRow.averageVolume}
