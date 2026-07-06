@@ -14995,16 +14995,16 @@ function AuthenticatedApp({
           )}
           {/* Selected App Dashboard */}{" "}
           {viewMode === "single" && selectedApp && (
-            <div className="space-y-6" ref={singleExportRef}>
+            <div className={isMobileViewport ? "space-y-4" : "space-y-6"} ref={singleExportRef}>
               {" "}
               {/* App Hero Card */}{" "}
-              <div className="card-glow p-6 md:p-8 flex flex-col md:flex-row items-center md:items-start gap-6">
+              <div className={`card-glow flex flex-col md:flex-row items-center md:items-start ${isMobileViewport ? "gap-3 p-4" : "gap-6 p-6 md:p-8"}`}>
                 {" "}
                 {/* Icon with ring */}{" "}
                 <div className="relative flex-shrink-0">
                   {" "}
                   <div
-                    className="p-1 rounded-[28px]"
+                    className={isMobileViewport ? "rounded-[22px] p-1" : "rounded-[28px] p-1"}
                     style={{
                       background:
                         "linear-gradient(135deg, rgba(34, 211, 238,0.3), rgba(129,140,248,0.3))",
@@ -15014,22 +15014,22 @@ function AuthenticatedApp({
                     <img
                       src={selectedApp.icon}
                       alt={selectedApp.title}
-                      className="w-28 h-28 md:w-32 md:h-32 rounded-[24px] object-cover"
+                      className={`${isMobileViewport ? "h-20 w-20 rounded-[18px]" : "h-28 w-28 rounded-[24px] md:h-32 md:w-32"} object-cover`}
                     />{" "}
                   </div>{" "}
                 </div>{" "}
                 <div className="flex-1 w-full text-center md:text-left">
                   {" "}
-                  <div className="flex flex-col md:flex-row justify-between items-center md:items-start gap-4">
+                  <div className={`flex flex-col md:flex-row justify-between items-center md:items-start ${isMobileViewport ? "gap-2" : "gap-4"}`}>
                     {" "}
                     <div className="flex-1">
                       {" "}
-                      <div className="flex flex-wrap justify-center md:justify-start items-center gap-2.5 mb-1.5">
+                      <div className={`flex flex-wrap justify-center md:justify-start items-center ${isMobileViewport ? "mb-1 gap-2" : "mb-1.5 gap-2.5"}`}>
                         {" "}
                         <h2
-                          className="font-display font-bold text-app-text"
+                          className={`font-display font-bold text-app-text ${isMobileViewport ? "max-w-[16rem]" : ""}`}
                           style={{
-                            fontSize: "1.75rem",
+                            fontSize: isMobileViewport ? "1.1rem" : "1.75rem",
                             letterSpacing: "-0.03em",
                             lineHeight: "1.1",
                           }}
@@ -15041,7 +15041,7 @@ function AuthenticatedApp({
                             href={selectedApp.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex-shrink-0 p-2 rounded-xl transition-all"
+                            className={`flex-shrink-0 transition-all ${isMobileViewport ? "rounded-lg p-1.5" : "rounded-xl p-2"}`}
                             style={{
                               background: "rgba(34, 211, 238,0.08)",
                               border: "1px solid rgba(34, 211, 238,0.2)",
@@ -15050,11 +15050,11 @@ function AuthenticatedApp({
                             title="Open in Store"
                           >
                             {" "}
-                            <ExternalLink className="w-4 h-4" />{" "}
+                            <ExternalLink className={isMobileViewport ? "h-3.5 w-3.5" : "w-4 h-4"} />{" "}
                           </a>
                         )}{" "}
                       </div>{" "}
-                      <p className="text-app-text-muted font-medium">
+                      <p className={`${isMobileViewport ? "text-base" : ""} text-app-text-muted font-medium`}>
                         {selectedApp.developer}
                       </p>{" "}
                     </div>{" "}
@@ -15063,7 +15063,7 @@ function AuthenticatedApp({
                         onClick={() =>
                           toggleBookmark(selectedApp, storeType, country)
                         }
-                        className="p-2.5 rounded-xl transition-all flex items-center justify-center"
+                        className={`transition-all flex items-center justify-center ${isMobileViewport ? "rounded-lg p-2" : "rounded-xl p-2.5"}`}
                         style={
                           isSelectedAppBookmarked
                             ? {
@@ -15085,43 +15085,43 @@ function AuthenticatedApp({
                       >
                         {" "}
                         <Bookmark
-                          className={`w-5 h-5 ${isSelectedAppBookmarked ? "fill-current" : ""}`}
+                          className={`${isMobileViewport ? "h-4 w-4" : "w-5 h-5"} ${isSelectedAppBookmarked ? "fill-current" : ""}`}
                         />{" "}
                       </button>{" "}
                     </div>{" "}
                   </div>{" "}
                   {/* Stats row */}{" "}
-                  <div className="mt-5 flex flex-wrap justify-center md:justify-start gap-2">
+                  <div className={`flex flex-wrap justify-center md:justify-start ${isMobileViewport ? "mt-3 gap-1.5" : "mt-5 gap-2"}`}>
                     {" "}
-                    <div className="stat-card">
+                    <div className={isMobileViewport ? "stat-card !min-h-0 !rounded-2xl !px-3 !py-2" : "stat-card"}>
                       {" "}
-                      <span style={{ color: "#fbbf24", fontSize: "1.125rem" }}>
+                      <span style={{ color: "#fbbf24", fontSize: isMobileViewport ? "1rem" : "1.125rem" }}>
                         &#9733;
                       </span>{" "}
-                      <span className="text-sm font-semibold text-app-text font-mono">
+                      <span className={`${isMobileViewport ? "text-[13px]" : "text-sm"} font-semibold text-app-text font-mono`}>
                         {selectedApp.score
                           ? Number(selectedApp.score).toFixed(1)
                           : "N/A"}
                       </span>{" "}
                     </div>{" "}
                     {selectedApp.installs && (
-                      <div className="stat-card">
+                      <div className={isMobileViewport ? "stat-card !min-h-0 !rounded-2xl !px-3 !py-2" : "stat-card"}>
                         {" "}
                         <Download
-                          className="w-4 h-4"
+                          className={isMobileViewport ? "h-3.5 w-3.5" : "w-4 h-4"}
                           style={{ color: "#64748b" }}
                         />{" "}
-                        <span className="text-sm font-medium text-app-text-muted">
+                        <span className={`${isMobileViewport ? "text-[13px]" : "text-sm"} font-medium text-app-text-muted`}>
                           {selectedApp.installs}
                         </span>{" "}
                       </div>
                     )}{" "}
                     {selectedApp.category && (
-                      <div className="stat-card">
+                      <div className={isMobileViewport ? "stat-card !min-h-0 !rounded-2xl !px-3 !py-2" : "stat-card"}>
                         {" "}
                         <span
                           className="badge badge-cyan"
-                          style={{ fontSize: "0.625rem" }}
+                          style={{ fontSize: isMobileViewport ? "0.56rem" : "0.625rem" }}
                         >
                           {selectedApp.category}
                         </span>{" "}
