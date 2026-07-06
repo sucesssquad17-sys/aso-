@@ -1,0 +1,17 @@
+# Rank Analyzer Pro
+
+Rank Analyzer Pro is an ASO keyword tracking platform for mobile app teams.
+
+Main pages:
+- https://rankanalyzerpro.com/
+- https://rankanalyzerpro.com/aso-rank-tracker/
+- https://rankanalyzerpro.com/google-play-keyword-rank-tracker/
+- https://rankanalyzerpro.com/app-store-keyword-rank-tracker/
+- https://rankanalyzerpro.com/competitor-app-keyword-tracker/
+- https://rankanalyzerpro.com/app-keyword-tracking-tool/
+
+Core use cases:
+- Track App Store and Google Play keyword rankings by country
+- Monitor competitor keyword overlap and movement
+- Review daily rank history and alerts
+- Discover keyword opportunities worth tracking

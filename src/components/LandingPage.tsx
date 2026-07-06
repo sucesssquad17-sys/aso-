@@ -564,6 +564,34 @@ export default function LandingPage({
                   ))}
                 </ul>
               </div>
+
+              <div>
+                <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-app-text-muted">
+                  SEO Pages
+                </h3>
+                <ul className="flex flex-col space-y-3 text-app-text-muted">
+                  <li>
+                    <a href="/aso-rank-tracker/" className="transition-colors hover:text-app-text">
+                      ASO Rank Tracker
+                    </a>
+                  </li>
+                  <li>
+                    <a href="/google-play-keyword-rank-tracker/" className="transition-colors hover:text-app-text">
+                      Google Play Tracker
+                    </a>
+                  </li>
+                  <li>
+                    <a href="/app-store-keyword-rank-tracker/" className="transition-colors hover:text-app-text">
+                      App Store Tracker
+                    </a>
+                  </li>
+                  <li>
+                    <a href="/competitor-app-keyword-tracker/" className="transition-colors hover:text-app-text">
+                      Competitor Tracking
+                    </a>
+                  </li>
+                </ul>
+              </div>
               
               <div>
                 <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-app-text-muted">
@@ -589,7 +617,7 @@ export default function LandingPage({
                 </ul>
               </div>
               
-              <div className="col-span-2 sm:col-span-1">
+              <div className="col-span-2 sm:col-span-3 lg:col-span-1">
                 <h3 className="mb-4 font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                   Focus
                 </h3>
