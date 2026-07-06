@@ -177,12 +177,12 @@ export function WorkspaceEmptyBlock({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="workspace-empty-block">
-      <div className="workspace-empty-icon">
+    <div className="workspace-empty-block px-5 py-6 sm:px-8 sm:py-8">
+      <div className="workspace-empty-icon h-11 w-11 sm:h-14 sm:w-14">
         <Icon className="h-6 w-6" />
       </div>
-      <h3 className="workspace-empty-title">{title}</h3>
-      <p className="workspace-empty-description">{description}</p>
+      <h3 className="workspace-empty-title text-sm sm:text-base">{title}</h3>
+      <p className="workspace-empty-description max-w-[20rem] text-[11px] sm:text-sm">{description}</p>
       {action && <div className="mt-2">{action}</div>}
     </div>
   );

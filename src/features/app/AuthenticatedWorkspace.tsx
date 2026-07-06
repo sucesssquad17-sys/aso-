@@ -10585,25 +10585,27 @@ function AuthenticatedApp({
         {
           label: "Saved Groups",
           value: competitorGroupStats.groupCount,
-          hint: `${competitorGroupStats.withSnapshots} with snapshots`,
+          hint: isMobileViewport
+            ? `${competitorGroupStats.withSnapshots} snap`
+            : `${competitorGroupStats.withSnapshots} with snapshots`,
           accent: "cyan" as const,
         },
         {
           label: "Snapshots",
           value: competitorGroupStats.snapshotCount,
-          hint: "Saved analyses",
+          hint: isMobileViewport ? "Saved runs" : "Saved analyses",
           accent: "violet" as const,
         },
         {
           label: "Tracked Terms",
           value: competitorGroupStats.trackedKeywordCount,
-          hint: "Terms in groups",
+          hint: isMobileViewport ? "In groups" : "Terms in groups",
           accent: "cyan" as const,
         },
         {
           label: "Ranked Pairs",
           value: competitorRankedPairs,
-          hint: "Pairs ranking now",
+          hint: isMobileViewport ? "Live now" : "Pairs ranking now",
           accent: "amber" as const,
         },
       ];
@@ -10683,6 +10685,7 @@ function AuthenticatedApp({
     competitorGroupStats.trackedKeywordCount,
     competitorGroupStats.withSnapshots,
     competitorRankedPairs,
+    isMobileViewport,
     keywordSuggestions.length,
     selectedAppAnalysisSnapshot,
     selectedAppChartEntry,
@@ -10959,7 +10962,7 @@ function AuthenticatedApp({
   }
 
   const renderSearchSection = (isCompact = false) => (
-    <WorkspacePanel className={`workspace-search-panel workspace-toolbar-panel ${isCompact ? "p-3 mb-6" : "mb-8"}`} tone={isCompact ? "muted" : "strong"}>
+    <WorkspacePanel className={`workspace-search-panel workspace-toolbar-panel ${isCompact ? (isMobileViewport ? "mb-4 p-2.5" : "mb-6 p-3") : isMobileViewport ? "mb-5" : "mb-8"}`} tone={isCompact ? "muted" : "strong"}>
               {!isCompact && (
 <div className="workspace-search-composer-header mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
@@ -10989,7 +10992,7 @@ function AuthenticatedApp({
                 </div>
               </div>
               )}
-              <div className="workspace-search-composer-body flex flex-col gap-2">
+              <div className={`workspace-search-composer-body flex flex-col ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
                 <div className="workspace-search-composer-controls flex flex-wrap items-center gap-1.5">
                   <div className="workspace-store-toggle shrink-0">
                     <button
@@ -11025,7 +11028,7 @@ function AuthenticatedApp({
                       onChange={handleCountryChange}
                       options={COUNTRIES}
                       ariaLabel="Select storefront country"
-                      className="w-[120px] min-w-0 sm:w-[168px] sm:min-w-[168px]"
+                      className={`${isMobileViewport ? "w-[112px]" : "w-[120px]"} min-w-0 sm:w-[168px] sm:min-w-[168px]`}
                     />
                   </div>
                 </div>
@@ -11044,7 +11047,7 @@ function AuthenticatedApp({
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder={`Search apps or paste a ${storeType === "android" ? "Play Store" : "App Store"} URL...`}
-                      className="input-field workspace-search-composer-input !py-2 text-sm sm:!py-2.5 sm:text-[0.95rem] w-full"
+                      className={`input-field workspace-search-composer-input w-full text-sm ${isMobileViewport ? "!py-1.5" : "!py-2"} sm:!py-2.5 sm:text-[0.95rem]`}
                       style={{
                         paddingLeft: "2.45rem",
                         paddingRight: searchTerm ? "2.45rem" : "1rem",
@@ -11067,7 +11070,7 @@ function AuthenticatedApp({
                   <button
                     type="submit"
                     disabled={isSearching || !searchTerm.trim()}
-                    className="btn-primary workspace-search-composer-submit w-full !px-4 !py-2 text-sm sm:w-auto sm:!px-6 sm:!py-2.5 sm:text-[0.9rem]"
+                    className={`btn-primary workspace-search-composer-submit w-full text-sm sm:w-auto sm:!px-6 sm:!py-2.5 sm:text-[0.9rem] ${isMobileViewport ? "!px-4 !py-1.5" : "!px-4 !py-2"}`}
                   >
                     {isSearching ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -11082,10 +11085,10 @@ function AuthenticatedApp({
                 {visibleWorkspaceMode === "competitors" &&
                   !isCompact &&
                   competitorDraftStarted && (
-                  <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/45 p-3 sm:p-4">
+                  <div className={`mt-3 rounded-2xl border border-app-border/60 bg-app-surface/45 ${isMobileViewport ? "p-2.5" : "p-3 sm:p-4"}`}>
                     <div className="flex flex-col gap-3">
                       <div className="grid gap-2 md:grid-cols-2">
-                        <div className="rounded-xl border border-app-border/60 bg-app-surface-muted/65 px-3 py-3">
+                        <div className={`rounded-xl border border-app-border/60 bg-app-surface-muted/65 ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                               Your App
@@ -11128,7 +11131,7 @@ function AuthenticatedApp({
                             </p>
                           )}
                         </div>
-                        <div className="rounded-xl border border-app-border/60 bg-app-surface-muted/65 px-3 py-3">
+                        <div className={`rounded-xl border border-app-border/60 bg-app-surface-muted/65 ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               Rival App
@@ -11191,7 +11194,7 @@ function AuthenticatedApp({
                                 setCompetitorGroupMode(mode);
                                 clearCompetitorDraftAnalysis();
                               }}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors ${competitorGroupMode === mode ? "bg-app-surface-muted text-cyan-100 ring-1 ring-inset ring-cyan-300/10" : "text-app-text-muted hover:text-app-text"}`}
+                              className={`rounded-lg ${isMobileViewport ? "px-2.5 py-1 text-[10px]" : "px-3 py-1.5 text-xs"} font-semibold uppercase tracking-wide transition-colors ${competitorGroupMode === mode ? "bg-app-surface-muted text-cyan-100 ring-1 ring-inset ring-cyan-300/10" : "text-app-text-muted hover:text-app-text"}`}
                             >
                               {mode}
                             </button>
@@ -11204,7 +11207,7 @@ function AuthenticatedApp({
                             disabled={
                               isAnalyzingCompetitorGroup || !competitorDraftCanAnalyze
                             }
-                            className="btn-primary"
+                            className={isMobileViewport ? "btn-primary !px-3 !py-1.5 !text-[11px]" : "btn-primary"}
                           >
                             {isAnalyzingCompetitorGroup ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
@@ -11217,7 +11220,7 @@ function AuthenticatedApp({
                             <button
                               type="button"
                               onClick={resetCompetitorDraft}
-                              className="btn-ghost"
+                              className={isMobileViewport ? "btn-ghost !px-3 !py-1.5 !text-[11px]" : "btn-ghost"}
                             >
                               Reset
                             </button>
@@ -11300,12 +11303,24 @@ function AuthenticatedApp({
                 searchResults.length === 0 &&
                 !error &&
                 shouldShowSearchResults && (
-                  <div className="mt-4">
-                    <WorkspaceEmptyBlock
-                      icon={Search}
-                      title="No apps found"
-                      description="Try adjusting your search term or paste a direct store URL."
-                    />
+                  <div className="mt-3">
+                    {isMobileViewport ? (
+                      <div className="workspace-empty-block px-4 py-5">
+                        <div className="workspace-empty-icon !h-10 !w-10">
+                          <Search className="h-5 w-5" />
+                        </div>
+                        <h3 className="workspace-empty-title !text-sm">No apps found</h3>
+                        <p className="workspace-empty-description !max-w-[18rem] !text-[11px]">
+                          Try adjusting your search term or paste a direct store URL.
+                        </p>
+                      </div>
+                    ) : (
+                      <WorkspaceEmptyBlock
+                        icon={Search}
+                        title="No apps found"
+                        description="Try adjusting your search term or paste a direct store URL."
+                      />
+                    )}
                   </div>
                 )}{" "}
               {!isSearching && searchResults.length > 0 && shouldShowSearchResults && (
@@ -12281,12 +12296,12 @@ function AuthenticatedApp({
             renderSearchSection(false)
           }          {/* Competitors Dashboard */}{" "}
           {viewMode === "competitors" && (
-            <div className="space-y-6" ref={competitorsExportRef}>
+            <div className={isMobileViewport ? "space-y-4" : "space-y-6"} ref={competitorsExportRef}>
               {/* Compact Search Section for Competitors */}
               {competitorDraftHasAnalysis && renderSearchSection(true)}
               {competitorDraftHasAnalysis ? (
-                <div className="card p-5 md:p-6">
-                  <div className="flex flex-col gap-5">
+                <div className={`card ${isMobileViewport ? "p-3.5" : "p-5 md:p-6"}`}>
+                  <div className={`flex flex-col ${isMobileViewport ? "gap-4" : "gap-5"}`}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <h3 className="section-header">
@@ -12531,20 +12546,20 @@ function AuthenticatedApp({
                               </div>
                             ))}
                           </div>
-                          <div className={`rounded-2xl border border-app-border/60 bg-app-surface-muted/65 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "p-3" : "p-4"}`}>
+                          <div className={`rounded-2xl border border-app-border/60 bg-app-surface-muted/65 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "p-2.5" : "p-4"}`}>
                             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                                   Track Keywords For This Group
                                 </p>
-                                <p className={`${isMobileViewport ? "mt-1.5 text-xs line-clamp-2" : "mt-2 text-sm"} text-app-text-muted`}>
+                                <p className={`${isMobileViewport ? "mt-1 text-[11px] line-clamp-2" : "mt-2 text-sm"} text-app-text-muted`}>
                                   Add from keywords both apps rank for, or search
                                   any keyword and check both apps before tracking it.
                                 </p>
                                 <p className={`${isMobileViewport ? "mt-1" : "mt-2"} text-xs text-app-text-muted`}>
                                   {competitorDraftSaveHint}
                                 </p>
-                                <p className="mt-1 text-[11px] text-cyan-200/80">
+                                <p className={`${isMobileViewport ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]"} text-cyan-200/80`}>
                                   Country picks stay in draft until you save or update this group.
                                 </p>
                               </div>
@@ -12566,7 +12581,7 @@ function AuthenticatedApp({
                                       }
                                     }}
                                     placeholder="Search a keyword for both apps"
-                                    className="w-full rounded-xl border border-app-border/60 bg-app-surface/70 py-2 sm:py-2.5 pl-9 pr-3 text-[13px] sm:text-sm text-app-text outline-none transition-colors placeholder:text-app-text-muted focus:border-cyan-400/30"
+                                    className={`w-full rounded-xl border border-app-border/60 bg-app-surface/70 pl-9 pr-3 text-app-text outline-none transition-colors placeholder:text-app-text-muted focus:border-cyan-400/30 ${isMobileViewport ? "py-1.5 text-[12px]" : "py-2 sm:py-2.5 text-[13px] sm:text-sm"}`}
                                   />
                                 </div>
                                 <button
@@ -12578,7 +12593,7 @@ function AuthenticatedApp({
                                     competitorDraftApps.length === 0 ||
                                     !competitorDraftKeywordSearch.trim()
                                   }
-                                  className="rounded-xl border border-app-border/70 bg-app-surface-muted/80 px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted disabled:opacity-40"
+                                  className={`rounded-xl border border-app-border/70 bg-app-surface-muted/80 font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted disabled:opacity-40 ${isMobileViewport ? "px-3 py-1.5 text-[12px]" : "px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm"}`}
                                 >
                                   {isCheckingCompetitorDraftKeyword ? (
                                     <span className="inline-flex items-center gap-2">
@@ -12610,7 +12625,7 @@ function AuthenticatedApp({
                                   </button>
                                 ))
                               ) : (
-                                <p className="text-sm text-app-text-muted">
+                                <p className={`${isMobileViewport ? "text-[12px]" : "text-sm"} text-app-text-muted`}>
                                   No keywords selected yet.
                                 </p>
                               )}
@@ -12627,7 +12642,7 @@ function AuthenticatedApp({
                                   return (
                                     <div
                                       key={`${candidate.source}:${candidate.keyword}`}
-                                      className={`rounded-2xl border border-app-border/50 bg-app-surface/45 ${isMobileViewport ? "p-3" : "p-4"}`}
+                                      className={`rounded-2xl border border-app-border/50 bg-app-surface/45 ${isMobileViewport ? "p-2.5" : "p-4"}`}
                                     >
                                       <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${isMobileViewport ? "gap-2" : "gap-3"}`}>
                                         <div>
@@ -12665,7 +12680,7 @@ function AuthenticatedApp({
                                               candidate.keyword,
                                             )
                                           }
-                                          className={`rounded-lg border font-semibold transition-colors ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-[11px]"} ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-app-border/70 bg-app-surface-muted/80 text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
+                                          className={`rounded-lg border font-semibold transition-colors ${isMobileViewport ? "px-2 py-1 text-[9px]" : "px-3 py-2 text-[11px]"} ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-app-border/70 bg-app-surface-muted/80 text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
                                         >
                                           {activeSelection
                                             ? "Edit Countries"
@@ -12872,10 +12887,10 @@ function AuthenticatedApp({
                     return (
                       <div
                         key={card.group.groupId}
-                        className="competitor-group-card min-w-0 rounded-3xl border border-app-border/80 bg-app-surface-muted/75 shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10"
+                        className={`competitor-group-card min-w-0 border border-app-border/80 bg-app-surface-muted/75 shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10 ${isMobileViewport ? "rounded-2xl" : "rounded-3xl"}`}
                       >
-                        <div className="competitor-group-header border-b border-app-border/70 bg-app-surface-muted/35 px-5 py-5">
-                          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className={`competitor-group-header border-b border-app-border/70 bg-app-surface-muted/35 ${isMobileViewport ? "px-3 py-3" : "px-5 py-5"}`}>
+                          <div className={`flex flex-col ${isMobileViewport ? "gap-2.5" : "gap-4"} lg:flex-row lg:items-start lg:justify-between`}>
                             <div className="min-w-0">
                               <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                                 <h3 className="competitor-group-title max-w-full truncate text-base font-semibold text-app-text">
@@ -12891,10 +12906,10 @@ function AuthenticatedApp({
                                   {card.group.mode}
                                 </span>
                               </div>
-                              <p className="mt-2 text-sm text-app-text-muted sm:hidden">
+                              <p className="mt-1 text-[12px] text-app-text-muted sm:hidden">
                                 {compactGroupContext}
                               </p>
-                              <p className="mt-1 text-xs text-app-text-muted sm:hidden">
+                              <p className="mt-0.5 text-[11px] text-app-text-muted sm:hidden">
                                 {compactGroupStatus}
                               </p>
                               <p className="mt-2 hidden text-sm text-app-text-muted sm:block">
@@ -12912,7 +12927,7 @@ function AuthenticatedApp({
                                   : "not started"}
                               </p>
                             </div>
-                            <div className="competitor-group-actions flex flex-wrap items-center gap-2">
+                            <div className={`competitor-group-actions flex flex-wrap items-center ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -12920,7 +12935,7 @@ function AuthenticatedApp({
                                     card.group.groupId,
                                   )
                                 }
-                                className="competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
+                                className={`competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
                               >
                                 <Bell className="h-4 w-4" />
                                 <span className="sm:hidden">ASO</span>
@@ -12933,7 +12948,7 @@ function AuthenticatedApp({
                                     card.group.groupId,
                                   )
                                 }
-                                className="competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80"
+                                className={`competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
                               >
                                 <ChevronDown
                                   className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -12943,7 +12958,7 @@ function AuthenticatedApp({
                               <button
                                 type="button"
                                 onClick={() => removeCompetitorGroup(card.group.groupId)}
-                                className="competitor-group-action rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200 transition-colors hover:bg-red-500/20"
+                                className={`competitor-group-action rounded-xl border border-red-500/25 bg-red-500/10 font-semibold text-red-200 transition-colors hover:bg-red-500/20 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
                               >
                                 <span className="sm:hidden">Remove</span>
                                 <span className="hidden sm:inline">Remove Group</span>
@@ -12952,9 +12967,9 @@ function AuthenticatedApp({
                           </div>
                         </div>
 
-                        <div className="competitor-group-body space-y-4 p-5">
+                        <div className={`competitor-group-body ${isMobileViewport ? "space-y-3 p-3" : "space-y-4 p-5"}`}>
                           {!isExpanded ? (
-                            <div className="rounded-2xl border border-app-border/70 bg-app-surface-muted/55 px-4 py-4 text-sm text-app-text-muted shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                            <div className={`rounded-2xl border border-app-border/70 bg-app-surface-muted/55 text-app-text-muted shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "px-3 py-2.5 text-[12px]" : "px-4 py-4 text-sm"}`}>
                               {1 + card.group.competitors.length} apps,{" "}
                               {card.trackedKeywords.length} tracked keywords,{" "}
                               {card.rankedPairCount} ranked pairs.
