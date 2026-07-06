@@ -5620,6 +5620,235 @@ function shouldExtendDiscoveryDepth(
   );
 }
 
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function getDiscoveryKeywordTokenCount(keyword: string) {
+  return keyword
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length || 1;
+}
+
+function getDiscoverySpecificityBonus(keyword: string) {
+  const tokenCount = getDiscoveryKeywordTokenCount(keyword);
+  if (tokenCount >= 4) return 1;
+  if (tokenCount === 3) return 0.8;
+  if (tokenCount === 2) return 0.35;
+  return 0;
+}
+
+function isDiscoveryGenericHeadLike(input: {
+  keyword: string;
+  displayQuality: number;
+  genericCoverage: number;
+  exactTitleMatch: number;
+  exactTitleSegment: number;
+  orderedTitleCoverage: number;
+  semanticCoverage: number;
+  categorySemanticCoverage: number;
+}) {
+  const tokenCount = getDiscoveryKeywordTokenCount(input.keyword);
+  if (tokenCount > 2) {
+    return false;
+  }
+
+  return (
+    input.genericCoverage >= 0.65 &&
+    input.exactTitleMatch <= 0 &&
+    input.exactTitleSegment <= 0 &&
+    input.orderedTitleCoverage < 0.75 &&
+    input.semanticCoverage < 0.55 &&
+    input.categorySemanticCoverage < 0.55 &&
+    input.displayQuality < 72
+  );
+}
+
+function scoreDiscoveryRankingOutcome(
+  outcome: DiscoveryCheckedCandidateOutcome,
+  searchDepth: number,
+) {
+  const rankStrength = clamp01(
+    1 - ((Math.max(1, outcome.rank) - 1) / Math.max(1, searchDepth - 1)),
+  );
+  const relevance = clamp01(Number(outcome.relevance || 0) / 100);
+  const displayQuality = clamp01(Number(outcome.displayQuality || 0) / 100);
+  const semanticStrength = clamp01(
+    Math.max(
+      outcome.featureQuality.semanticCoverage || 0,
+      outcome.featureQuality.categorySemanticCoverage || 0,
+    ),
+  );
+  const titleStrength = clamp01(
+    Math.max(
+      outcome.featureQuality.exactTitleMatch || 0,
+      outcome.featureQuality.exactTitleSegment || 0,
+      outcome.featureQuality.orderedTitleCoverage || 0,
+    ),
+  );
+  const specificityBonus = getDiscoverySpecificityBonus(outcome.keyword);
+  const genericPenalty = clamp01(outcome.featureQuality.genericCoverage || 0) *
+    (specificityBonus <= 0.35 ? 1 : 0.45);
+
+  return (
+    rankStrength * 0.34 +
+    relevance * 0.28 +
+    displayQuality * 0.14 +
+    semanticStrength * 0.1 +
+    titleStrength * 0.08 +
+    specificityBonus * 0.12 -
+    genericPenalty * 0.18
+  );
+}
+
+function scoreDiscoverySuggestionCandidate(candidate: DiscoveryMetricCandidate) {
+  const relevance = clamp01(Number(candidate.baseline.relevance || 0) / 100);
+  const displayQuality = clamp01(Number(candidate.displayQuality || 0) / 100);
+  const semanticStrength = clamp01(
+    Math.max(
+      candidate.features.semanticCoverage || 0,
+      candidate.features.categorySemanticCoverage || 0,
+    ),
+  );
+  const titleStrength = clamp01(
+    Math.max(
+      candidate.features.exactTitleMatch || 0,
+      candidate.features.exactTitleSegment || 0,
+      candidate.features.orderedTitleCoverage || 0,
+    ),
+  );
+  const demand = clamp01(Number(candidate.baseline.demand || 0) / 100);
+  const specificityBonus = getDiscoverySpecificityBonus(candidate.keyword);
+  const genericPenalty = clamp01(candidate.features.genericCoverage || 0) *
+    (specificityBonus <= 0.35 ? 1 : 0.45);
+
+  return (
+    relevance * 0.34 +
+    displayQuality * 0.18 +
+    semanticStrength * 0.14 +
+    titleStrength * 0.1 +
+    demand * 0.08 +
+    specificityBonus * 0.16 -
+    genericPenalty * 0.18
+  );
+}
+
+function selectDiscoveryDiverseRankings(
+  candidates: DiscoveryCheckedCandidateOutcome[],
+  mode: DiscoveryMode,
+  searchDepth: number,
+  limit: number,
+) {
+  const sorted = [...candidates].sort((a, b) => {
+    const scoreDelta =
+      scoreDiscoveryRankingOutcome(b, searchDepth) -
+      scoreDiscoveryRankingOutcome(a, searchDepth);
+    if (Math.abs(scoreDelta) > 0.0001) return scoreDelta;
+    if (a.rank !== b.rank) return a.rank - b.rank;
+    return b.relevance - a.relevance;
+  });
+
+  const genericHeadLimit = DISCOVERY_GENERIC_HEAD_LIMIT[mode];
+  const selected: DiscoveryCheckedCandidateOutcome[] = [];
+  const deferredGeneric: DiscoveryCheckedCandidateOutcome[] = [];
+  let genericHeadCount = 0;
+
+  for (const candidate of sorted) {
+    const isGenericHead = isDiscoveryGenericHeadLike({
+      keyword: candidate.keyword,
+      displayQuality: candidate.displayQuality,
+      genericCoverage: candidate.featureQuality.genericCoverage,
+      exactTitleMatch: candidate.featureQuality.exactTitleMatch,
+      exactTitleSegment: candidate.featureQuality.exactTitleSegment,
+      orderedTitleCoverage: candidate.featureQuality.orderedTitleCoverage,
+      semanticCoverage: candidate.featureQuality.semanticCoverage,
+      categorySemanticCoverage: candidate.featureQuality.categorySemanticCoverage,
+    });
+
+    if (isGenericHead && genericHeadCount >= genericHeadLimit) {
+      deferredGeneric.push(candidate);
+      continue;
+    }
+
+    selected.push(candidate);
+    if (isGenericHead) {
+      genericHeadCount += 1;
+    }
+
+    if (selected.length >= limit) {
+      return selected;
+    }
+  }
+
+  for (const candidate of deferredGeneric) {
+    selected.push(candidate);
+    if (selected.length >= limit) {
+      break;
+    }
+  }
+
+  return selected;
+}
+
+function selectDiscoveryDiverseSuggestions(
+  candidates: DiscoveryMetricCandidate[],
+  mode: DiscoveryMode,
+  limit: number,
+) {
+  const sorted = [...candidates].sort((a, b) => {
+    const scoreDelta =
+      scoreDiscoverySuggestionCandidate(b) -
+      scoreDiscoverySuggestionCandidate(a);
+    if (Math.abs(scoreDelta) > 0.0001) return scoreDelta;
+    if (b.baseline.relevance !== a.baseline.relevance) {
+      return b.baseline.relevance - a.baseline.relevance;
+    }
+    return a.keyword.length - b.keyword.length;
+  });
+
+  const genericHeadLimit = DISCOVERY_GENERIC_HEAD_LIMIT[mode];
+  const selected: DiscoveryMetricCandidate[] = [];
+  const deferredGeneric: DiscoveryMetricCandidate[] = [];
+  let genericHeadCount = 0;
+
+  for (const candidate of sorted) {
+    const isGenericHead = isDiscoveryGenericHeadLike({
+      keyword: candidate.keyword,
+      displayQuality: candidate.displayQuality,
+      genericCoverage: candidate.features.genericCoverage,
+      exactTitleMatch: candidate.features.exactTitleMatch,
+      exactTitleSegment: candidate.features.exactTitleSegment,
+      orderedTitleCoverage: candidate.features.orderedTitleCoverage,
+      semanticCoverage: candidate.features.semanticCoverage,
+      categorySemanticCoverage: candidate.features.categorySemanticCoverage,
+    });
+
+    if (isGenericHead && genericHeadCount >= genericHeadLimit) {
+      deferredGeneric.push(candidate);
+      continue;
+    }
+
+    selected.push(candidate);
+    if (isGenericHead) {
+      genericHeadCount += 1;
+    }
+
+    if (selected.length >= limit) {
+      return selected;
+    }
+  }
+
+  for (const candidate of deferredGeneric) {
+    selected.push(candidate);
+    if (selected.length >= limit) {
+      break;
+    }
+  }
+
+  return selected;
+}
+
 async function getGooglePlayAppWeb(appId: string, country: string) {
   const { html, status } = await fetchPlayStoreHtml(`/store/apps/details?id=${encodeURIComponent(appId)}`, country);
   if (status >= 400) {
@@ -7619,6 +7848,11 @@ type DiscoveryCheckedCandidateOutcome = {
   featureQuality: DiscoveryFeatureQuality;
 };
 
+const DISCOVERY_GENERIC_HEAD_LIMIT: Record<DiscoveryMode, number> = {
+  fast: 2,
+  deep: 3,
+};
+
 type DiscoveryCandidateCacheEntry = {
   completeness: DiscoveryMode;
   rankedCandidates: DiscoveryMetricCandidate[];
@@ -8475,18 +8709,20 @@ async function discoverRankedKeywords(input: {
     }
   }
 
-  const rankings = validRankings
+  const admittedRankings = validRankings
     .filter((candidate) =>
       shouldAdmitDiscoveryCandidate(
         input.mode,
         candidate.featureQuality,
         candidate.displayQuality,
       ),
-    )
-    .sort((a, b) => {
-      if (a.rank !== b.rank) return a.rank - b.rank;
-      return b.relevance - a.relevance;
-    })
+    );
+  const rankings = selectDiscoveryDiverseRankings(
+    admittedRankings,
+    input.mode,
+    profile.searchDepth,
+    profile.finalRankingLimit,
+  )
     .map(({ keyword, rank, demand, volume, difficulty, relevance, confidence }) => ({
       keyword,
       rank,
@@ -8495,14 +8731,17 @@ async function discoverRankedKeywords(input: {
       difficulty,
       relevance,
       confidence,
-    }))
-    .slice(0, profile.finalRankingLimit);
+    }));
 
   // Always show unranked candidates as suggestions (not just when rankings=0)
   const rankedKeywordSet = new Set(rankings.map((ranking) => normalizeKeyword(ranking.keyword)));
-  const suggestions = rankedCandidates
+  const suggestionCandidates = rankedCandidates
     .filter((candidate) => !rankedKeywordSet.has(normalizeKeyword(candidate.keyword)))
-    .slice(0, profile.finalRankingLimit)
+  const suggestions = selectDiscoveryDiverseSuggestions(
+    suggestionCandidates,
+    input.mode,
+    profile.finalRankingLimit,
+  )
     .map(({ keyword, baseline }) => ({
       keyword,
       demand: baseline.demand,
