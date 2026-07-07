@@ -45,6 +45,7 @@ import {
   trimDiscoveryPayloadForMode,
 } from '../src/lib/discoveryCache';
 import {
+  buildDiscoveryContextCandidateKeywords,
   buildDiscoveryPromptSections,
   buildDiscoveryRefinementPrompt,
   extractDiscoveryFeatureSummary,
@@ -1069,6 +1070,30 @@ test('discovery prompt sections cap repeated competitor terms and strip excluded
   assert.equal(sections.rawDescriptionExcerpt.includes('busy adults with adhd'), true);
 });
 
+test('discovery local candidate expansion adds contextual mid-tail phrases without network data', () => {
+  const candidates = buildDiscoveryContextCandidateKeywords({
+    context: {
+      title: 'Rizz Master: AI Dating Wingman',
+      description:
+        'Generate flirty replies, opener ideas, dating bio help, and conversation starters for online dating chats.',
+      category: 'Lifestyle',
+      developer: 'Vantalum',
+      store: 'android',
+      country: 'us',
+    },
+    limits: {
+      featureSummaryLimit: 8,
+      seedPackLimit: 12,
+      phraseWindowLimit: 16,
+      totalLimit: 18,
+    },
+  });
+
+  assert.ok(candidates.includes('dating conversation starter'));
+  assert.ok(candidates.includes('flirty text generator'));
+  assert.ok(candidates.some((candidate) => candidate.split(' ').length >= 3));
+});
+
 test('discovery refinement prompt uses structured sections in order and omits empty sections', () => {
   const { sections } = buildDiscoveryPromptSections({
     context: {
@@ -1121,6 +1146,8 @@ test('discovery refinement prompt uses structured sections in order and omits em
   assert.ok(prompt.indexOf('Raw description excerpt:') < prompt.indexOf('Competitor repeated terms:'));
   assert.ok(prompt.indexOf('Competitor repeated terms:') < prompt.indexOf('Candidate keywords:'));
   assert.ok(prompt.includes('Return only a JSON array of strings. No markdown. No commentary.'));
+  assert.ok(prompt.includes('Prefer 2 to 5 word phrases.'));
+  assert.ok(prompt.includes('Cover a mix of primary, feature, audience, problem, and use-case phrases'));
 });
 
 test('discovery response metadata marks partial verification and fallback states clearly', () => {

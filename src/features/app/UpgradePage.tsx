@@ -99,7 +99,7 @@ const FEATURE_ICONS: Record<string, React.ElementType> = {
   "App Store & Google Play tracking": Globe,
   "Keyword rank tracking": TrendingUp,
   "AI-Powered Keyword Discovery": Sparkles,
-  "ASO Comparison": Target,
+  "Visibility comparison": Target,
   "Competitor analysis": Swords,
   "Daily automated monitoring": Zap,
   "Rank change alerts": Bell,

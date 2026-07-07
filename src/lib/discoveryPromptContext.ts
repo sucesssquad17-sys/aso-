@@ -118,6 +118,133 @@ const PAIN_POINT_MARKERS = new Set([
   "streak",
   "time",
 ]);
+const PHRASE_EDGE_FILLERS = new Set([
+  "a",
+  "an",
+  "and",
+  "for",
+  "from",
+  "in",
+  "into",
+  "of",
+  "on",
+  "or",
+  "the",
+  "to",
+  "with",
+  "without",
+  "your",
+]);
+const DISCOVERY_SEED_PACKS = [
+  {
+    triggers: ["rizz", "dating", "flirt", "flirty", "wingman", "match", "opener", "pickup", "bio"],
+    phrases: [
+      "ai dating assistant",
+      "rizz line generator",
+      "pickup line generator",
+      "dating conversation starter",
+      "flirty text generator",
+      "dating profile helper",
+      "dating bio ideas",
+      "online dating opener ideas",
+      "texting assistant for dating",
+    ],
+  },
+  {
+    triggers: ["habit", "routine", "planner", "productivity", "checklist", "streak", "reminder", "goal"],
+    phrases: [
+      "daily habit tracker",
+      "habit streak tracker",
+      "daily routine planner",
+      "morning routine checklist",
+      "goal reminder app",
+      "goal progress tracker",
+      "simple routine planner",
+      "focus habit tracker",
+      "daily checklist planner",
+    ],
+  },
+  {
+    triggers: ["fitness", "workout", "gym", "exercise", "weight", "calorie", "training"],
+    phrases: [
+      "home workout planner",
+      "gym workout tracker",
+      "workout routine planner",
+      "calorie deficit tracker",
+      "fitness progress tracker",
+      "strength training log",
+      "daily exercise planner",
+    ],
+  },
+  {
+    triggers: ["bible", "prayer", "verse", "scripture", "devotional", "gospel", "christian"],
+    phrases: [
+      "daily bible study",
+      "daily scripture reading",
+      "bible verse tracker",
+      "prayer journal app",
+      "christian devotional app",
+      "guided bible study",
+      "daily prayer reminder",
+    ],
+  },
+  {
+    triggers: ["math", "algebra", "quiz", "study", "flashcard", "kids", "learning", "education"],
+    phrases: [
+      "kids math practice",
+      "algebra practice app",
+      "math quiz game",
+      "multiplication practice app",
+      "brain training math",
+      "study quiz app",
+      "flashcard learning app",
+    ],
+  },
+  {
+    triggers: ["ai", "assistant", "chat", "voice", "bot", "companion"],
+    phrases: [
+      "ai voice assistant",
+      "ai chat assistant",
+      "smart ai helper",
+      "ai companion app",
+      "voice ai chatbot",
+      "personal ai assistant",
+    ],
+  },
+  {
+    triggers: ["photo", "image", "editor", "camera", "filter", "background", "enhance"],
+    phrases: [
+      "photo editor app",
+      "background remover app",
+      "image enhancer app",
+      "photo filter editor",
+      "portrait photo editor",
+      "image cleanup tool",
+    ],
+  },
+  {
+    triggers: ["finance", "budget", "expense", "wallet", "money", "saving", "invoice"],
+    phrases: [
+      "budget planner app",
+      "expense tracker app",
+      "money saving tracker",
+      "personal finance planner",
+      "wallet budget tracker",
+      "invoice tracker app",
+    ],
+  },
+  {
+    triggers: ["health", "wellness", "mood", "meditation", "sleep", "calm", "therapy"],
+    phrases: [
+      "mood tracker app",
+      "guided meditation app",
+      "sleep routine tracker",
+      "daily wellness tracker",
+      "mental health journal",
+      "calm breathing exercises",
+    ],
+  },
+] as const;
 
 function dedupeNormalized(values: string[], limit: number) {
   const seen = new Set<string>();
@@ -292,6 +419,137 @@ function buildRawDescriptionExcerpt(description: string | undefined, charLimit: 
   return (lastSpace > 48 ? trimmed.slice(0, lastSpace) : trimmed).trim();
 }
 
+function buildSeedPackCandidates(context: DiscoveryPromptContext, limit: number) {
+  const contextTokens = new Set(
+    tokenize(
+      [
+        context.title,
+        context.category || "",
+        context.description || "",
+      ].join(" "),
+    ),
+  );
+  const candidates: string[] = [];
+
+  for (const pack of DISCOVERY_SEED_PACKS) {
+    if (!pack.triggers.some((trigger) => contextTokens.has(trigger))) {
+      continue;
+    }
+    candidates.push(...pack.phrases);
+  }
+
+  return dedupeNormalized(candidates, limit);
+}
+
+function buildPhraseWindows(
+  lines: string[],
+  anchorTokens: Set<string>,
+  limit: number,
+) {
+  const candidates: string[] = [];
+
+  for (const line of lines) {
+    const words = normalizeKeyword(line)
+      .split(" ")
+      .filter(Boolean);
+    if (words.length < 2) {
+      continue;
+    }
+
+    for (let size = Math.min(4, words.length); size >= 2; size -= 1) {
+      for (let start = 0; start <= words.length - size; start += 1) {
+        const phraseWords = words.slice(start, start + size);
+        if (
+          PHRASE_EDGE_FILLERS.has(phraseWords[0]) ||
+          PHRASE_EDGE_FILLERS.has(phraseWords[phraseWords.length - 1])
+        ) {
+          continue;
+        }
+
+        const phrase = phraseWords.join(" ");
+        const phraseTokens = tokenize(phrase);
+        if (
+          phraseTokens.length < 2 ||
+          phraseTokens.every((token) => HIGH_VOLUME_TERMS.has(token)) ||
+          !phraseTokens.some((token) => anchorTokens.has(token)) ||
+          !phraseTokens.some((token) => !HIGH_VOLUME_TERMS.has(token))
+        ) {
+          continue;
+        }
+
+        if (isDiscoveryKeywordCandidate(phrase)) {
+          candidates.push(phrase);
+        }
+      }
+    }
+  }
+
+  return dedupeNormalized(candidates, limit);
+}
+
+export function buildDiscoveryContextCandidateKeywords(input: {
+  context: DiscoveryPromptContext;
+  limits?: {
+    featureSummaryLimit?: number;
+    seedPackLimit?: number;
+    phraseWindowLimit?: number;
+    totalLimit?: number;
+  };
+}) {
+  const featureSummaryLimit = input.limits?.featureSummaryLimit ?? 8;
+  const seedPackLimit = input.limits?.seedPackLimit ?? 18;
+  const phraseWindowLimit = input.limits?.phraseWindowLimit ?? 28;
+  const totalLimit = input.limits?.totalLimit ?? 36;
+
+  const rankedDescriptionLines = normalizeDescriptionSignals(input.context.description);
+  const categoryHintTokens = new Set(
+    deriveCategoryHints(input.context.category).flatMap((hint) => tokenize(hint)),
+  );
+  const highSignalDescriptionPhrases = rankedDescriptionLines
+    .slice(0, featureSummaryLimit)
+    .map((entry) => entry.text);
+  const targetUsers = buildAudienceLines(
+    rankedDescriptionLines,
+    categoryHintTokens,
+    Math.max(2, Math.floor(featureSummaryLimit / 2)),
+  );
+  const useCases = buildUseCaseLines(
+    rankedDescriptionLines,
+    Math.max(3, Math.floor(featureSummaryLimit / 2)),
+  );
+  const painPointsSolved = buildPainPointLines(
+    rankedDescriptionLines,
+    Math.max(2, Math.floor(featureSummaryLimit / 2)),
+  );
+  const anchorTokens = new Set([
+    ...tokenize(input.context.title),
+    ...tokenize(input.context.category),
+    ...tokenize(input.context.description),
+    ...categoryHintTokens,
+  ]);
+  const seedPackCandidates = buildSeedPackCandidates(input.context, seedPackLimit);
+  const phraseWindowCandidates = buildPhraseWindows(
+    [
+      ...useCases,
+      ...painPointsSolved,
+      ...targetUsers,
+      ...highSignalDescriptionPhrases,
+    ],
+    anchorTokens,
+    phraseWindowLimit,
+  );
+
+  return dedupeNormalized(
+    [
+      ...seedPackCandidates,
+      ...phraseWindowCandidates,
+      ...useCases.filter((line) => line.split(" ").length >= 2 && line.split(" ").length <= 5),
+      ...painPointsSolved.filter((line) => line.split(" ").length >= 2 && line.split(" ").length <= 5),
+    ].filter(isDiscoveryKeywordCandidate),
+    totalLimit,
+  );
+}
+
 function renderListSection(label: string, values: string[]) {
   if (values.length === 0) {
     return "";
@@ -457,7 +715,9 @@ export function buildDiscoveryRefinementPrompt(input: {
     "3. Use the app purpose, audience, use cases, pain points, and competitor repetition to discover concrete ASO phrases instead of generic head terms.",
     "4. Prefer natural head, mid-tail, and long-tail phrases with clear user intent grounded in this app context.",
     "5. Exclude junk, release-note phrasing, unrelated broad terms, and competitor-brand phrases.",
-    "6. Keep each keyword phrase natural and human-searchable, with a maximum of 8 words.",
+    "6. Prefer 2 to 5 word phrases. Only include a single-word term when it is clearly category-specific and strongly grounded in the title or category.",
+    "7. Cover a mix of primary, feature, audience, problem, and use-case phrases without repeating the same stem in tiny variations.",
+    "8. Keep each keyword phrase natural and human-searchable, with a maximum of 8 words.",
   ];
 
   return blocks.filter(Boolean).join("\n");

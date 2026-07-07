@@ -80,7 +80,7 @@ export const PRICING_INCLUDED_CAPABILITIES: PricingIncludedCapability[] = [
   { label: "App Store & Google Play tracking", sub: "iOS + Android in one workspace" },
   { label: "Keyword rank tracking", sub: "Per country, per store" },
   { label: "AI-Powered Keyword Discovery", sub: "Intelligent keyword recommendations" },
-  { label: "ASO Comparison", sub: "Head-to-head visibility metrics" },
+  { label: "Visibility comparison", sub: "Head-to-head search footprint metrics" },
   { label: "Competitor analysis", sub: "Track rivals side by side" },
   { label: "Daily automated monitoring", sub: "Runs every day, hands-free" },
   { label: "Rank change alerts", sub: "Notified when positions shift" },

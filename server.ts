@@ -144,6 +144,7 @@ import {
   shouldAdmitDiscoveryCandidate,
 } from './src/lib/discoveryKeywordGating';
 import {
+  buildDiscoveryContextCandidateKeywords,
   buildDiscoveryPromptSections as buildSharedDiscoveryPromptSections,
   buildDiscoveryRefinementPrompt as buildSharedDiscoveryRefinementPrompt,
   compactDiscoveryPromptCandidates as compactSharedDiscoveryPromptCandidates,
@@ -7614,6 +7615,28 @@ async function buildKeywordSignals(
   addTokenWeights(candidates, context.title, 16, 20);
   addTokenWeights(candidates, context.description, 2, 5);
   addDescriptionIntentTerms(candidates, context.description, ownTitleTokens, categoryHintTokens);
+  buildDiscoveryContextCandidateKeywords({
+    context: {
+      title: context.title,
+      description: context.description,
+      category: context.category,
+      developer: context.developer,
+      store: context.store || 'android',
+      country: context.country || 'us',
+    },
+    limits: {
+      featureSummaryLimit: mode === 'deep' ? 8 : 6,
+      seedPackLimit: mode === 'deep' ? 18 : 12,
+      phraseWindowLimit: mode === 'deep' ? 28 : 18,
+      totalLimit: mode === 'deep' ? 32 : 20,
+    },
+  }).forEach((phrase, index) => {
+    addWeightedDiscoveryPhrase(
+      candidates,
+      phrase,
+      Math.max(mode === 'deep' ? 10 : 8, (mode === 'deep' ? 28 : 22) - index),
+    );
+  });
 
   deriveCategoryHints(context.category).forEach((hint) => addWeightedTerm(candidates, hint, 8));
   tokenize(context.developer).forEach((token) => addWeightedTerm(candidates, token, 2));
@@ -7806,6 +7829,28 @@ function addDescriptionIntentTerms(
 
     addWeightedTerm(target, bigram, weight);
   });
+}
+
+function addWeightedDiscoveryPhrase(
+  target: Map<string, number>,
+  rawPhrase: string,
+  weight: number,
+) {
+  if (weight <= 0) {
+    return;
+  }
+
+  const phrase = normalizeKeyword(rawPhrase);
+  if (!phrase || !isDiscoveryKeywordCandidate(phrase)) {
+    return;
+  }
+
+  const parts = phrase.split(' ');
+  if (parts.length < 2 || parts.length > 5) {
+    return;
+  }
+
+  target.set(phrase, (target.get(phrase) || 0) + weight);
 }
 
 function selectMetricEnrichmentKeywords(

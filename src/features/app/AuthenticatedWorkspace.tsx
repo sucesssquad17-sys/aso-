@@ -8555,10 +8555,7 @@ function AuthenticatedApp({
   const compareCoverageChartData = React.useMemo(
     () =>
       compareAppInsights.map((insight) => ({
-        appTitle:
-          insight.app.title.length > 18
-            ? `${insight.app.title.slice(0, 18)}...`
-            : insight.app.title,
+        appTitle: insight.app.title,
         top10: insight.top10,
         top30: insight.top30,
         top100: insight.top100,
@@ -8587,6 +8584,15 @@ function AuthenticatedApp({
     [compareAppInsights],
   );
   const compareCoverageLeader = compareCoverageLeaders[0] || null;
+  const formatCompareCoverageAxisLabel = React.useCallback(
+    (value: unknown) => {
+      const label = typeof value === "string" ? value : "";
+      if (!label) return "";
+      const maxLength = isMobileViewport ? 10 : 18;
+      return label.length > maxLength ? `${label.slice(0, maxLength)}...` : label;
+    },
+    [isMobileViewport],
+  );
   const selectedAppExportHistory = React.useMemo(() => {
     if (!selectedApp) return [];
     const appStoreId = getAppStoreId(selectedApp, storeType);
@@ -16866,36 +16872,81 @@ function AuthenticatedApp({
                           {" "}
                           <BarChart
                             data={compareCoverageChartData}
-                            margin={{ top: 20, right: 20, left: 0, bottom: 50 }}
+                            layout={isMobileViewport ? "vertical" : "horizontal"}
+                            barCategoryGap={isMobileViewport ? 8 : 16}
+                            margin={
+                              isMobileViewport
+                                ? { top: 12, right: 12, left: 0, bottom: 4 }
+                                : { top: 20, right: 20, left: 0, bottom: 50 }
+                            }
                           >
                             {" "}
                             <CartesianGrid
                               strokeDasharray="3 3"
                               vertical={false}
-                              stroke="#1e293b"
+                              stroke={chartGridStroke}
                             />{" "}
-                            <XAxis
-                              dataKey="appTitle"
-                              angle={-20}
-                              textAnchor="end"
-                              interval={0}
-                              height={60}
-                              fontSize={12}
-                              tick={{ fill: "#94a3b8" }}
-                            />{" "}
-                            <YAxis fontSize={12} tick={{ fill: "#94a3b8" }} />{" "}
+                            {isMobileViewport ? (
+                              <>
+                                <XAxis
+                                  type="number"
+                                  allowDecimals={false}
+                                  fontSize={11}
+                                  tick={{ fill: chartAxisTickColor }}
+                                  axisLine={{ stroke: chartGridStroke }}
+                                  tickLine={{ stroke: chartGridStroke }}
+                                />
+                                <YAxis
+                                  type="category"
+                                  dataKey="appTitle"
+                                  width={92}
+                                  fontSize={11}
+                                  tick={{ fill: chartAxisTickColor }}
+                                  tickFormatter={formatCompareCoverageAxisLabel}
+                                  axisLine={false}
+                                  tickLine={false}
+                                />
+                              </>
+                            ) : (
+                              <>
+                                <XAxis
+                                  dataKey="appTitle"
+                                  angle={-20}
+                                  textAnchor="end"
+                                  interval={0}
+                                  height={60}
+                                  fontSize={12}
+                                  tick={{ fill: chartAxisTickColor }}
+                                  tickFormatter={formatCompareCoverageAxisLabel}
+                                  axisLine={{ stroke: chartGridStroke }}
+                                  tickLine={{ stroke: chartGridStroke }}
+                                />{" "}
+                                <YAxis
+                                  fontSize={12}
+                                  tick={{ fill: chartAxisTickColor }}
+                                  axisLine={{ stroke: chartGridStroke }}
+                                  tickLine={{ stroke: chartGridStroke }}
+                                  allowDecimals={false}
+                                />{" "}
+                              </>
+                            )}
                             <Tooltip
-                              contentStyle={{
-                                backgroundColor: "#0f172a",
-                                borderRadius: "12px",
-                                border: "1px solid #1e293b",
-                                color: "#f8fafc",
-                              }}
+                              contentStyle={chartTooltipStyle}
+                              formatter={(value: number, name: string) => [
+                                value,
+                                name,
+                              ]}
+                              labelFormatter={(label) => String(label)}
                             />{" "}
                             <Legend
                               verticalAlign="top"
-                              height={36}
-                              wrapperStyle={{ fontSize: "12px" }}
+                              align={isMobileViewport ? "left" : "center"}
+                              height={isMobileViewport ? 24 : 36}
+                              iconSize={isMobileViewport ? 10 : 14}
+                              wrapperStyle={{
+                                fontSize: isMobileViewport ? "11px" : "12px",
+                                color: chartLegendTextColor,
+                              }}
                             />{" "}
                             <Bar
                               dataKey="top10"
