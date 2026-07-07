@@ -66,6 +66,7 @@ import {
 } from './src/lib/trackingTime';
 import {
   buildWeeklyReportEmailHtml,
+  buildWeeklyReportEmailText,
   buildWeeklyReportEmailSummary,
   buildWeeklyReportWorkspaceUrl,
   getSafeAppUrl,
@@ -4362,6 +4363,16 @@ async function maybeSendWeeklyReportEmail(
       from: `Rank Analyzer Pro <${sender}>`,
       to: recipient,
       subject: `Your weekly ASO report - ${summary.rangeLabel}`,
+      text: buildWeeklyReportEmailText({
+        summary,
+        reportUrl,
+        weekday: settings.weekday,
+        preferencesUrl: getEmailPreferenceUrl({
+          kind: 'weekly',
+          userId: userDocRef.id,
+          email: recipient,
+        }),
+      }),
       html: buildWeeklyReportEmailHtml({
         summary,
         reportUrl,
@@ -4427,6 +4438,28 @@ function buildCronFailureEmailHtml(input: {
   `;
 }
 
+function buildCronFailureEmailText(input: {
+  runKey: string;
+  trigger: 'automatic' | 'manual' | 'watchdog' | 'recovery';
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  errorMessage: string;
+}) {
+  return [
+    `Cron job failed: ${input.runKey}`,
+    '',
+    'The daily tracking cron job failed before completing.',
+    `Trigger: ${input.trigger}`,
+    `Started: ${formatAlertEmailTimestamp(input.startedAt)}`,
+    `Finished: ${formatAlertEmailTimestamp(input.finishedAt)}`,
+    `Duration: ${Math.max(0, Math.round(input.durationMs / 1000))}s`,
+    `Error: ${input.errorMessage}`,
+    '',
+    `Open workspace: ${ALERT_EMAIL_APP_URL}`,
+  ].join('\n');
+}
+
 function buildTestEmailHtml(input: {
   requestedBy: string;
   message: string;
@@ -4446,6 +4479,23 @@ function buildTestEmailHtml(input: {
       </a>
     </div>
   `;
+}
+
+function buildTestEmailText(input: {
+  requestedBy: string;
+  message: string;
+  sentAt: string;
+}) {
+  return [
+    'Test email delivered',
+    '',
+    input.message,
+    `Environment: ${process.env.NODE_ENV || 'development'}`,
+    `Requested by: ${input.requestedBy}`,
+    `Sent: ${formatAlertEmailTimestamp(input.sentAt)}`,
+    '',
+    `Open workspace: ${ALERT_EMAIL_APP_URL}`,
+  ].join('\n');
 }
 
 function getAnnouncementEmailCampaignsCollection(adminDb: Firestore) {
@@ -4472,6 +4522,29 @@ function buildAnnouncementEmailHtml(
       </div>
     </div>
   `;
+}
+
+function buildAnnouncementEmailText(
+  campaign: AnnouncementEmailCampaignDocument,
+  unsubscribeUrl: string,
+) {
+  const lines = [
+    campaign.subject,
+    '',
+    campaign.message.trim(),
+  ];
+
+  if (campaign.buttonLabel && campaign.buttonUrl) {
+    lines.push('', `${campaign.buttonLabel}: ${campaign.buttonUrl}`);
+  }
+
+  lines.push(
+    '',
+    'You are receiving this announcement because your account has product email updates enabled.',
+    `Unsubscribe from announcement emails: ${unsubscribeUrl}`,
+  );
+
+  return lines.join('\n');
 }
 
 function getEmailPreferenceUrl(input: {
@@ -4630,6 +4703,15 @@ async function sendAnnouncementCampaign(
           from: `Rank Analyzer Pro <${sender}>`,
           to: recipient.email,
           subject: claimedCampaign.subject,
+          text: buildAnnouncementEmailText(
+            claimedCampaign,
+            getEmailPreferenceUrl({
+              kind: 'announcement',
+              campaignId: claimedCampaign.campaignId,
+              userId: recipient.userDocRef.id,
+              email: recipient.email,
+            }),
+          ),
           html: buildAnnouncementEmailHtml(
             claimedCampaign,
             getEmailPreferenceUrl({
@@ -4729,6 +4811,7 @@ async function sendCronFailureEmail(input: {
       from: `Rank Analyzer Pro <${sender}>`,
       to: CRON_FAILURE_EMAIL_RECIPIENTS,
       subject: `Cron job failed: ${input.runKey}`,
+      text: buildCronFailureEmailText(input),
       html: buildCronFailureEmailHtml(input),
     });
     if (result.error) {
@@ -9406,19 +9489,53 @@ async function startServer() {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
 
-      if (typeof req.body?.announcementEmailsEnabled !== 'boolean') {
-        throw createBadRequestError('announcementEmailsEnabled must be a boolean.');
+      const announcementEmailsEnabled = req.body?.announcementEmailsEnabled;
+      const alertEmailsEnabled = req.body?.alertEmailsEnabled;
+      const weeklyReportEnabled = req.body?.weeklyReportEnabled;
+      const hasAnnouncementPreference =
+        typeof announcementEmailsEnabled === 'boolean';
+      const hasAlertPreference = typeof alertEmailsEnabled === 'boolean';
+      const hasWeeklyPreference = typeof weeklyReportEnabled === 'boolean';
+
+      if (
+        !hasAnnouncementPreference &&
+        !hasAlertPreference &&
+        !hasWeeklyPreference
+      ) {
+        throw createBadRequestError(
+          'At least one of announcementEmailsEnabled, alertEmailsEnabled, or weeklyReportEnabled must be a boolean.',
+        );
       }
 
       const updatedAt = new Date().toISOString();
-      await adminDb.collection('users').doc(decodedToken.uid).set({
-        announcementEmailsEnabled: req.body.announcementEmailsEnabled,
-        announcementEmailsUpdatedAt: updatedAt,
+      const updates: DocumentData = {
         updatedAt,
-      } satisfies Partial<UserTrackingDocument>, { merge: true });
+      };
+
+      if (hasAnnouncementPreference) {
+        updates.announcementEmailsEnabled = announcementEmailsEnabled;
+        updates.announcementEmailsUpdatedAt = updatedAt;
+      }
+      if (hasAlertPreference) {
+        updates.alertEmailsEnabled = alertEmailsEnabled;
+        updates.alertEmailsUpdatedAt = updatedAt;
+      }
+      if (hasWeeklyPreference) {
+        updates['weeklyReportSettings.enabled'] = weeklyReportEnabled;
+        updates['weeklyReportSettings.lastAttemptedAt'] = updatedAt;
+      }
+
+      await adminDb.collection('users').doc(decodedToken.uid).set(
+        updates,
+        { merge: true },
+      );
 
       res.json({
-        announcementEmailsEnabled: req.body.announcementEmailsEnabled,
+        ...(hasAnnouncementPreference
+          ? { announcementEmailsEnabled }
+          : {}),
+        ...(hasAlertPreference ? { alertEmailsEnabled } : {}),
+        ...(hasWeeklyPreference ? { weeklyReportEnabled } : {}),
         updatedAt,
       });
     } catch (error) {
@@ -9656,6 +9773,11 @@ async function startServer() {
         from: `Rank Analyzer Pro <${sender}>`,
         to: recipient,
         subject,
+        text: buildTestEmailText({
+          requestedBy,
+          message,
+          sentAt,
+        }),
         html: buildTestEmailHtml({
           requestedBy,
           message,
@@ -9822,11 +9944,11 @@ async function startServer() {
         return sendHtml(200, 'Alert emails turned off', 'Alert email delivery has been turned off for this account.');
       }
       if (kind === 'weekly') {
-        await adminDb.collection('users').doc(uid).set({
+        await adminDb.collection('users').doc(uid).update({
           'weeklyReportSettings.enabled': false,
           'weeklyReportSettings.lastAttemptedAt': updatedAt,
           updatedAt,
-        }, { merge: true });
+        });
 
         return sendHtml(200, 'Weekly emails turned off', 'Weekly report emails have been turned off for this account.');
       }

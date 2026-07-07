@@ -257,6 +257,94 @@ export function buildAlertBatchEmailHtml(
   `;
 }
 
+export function buildAlertEmailText(
+  event: AlertEvent,
+  dashboardUrl: string,
+  preferencesUrl?: string,
+) {
+  const storeLabel = event.store === "ios" ? "iOS" : "Android";
+  const changedFields =
+    Array.isArray(event.changedFields) && event.changedFields.length
+      ? event.changedFields
+          .map((field) => formatAlertChangedFieldLabel(field))
+          .join(", ")
+      : null;
+  const heading =
+    event.scope === "competitor_aso"
+      ? event.changedAppTitle || event.keyword
+      : event.keyword;
+
+  return [
+    getAlertEmailSubject(event),
+    "",
+    event.message,
+    `Target: ${heading}`,
+    `Store: ${storeLabel}`,
+    `Country: ${event.country.toUpperCase()}`,
+    `Triggered: ${formatEmailTimestamp(event.createdAt)}`,
+    ...(changedFields ? [`Changed fields: ${changedFields}`] : []),
+    "",
+    `Open workspace: ${dashboardUrl}`,
+    ...(preferencesUrl
+      ? [`Manage alert email preferences: ${preferencesUrl}`]
+      : []),
+  ].join("\n");
+}
+
+export function buildAlertBatchEmailText(
+  events: AlertEvent[],
+  dashboardUrl: string,
+  preferencesUrl?: string,
+) {
+  const rows = events
+    .slice()
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() -
+        new Date(left.createdAt).getTime(),
+    )
+    .map((event) => {
+      const scopeLabel =
+        event.scope === "competitor_aso" ? "Competitor ASO" : "Keyword";
+      const heading =
+        event.scope === "competitor_aso"
+          ? event.changedAppTitle || event.keyword
+          : event.keyword;
+      const changedFields =
+        Array.isArray(event.changedFields) && event.changedFields.length
+          ? event.changedFields
+              .map((field) => formatAlertChangedFieldLabel(field))
+              .join(", ")
+          : null;
+      return [
+        `- ${heading}`,
+        `  Scope: ${scopeLabel}`,
+        `  Alert type: ${ALERT_CONDITION_LABELS[event.eventType]}`,
+        `  Store: ${event.store === "ios" ? "iOS" : "Android"}`,
+        `  Country: ${event.country.toUpperCase()}`,
+        `  Triggered: ${formatEmailTimestamp(event.createdAt)}`,
+        `  Message: ${event.message}`,
+        ...(changedFields ? [`  Changed fields: ${changedFields}`] : []),
+      ].join("\n");
+    })
+    .join("\n\n");
+
+  return [
+    getAlertBatchEmailSubject(events),
+    "",
+    events.length === 1
+      ? "One alert triggered in your workspace."
+      : `${events.length} alerts triggered in your workspace.`,
+    "",
+    rows,
+    "",
+    `Open workspace: ${dashboardUrl}`,
+    ...(preferencesUrl
+      ? [`Manage alert email preferences: ${preferencesUrl}`]
+      : []),
+  ].join("\n");
+}
+
 async function updateAlertEmailStatus(
   userDocRef: DocumentReference<DocumentData>,
   event: AlertEvent,
@@ -350,6 +438,18 @@ export async function sendAlertEmailEvents(
       from: `Rank Analyzer Pro <${sender}>`,
       to: recipient,
       subject: getAlertBatchEmailSubject(events),
+      text:
+        events.length === 1
+          ? buildAlertEmailText(
+              events[0],
+              input.dashboardUrl,
+              input.preferencesUrl,
+            )
+          : buildAlertBatchEmailText(
+              events,
+              input.dashboardUrl,
+              input.preferencesUrl,
+            ),
       html:
         events.length === 1
           ? buildAlertEmailHtml(
@@ -732,4 +832,76 @@ export function buildWeeklyReportEmailHtml(input: {
       </div>
     </div>
   `;
+}
+
+export function buildWeeklyReportEmailText(input: {
+  summary: WeeklyReportEmailSummary;
+  reportUrl: string;
+  weekday: WeeklyReportWeekday;
+  preferencesUrl?: string;
+}) {
+  const lines = [
+    `Weekly Report: ${input.summary.rangeLabel}`,
+    "",
+    `Delivered on your ${WEEKDAY_VERB_LABELS[input.weekday]} schedule.`,
+    `Tracked keywords: ${input.summary.trackedKeywordCount}`,
+    `Currently ranked: ${input.summary.rankedKeywordCount}`,
+    `Average rank: ${input.summary.averageRankLabel}`,
+    `Top 10 / Top 3: ${input.summary.top10Count} / ${input.summary.top3Count}`,
+  ];
+
+  if (
+    input.summary.competitorGroupCount > 0 ||
+    input.summary.competitorTrackedTermCount > 0
+  ) {
+    lines.push(
+      "",
+      "Competitor coverage:",
+      `- Groups: ${input.summary.competitorGroupCount}`,
+      `- Tracked terms: ${input.summary.competitorTrackedTermCount}`,
+      `- Ranked pairs: ${input.summary.competitorRankedPairCount}`,
+    );
+  }
+
+  const appendMovementBlock = (
+    title: string,
+    items: WeeklyMovementItem[],
+    emptyLabel: string,
+  ) => {
+    lines.push("", `${title}:`);
+    if (!items.length) {
+      lines.push(emptyLabel);
+      return;
+    }
+    items.forEach((item) => {
+      lines.push(
+        `- ${item.keyword} (${item.appTitle}, ${item.country}) ${item.currentRankLabel} ${item.deltaLabel}`,
+      );
+    });
+  };
+
+  appendMovementBlock(
+    "Biggest movers",
+    input.summary.topMovers,
+    "No major movement in the current 7-day window.",
+  );
+  appendMovementBlock(
+    "Top gains",
+    input.summary.topGainers,
+    "No gains surfaced in the current 7-day window.",
+  );
+  appendMovementBlock(
+    "Top losses",
+    input.summary.topLosers,
+    "No losses surfaced in the current 7-day window.",
+  );
+
+  lines.push("", `View full report: ${input.reportUrl}`);
+  if (input.preferencesUrl) {
+    lines.push(
+      `Manage weekly email preferences: ${input.preferencesUrl}`,
+    );
+  }
+
+  return lines.join("\n");
 }

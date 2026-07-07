@@ -113,6 +113,9 @@ test("three alert events call resend once and mark all delivered", async () => {
     sendCalls[0].from,
     "Rank Analyzer Pro <alerts@rankanalyzerpro.com>",
   );
+  assert.match(String(sendCalls[0].text), /3 alerts triggered in your workspace\./);
+  assert.match(String(sendCalls[0].text), /Alert type: Title Changed/);
+  assert.match(String(sendCalls[0].text), /Manage alert email preferences:/);
   assert.match(String(sendCalls[0].html), /3 alerts triggered/);
   assert.match(String(sendCalls[0].html), /Alert type:/);
   assert.match(String(sendCalls[0].html), /Changed fields:/);
@@ -186,6 +189,8 @@ test("single-event behavior still uses the current subject style", async () => {
 
   assert.equal(sendCalls.length, 1);
   assert.equal(sendCalls[0].subject, "Keyword alert: instagram");
+  assert.match(String(sendCalls[0].text), /Instagram entered top 10\./);
+  assert.match(String(sendCalls[0].text), /Open workspace: https:\/\/rankanalyzerpro\.com/);
   assert.match(String(sendCalls[0].html), /Instagram entered top 10\./);
   assert.equal(updateCalls.length, 1);
   assert.equal(updateCalls[0].patch.emailDeliveryStatus, "delivered");
