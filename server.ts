@@ -148,18 +148,24 @@ import {
   buildDiscoveryPromptSections as buildSharedDiscoveryPromptSections,
   buildDiscoveryRefinementPrompt as buildSharedDiscoveryRefinementPrompt,
   compactDiscoveryPromptCandidates as compactSharedDiscoveryPromptCandidates,
+  type DiscoveryPromptLimits,
 } from './src/lib/discoveryPromptContext';
 import {
   buildDiscoveryWarnings,
   resolveDiscoveryResponseStatus,
   type DiscoveryCompetitorMiningStatus,
 } from './src/lib/discoveryResponse';
+import {
+  findAppleSearchResultIndex,
+  getNormalizedAppleResultIds,
+  getNormalizedAppleTargetIds,
+} from './src/lib/appleAppMatching';
 
 if (process.env.NODE_ENV !== 'production') {
   process.env.DISABLE_HMR = 'true';
 }
 
-// Discovery rank results stay fresh for 30 minutes; candidate/refinement caches stay warm for 12 hours.
+// Discovery rank results and candidate/refinement caches stay fresh for 30 minutes.
 const rankingCache = new NodeCache({ stdTTL: 14400 });
 const discoveryCandidateCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000, useClones: false });
 const keywordSourceCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000 });
@@ -597,8 +603,6 @@ type DodoSubscriptionWebhookEvent = {
 type DiscoveryProfile = {
   keywordLimit: number;
   batchSize: number;
-  earlyExitRankings: number | null;
-  minCheckedKeywords: number;
   searchDepth: number;
   initialSearchDepth: number;
   rankingCheckLimit: number;
@@ -615,14 +619,12 @@ type DiscoveryProfile = {
 
 const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
   fast: {
-    keywordLimit: 40,
+    keywordLimit: 80,
     batchSize: 2,
-    earlyExitRankings: 6,
-    minCheckedKeywords: 6,
     searchDepth: 100,
     initialSearchDepth: 100,
-    rankingCheckLimit: 8,
-    proxyVerificationLimit: 1,
+    rankingCheckLimit: 20,
+    proxyVerificationLimit: 2,
     extendedDepthCandidateLimit: 0,
     competitorSeedLimit: 2,
     competitorResultsPerSeed: 3,
@@ -630,17 +632,15 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     competitorProxyFallbackOnEmpty: false,
     verificationTimeoutMs: 3500,
     competitorTermLimit: 40,
-    finalRankingLimit: 10,
+    finalRankingLimit: 15,
   },
   deep: {
-    keywordLimit: 80,
+    keywordLimit: 180,
     batchSize: 3,
-    earlyExitRankings: 12,
-    minCheckedKeywords: 12,
     searchDepth: 150,
     initialSearchDepth: 100,
-    rankingCheckLimit: 18,
-    proxyVerificationLimit: 3,
+    rankingCheckLimit: 40,
+    proxyVerificationLimit: 5,
     extendedDepthCandidateLimit: 4,
     competitorSeedLimit: 4,
     competitorResultsPerSeed: 5,
@@ -648,7 +648,7 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     competitorProxyFallbackOnEmpty: false,
     verificationTimeoutMs: 4500,
     competitorTermLimit: 72,
-    finalRankingLimit: 20,
+    finalRankingLimit: 30,
   },
 };
 const TRACKING_STATE_FILE = path.join(process.cwd(), 'data', 'tracking-state.json');
@@ -820,7 +820,10 @@ const googlePlayDirectRequestOptions: StoreRequestOptions = {
 const googlePlayProxyRequestOptions: StoreRequestOptions = {
   timeout: PLAY_STORE_FETCH_TIMEOUT_MS,
 };
-const appStoreRequestOptions: StoreRequestOptions = {
+const appStoreDirectRequestOptions: StoreRequestOptions = {
+  timeout: PLAY_STORE_FETCH_TIMEOUT_MS,
+};
+const appStoreProxyRequestOptions: StoreRequestOptions = {
   timeout: PLAY_STORE_FETCH_TIMEOUT_MS,
 };
 
@@ -829,8 +832,12 @@ if (proxyAgent && proxyUrlString) {
     http: proxyAgent,
     https: proxyAgent
   };
-  appStoreRequestOptions.proxy = proxyUrlString;
+  appStoreProxyRequestOptions.proxy = proxyUrlString;
 }
+
+const appStoreRequestOptions = appStoreProxyRequestOptions.proxy
+  ? appStoreProxyRequestOptions
+  : appStoreDirectRequestOptions;
 
 const googlePlayDefaultRequestOptions = googlePlayProxyRequestOptions.agent
   ? googlePlayProxyRequestOptions
@@ -5672,6 +5679,121 @@ async function getGooglePlayRankWithFallback(
   }
 }
 
+async function searchAppleAppStore(
+  keyword: string,
+  country: string,
+  depth: number,
+  requestOptions: StoreRequestOptions,
+  deadlineAt: number,
+  failureMessage: string,
+) {
+  return await runWithDeadline<any[]>(
+    () => store.search({
+      term: keyword,
+      num: depth,
+      country,
+      requestOptions,
+    }),
+    deadlineAt,
+    failureMessage,
+  );
+}
+
+function logAppleDiscoveryVerification(input: {
+  keyword: string;
+  targetAppId: string;
+  normalizedTargetIds: Set<string>;
+  results: any[];
+  matchedIndex: number;
+  contextLabel: 'discovery' | 'ranking';
+}) {
+  const preview = input.results.slice(0, 5).map((app, index) => ({
+    index: index + 1,
+    title: String(app?.title || app?.trackName || app?.name || ''),
+    ids: Array.from(getNormalizedAppleResultIds(app)).slice(0, 6),
+  }));
+  console.log(
+    `[${input.contextLabel}] iOS rank verify keyword="${input.keyword}" target="${input.targetAppId}" normalizedTargetIds=${Array.from(input.normalizedTargetIds).join(',') || 'none'} results=${input.results.length} matchedIndex=${input.matchedIndex} preview=${JSON.stringify(preview)}`,
+  );
+}
+
+async function getAppleAppStoreRankWithFallback(
+  keyword: string,
+  appId: string,
+  country: string,
+  depth: number,
+  deadlineAt: number,
+  failureMessage: string,
+  contextLabel: 'discovery' | 'ranking',
+  options?: {
+    proxyFallbackOnNotRanked?: boolean;
+    proxyFirst?: boolean;
+  },
+) {
+  const normalizedTargetIds = getNormalizedAppleTargetIds(appId).identifiers;
+  const canUseProxy = Boolean(appStoreProxyRequestOptions.proxy);
+  const runSearch = async (requestOptions: StoreRequestOptions) => {
+    const results = await searchAppleAppStore(
+      keyword,
+      country,
+      depth,
+      requestOptions,
+      deadlineAt,
+      failureMessage,
+    );
+    const matchedIndex = findAppleSearchResultIndex(results, appId);
+    logAppleDiscoveryVerification({
+      keyword,
+      targetAppId: appId,
+      normalizedTargetIds,
+      results,
+      matchedIndex,
+      contextLabel,
+    });
+    return {
+      rank: matchedIndex === -1 ? -1 : matchedIndex + 1,
+      results,
+    };
+  };
+
+  if (options?.proxyFirst === true && canUseProxy) {
+    try {
+      const proxyResult = await runSearch(appStoreProxyRequestOptions);
+      if (proxyResult.rank !== -1) {
+        return proxyResult.rank;
+      }
+    } catch (error) {
+      console.warn(`[${contextLabel}] Proxy-first iOS rank lookup failed for "${keyword}", retrying direct search.`, error);
+    }
+
+    const directResult = await runSearch(appStoreDirectRequestOptions);
+    return directResult.rank;
+  }
+
+  try {
+    const directResult = await runSearch(appStoreDirectRequestOptions);
+    if (
+      directResult.rank !== -1 ||
+      options?.proxyFallbackOnNotRanked !== true ||
+      !canUseProxy
+    ) {
+      return directResult.rank;
+    }
+
+    console.warn(`[${contextLabel}] Direct iOS rank lookup returned not ranked for "${keyword}", retrying via proxy.`);
+    const proxyResult = await runSearch(appStoreProxyRequestOptions);
+    return proxyResult.rank;
+  } catch (error) {
+    if (!canUseProxy) {
+      throw error;
+    }
+
+    console.warn(`[${contextLabel}] Direct iOS rank lookup failed for "${keyword}", retrying via proxy.`, error);
+    const proxyResult = await runSearch(appStoreProxyRequestOptions);
+    return proxyResult.rank;
+  }
+}
+
 function shouldUseDiscoveryProxyVerification(
   candidate: DiscoveryMetricCandidate,
   candidateIndex: number,
@@ -5731,9 +5853,39 @@ function getDiscoveryKeywordTokenCount(keyword: string) {
 
 function getDiscoverySpecificityBonus(keyword: string) {
   const tokenCount = getDiscoveryKeywordTokenCount(keyword);
-  if (tokenCount >= 4) return 1;
-  if (tokenCount === 3) return 0.8;
-  if (tokenCount === 2) return 0.35;
+  if (tokenCount === 1) return 0.12;
+  if (tokenCount === 2) return 0.32;
+  if (tokenCount === 3) return 0.52;
+  if (tokenCount <= 5) return 0.64;
+  if (tokenCount <= 8) return 0.24;
+  return 0;
+}
+
+function getDiscoverySingleWordGroundingBonus(input: {
+  keyword: string;
+  exactTitleMatch: number;
+  exactTitleSegment: number;
+  orderedTitleCoverage: number;
+  semanticCoverage: number;
+  categorySemanticCoverage: number;
+}) {
+  if (getDiscoveryKeywordTokenCount(input.keyword) !== 1) {
+    return 0;
+  }
+
+  const titleStrength = Math.max(
+    input.exactTitleMatch || 0,
+    input.exactTitleSegment || 0,
+    input.orderedTitleCoverage || 0,
+  );
+  const semanticStrength = Math.max(
+    input.semanticCoverage || 0,
+    input.categorySemanticCoverage || 0,
+  );
+
+  if (titleStrength >= 1 || semanticStrength >= 0.85) return 0.3;
+  if (titleStrength >= 0.8 || semanticStrength >= 0.7) return 0.18;
+  if (titleStrength >= 0.6 || semanticStrength >= 0.55) return 0.08;
   return 0;
 }
 
@@ -5750,6 +5902,21 @@ function isDiscoveryGenericHeadLike(input: {
   const tokenCount = getDiscoveryKeywordTokenCount(input.keyword);
   if (tokenCount > 2) {
     return false;
+  }
+
+  if (tokenCount === 1) {
+    const titleStrength = Math.max(
+      input.exactTitleMatch || 0,
+      input.exactTitleSegment || 0,
+      input.orderedTitleCoverage || 0,
+    );
+    const semanticStrength = Math.max(
+      input.semanticCoverage || 0,
+      input.categorySemanticCoverage || 0,
+    );
+    if (titleStrength >= 0.8 || semanticStrength >= 0.65) {
+      return false;
+    }
   }
 
   return (
@@ -5786,8 +5953,16 @@ function scoreDiscoveryRankingOutcome(
     ),
   );
   const specificityBonus = getDiscoverySpecificityBonus(outcome.keyword);
+  const singleWordGroundingBonus = getDiscoverySingleWordGroundingBonus({
+    keyword: outcome.keyword,
+    exactTitleMatch: outcome.featureQuality.exactTitleMatch,
+    exactTitleSegment: outcome.featureQuality.exactTitleSegment,
+    orderedTitleCoverage: outcome.featureQuality.orderedTitleCoverage,
+    semanticCoverage: outcome.featureQuality.semanticCoverage,
+    categorySemanticCoverage: outcome.featureQuality.categorySemanticCoverage,
+  });
   const genericPenalty = clamp01(outcome.featureQuality.genericCoverage || 0) *
-    (specificityBonus <= 0.35 ? 1 : 0.45);
+    (singleWordGroundingBonus > 0 || specificityBonus >= 0.52 ? 0.45 : 1);
 
   return (
     rankStrength * 0.34 +
@@ -5795,7 +5970,8 @@ function scoreDiscoveryRankingOutcome(
     displayQuality * 0.14 +
     semanticStrength * 0.1 +
     titleStrength * 0.08 +
-    specificityBonus * 0.12 -
+    specificityBonus * 0.1 +
+    singleWordGroundingBonus * 0.1 -
     genericPenalty * 0.18
   );
 }
@@ -5818,8 +5994,16 @@ function scoreDiscoverySuggestionCandidate(candidate: DiscoveryMetricCandidate) 
   );
   const demand = clamp01(Number(candidate.baseline.demand || 0) / 100);
   const specificityBonus = getDiscoverySpecificityBonus(candidate.keyword);
+  const singleWordGroundingBonus = getDiscoverySingleWordGroundingBonus({
+    keyword: candidate.keyword,
+    exactTitleMatch: candidate.features.exactTitleMatch,
+    exactTitleSegment: candidate.features.exactTitleSegment,
+    orderedTitleCoverage: candidate.features.orderedTitleCoverage,
+    semanticCoverage: candidate.features.semanticCoverage,
+    categorySemanticCoverage: candidate.features.categorySemanticCoverage,
+  });
   const genericPenalty = clamp01(candidate.features.genericCoverage || 0) *
-    (specificityBonus <= 0.35 ? 1 : 0.45);
+    (singleWordGroundingBonus > 0 || specificityBonus >= 0.52 ? 0.45 : 1);
 
   return (
     relevance * 0.34 +
@@ -5827,7 +6011,8 @@ function scoreDiscoverySuggestionCandidate(candidate: DiscoveryMetricCandidate) 
     semanticStrength * 0.14 +
     titleStrength * 0.1 +
     demand * 0.08 +
-    specificityBonus * 0.16 -
+    specificityBonus * 0.12 +
+    singleWordGroundingBonus * 0.12 -
     genericPenalty * 0.18
   );
 }
@@ -6481,18 +6666,19 @@ async function getKeywordRank(
 
   try {
     if (storeType === 'ios') {
-      const results = await runWithDeadline<any[]>(
-        () => store.search({
-          term: keyword,
-          num: rankingDepth,
-          country,
-          requestOptions: appStoreRequestOptions,
-        }),
+      rank = await getAppleAppStoreRankWithFallback(
+        keyword,
+        appId,
+        country,
+        rankingDepth,
         deadlineAt,
         failureMessage,
+        'ranking',
+        {
+          proxyFallbackOnNotRanked: options?.proxyFallbackOnNotRanked,
+          proxyFirst: options?.proxyFirst,
+        },
       );
-      const index = results.findIndex((app) => String(app.appId) === String(appId) || String(app.id) === String(appId));
-      rank = index !== -1 ? index + 1 : -1;
     } else {
       rank = await getGooglePlayRankWithFallback(
         keyword,
@@ -7546,9 +7732,7 @@ async function mineCompetitorTerms(
     .map(([term, weight]) => {
       const parts = term.split(' ');
       const categoryBoost = parts.some((part) => categoryHintTokens.has(part)) ? 6 : 0;
-      const genericPenalty =
-        parts.length === 1 && HIGH_VOLUME_TERMS.has(parts[0]) && !categoryHintTokens.has(parts[0]) ? 3 : 0;
-      return [term, weight + categoryBoost - genericPenalty] as const;
+      return [term, weight + categoryBoost] as const;
     })
     .sort((a, b) => b[1] - a[1])
     .filter(([, weight]) => weight > 0)
@@ -7625,10 +7809,10 @@ async function buildKeywordSignals(
       country: context.country || 'us',
     },
     limits: {
-      featureSummaryLimit: mode === 'deep' ? 8 : 6,
-      seedPackLimit: mode === 'deep' ? 18 : 12,
-      phraseWindowLimit: mode === 'deep' ? 28 : 18,
-      totalLimit: mode === 'deep' ? 32 : 20,
+      featureSummaryLimit: mode === 'deep' ? 18 : 12,
+      seedPackLimit: mode === 'deep' ? 28 : 18,
+      phraseWindowLimit: mode === 'deep' ? 56 : 32,
+      totalLimit: mode === 'deep' ? 56 : 32,
     },
   }).forEach((phrase, index) => {
     addWeightedDiscoveryPhrase(
@@ -7846,7 +8030,7 @@ function addWeightedDiscoveryPhrase(
   }
 
   const parts = phrase.split(' ');
-  if (parts.length < 2 || parts.length > 5) {
+  if (parts.length < 1 || parts.length > 7) {
     return;
   }
 
@@ -7916,37 +8100,66 @@ const DISCOVERY_PRIMARY_MODEL_FAST =
   'openai/gpt-oss-20b';
 const DISCOVERY_PRIMARY_MODEL_DEEP =
   process.env.DISCOVERY_PRIMARY_MODEL_DEEP ||
+  process.env.DISCOVERY_PRIMARY_MODEL ||
   'openai/gpt-oss-20b';
 const DISCOVERY_FALLBACK_MODEL = process.env.DISCOVERY_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
 const DISCOVERY_REFINEMENT_RETRY_DELAYS_MS = [600, 1500] as const;
 const DISCOVERY_REFINEMENT_LIMITS = {
   fast: {
-    promptCandidateLimit: 40,
-    featureSummaryLimit: 10,
+    promptCandidateLimit: 80,
+    featureSummaryLimit: 20,
     outputKeywordLimit: 28,
     outputTokenLimit: 384,
     minimumUsableCount: 10,
-    appPurposeLimit: 2,
-    targetUsersLimit: 2,
-    coreFeaturesLimit: 4,
-    useCasesLimit: 3,
-    painPointsLimit: 2,
+    appPurposeLimit: 4,
+    targetUsersLimit: 4,
+    coreFeaturesLimit: 8,
+    useCasesLimit: 7,
+    painPointsLimit: 5,
     competitorRepeatedTermsLimit: 8,
-    rawDescriptionExcerptChars: 220,
+    rawDescriptionExcerptChars: 1800,
   },
   deep: {
-    promptCandidateLimit: 90,
-    featureSummaryLimit: 18,
-    outputKeywordLimit: 50,
-    outputTokenLimit: 800,
-    minimumUsableCount: 18,
-    appPurposeLimit: 3,
-    targetUsersLimit: 4,
-    coreFeaturesLimit: 6,
-    useCasesLimit: 5,
-    painPointsLimit: 4,
-    competitorRepeatedTermsLimit: 12,
-    rawDescriptionExcerptChars: 420,
+    promptCandidateLimit: 220,
+    featureSummaryLimit: 44,
+    outputKeywordLimit: 60,
+    outputTokenLimit: 960,
+    minimumUsableCount: 14,
+    appPurposeLimit: 6,
+    targetUsersLimit: 6,
+    coreFeaturesLimit: 12,
+    useCasesLimit: 10,
+    painPointsLimit: 8,
+    competitorRepeatedTermsLimit: 14,
+    rawDescriptionExcerptChars: 3600,
+  },
+} as const;
+const DISCOVERY_PROMPT_SOFT_TARGET_TOKENS: Record<DiscoveryMode, number> = {
+  fast: 2000,
+  deep: 4000,
+};
+const DISCOVERY_PROMPT_FLOOR_LIMITS = {
+  fast: {
+    promptCandidateLimit: 112,
+    featureSummaryLimit: 24,
+    appPurposeLimit: 5,
+    targetUsersLimit: 5,
+    coreFeaturesLimit: 10,
+    useCasesLimit: 9,
+    painPointsLimit: 7,
+    competitorRepeatedTermsLimit: 10,
+    rawDescriptionExcerptChars: 2400,
+  },
+  deep: {
+    promptCandidateLimit: 220,
+    featureSummaryLimit: 44,
+    appPurposeLimit: 8,
+    targetUsersLimit: 8,
+    coreFeaturesLimit: 16,
+    useCasesLimit: 14,
+    painPointsLimit: 12,
+    competitorRepeatedTermsLimit: 18,
+    rawDescriptionExcerptChars: 4200,
   },
 } as const;
 
@@ -7987,8 +8200,8 @@ type DiscoveryCheckedCandidateOutcome = {
 };
 
 const DISCOVERY_GENERIC_HEAD_LIMIT: Record<DiscoveryMode, number> = {
-  fast: 2,
-  deep: 3,
+  fast: 4,
+  deep: 6,
 };
 
 type DiscoveryCandidateCacheEntry = {
@@ -8069,6 +8282,8 @@ type DiscoveryRefinementCacheEntry = {
   competitorRepeatedTermCount: number;
   promptSectionCount: number;
   rawDescriptionExcerptLength: number;
+  promptCharCount: number;
+  promptApproxTokenCount: number;
   fallbackReason: DiscoveryProviderAttemptFailureReason | null;
 };
 
@@ -8088,6 +8303,14 @@ function keywordContainsExcludedBrandToken(keyword: string, excludedBrandTokens:
   }
 
   return tokenize(keyword).some((token) => excludedBrandTokens.has(token));
+}
+
+function getApproxPromptTokenCount(prompt: string) {
+  return Math.ceil(prompt.length / 4);
+}
+
+function getDiscoveryRefinementTemperature(mode: DiscoveryMode) {
+  return 0.65;
 }
 
 function parseKeywordArrayResponse(text: string) {
@@ -8156,7 +8379,7 @@ async function generateGroqKeywordList(prompt: string, mode: DiscoveryMode) {
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.4,
+        temperature: getDiscoveryRefinementTemperature(mode),
         max_tokens: DISCOVERY_REFINEMENT_LIMITS[mode].outputTokenLimit,
       });
       return parseKeywordArrayResponse(response.choices[0]?.message?.content || '');
@@ -8187,7 +8410,7 @@ async function generateGeminiDiscoveryKeywordList(prompt: string, mode: Discover
         model: DISCOVERY_FALLBACK_MODEL,
         contents: prompt,
         config: {
-          temperature: 0.4,
+          temperature: getDiscoveryRefinementTemperature(mode),
           maxOutputTokens: DISCOVERY_REFINEMENT_LIMITS[mode].outputTokenLimit,
           responseMimeType: 'application/json',
           responseSchema: {
@@ -8283,18 +8506,55 @@ async function refineKeywordsWithModel(
   options?: { force?: boolean },
 ): Promise<DiscoveryRefinementCacheEntry> {
   const refinementPoolLimit = DISCOVERY_PROFILES[mode].keywordLimit;
-  const promptKeywords = compactSharedDiscoveryPromptCandidates(
-    rawKeywords,
-    DISCOVERY_REFINEMENT_LIMITS[mode].promptCandidateLimit,
-  );
   const normalizedExcludedBrandTokens = (excludedBrandTokens || []).slice().sort((a, b) => a.localeCompare(b));
-  const { sections, counts } = buildSharedDiscoveryPromptSections({
+  let activeLimits: DiscoveryPromptLimits = { ...DISCOVERY_REFINEMENT_LIMITS[mode] };
+  let promptKeywords = compactSharedDiscoveryPromptCandidates(
+    rawKeywords,
+    activeLimits.promptCandidateLimit,
+  );
+  let { sections, counts } = buildSharedDiscoveryPromptSections({
     context,
-    limits: DISCOVERY_REFINEMENT_LIMITS[mode],
+    limits: activeLimits,
     candidateKeywords: promptKeywords,
     competitorRepeatedTerms,
     excludedBrandTokens: normalizedExcludedBrandTokens,
   });
+  let prompt = buildSharedDiscoveryRefinementPrompt({
+    context,
+    mode,
+    limits: activeLimits,
+    sections,
+  });
+  let promptCharCount = prompt.length;
+  let promptApproxTokenCount = getApproxPromptTokenCount(prompt);
+  const promptSoftTargetTokens = DISCOVERY_PROMPT_SOFT_TARGET_TOKENS[mode];
+
+  if (promptApproxTokenCount < promptSoftTargetTokens) {
+    activeLimits = {
+      ...activeLimits,
+      ...DISCOVERY_PROMPT_FLOOR_LIMITS[mode],
+    };
+    promptKeywords = compactSharedDiscoveryPromptCandidates(
+      rawKeywords,
+      activeLimits.promptCandidateLimit,
+    );
+    ({ sections, counts } = buildSharedDiscoveryPromptSections({
+      context,
+      limits: activeLimits,
+      candidateKeywords: promptKeywords,
+      competitorRepeatedTerms,
+      excludedBrandTokens: normalizedExcludedBrandTokens,
+    }));
+    prompt = buildSharedDiscoveryRefinementPrompt({
+      context,
+      mode,
+      limits: activeLimits,
+      sections,
+    });
+    promptCharCount = prompt.length;
+    promptApproxTokenCount = getApproxPromptTokenCount(prompt);
+  }
+
   const normalizedContext = {
     title: normalizeKeyword(context.title),
     category: normalizeKeyword(context.category || ''),
@@ -8312,18 +8572,12 @@ async function refineKeywordsWithModel(
   const cached = keywordRefinementCache.get<DiscoveryRefinementCacheEntry>(cacheKey);
   if (!options?.force && cached) {
     console.log(
-      `[keyword-refine] cache=hit mode=${mode} provider=${cached.providerUsed || 'local'} model=${cached.modelUsed || 'none'} raw=${cached.rawCount} prompt=${cached.promptCandidateCount} sections=${cached.promptSectionCount} purpose=${cached.appPurposeCount} users=${cached.targetUsersCount} features=${cached.featureLineCount} core=${cached.coreFeatureCount} useCases=${cached.useCaseCount} pain=${cached.painPointCount} competitorTerms=${cached.competitorRepeatedTermCount} rawExcerpt=${cached.rawDescriptionExcerptLength} modelOut=${cached.modelCount} sanitized=${cached.sanitizedModelCount} fallbackReason=${cached.fallbackReason || 'none'} fallbackAdded=${cached.fallbackAddedCount}`,
+      `[keyword-refine] cache=hit mode=${mode} provider=${cached.providerUsed || 'local'} model=${cached.modelUsed || 'none'} raw=${cached.rawCount} prompt=${cached.promptCandidateCount} sections=${cached.promptSectionCount} purpose=${cached.appPurposeCount} users=${cached.targetUsersCount} features=${cached.featureLineCount} core=${cached.coreFeatureCount} useCases=${cached.useCaseCount} pain=${cached.painPointCount} competitorTerms=${cached.competitorRepeatedTermCount} rawExcerpt=${cached.rawDescriptionExcerptLength} promptChars=${cached.promptCharCount} promptTokens=${cached.promptApproxTokenCount} modelOut=${cached.modelCount} sanitized=${cached.sanitizedModelCount} fallbackReason=${cached.fallbackReason || 'none'} fallbackAdded=${cached.fallbackAddedCount}`,
     );
     return cached;
   }
 
   const excludedBrandTokenSet = new Set(sections.excludedBrandTokens);
-  const prompt = buildSharedDiscoveryRefinementPrompt({
-    context,
-    mode,
-    limits: DISCOVERY_REFINEMENT_LIMITS[mode],
-    sections,
-  });
 
   let providerUsed: DiscoveryProviderName | null = null;
   let modelUsed: string | null = null;
@@ -8415,11 +8669,13 @@ async function refineKeywordsWithModel(
     competitorRepeatedTermCount: counts.competitorRepeatedTermCount,
     promptSectionCount: counts.promptSectionCount,
     rawDescriptionExcerptLength: counts.rawDescriptionExcerptLength,
+    promptCharCount,
+    promptApproxTokenCount,
     fallbackReason,
   };
 
   console.log(
-    `[keyword-refine] cache=miss mode=${mode} provider=${providerUsed || 'local'} model=${modelUsed || 'none'} raw=${rawKeywords.length} prompt=${promptKeywords.length} sections=${counts.promptSectionCount} purpose=${counts.appPurposeCount} users=${counts.targetUsersCount} features=${counts.featureLineCount} core=${counts.coreFeatureCount} useCases=${counts.useCaseCount} pain=${counts.painPointCount} competitorTerms=${counts.competitorRepeatedTermCount} rawExcerpt=${counts.rawDescriptionExcerptLength} modelOut=${modelKeywords.length} sanitized=${modelKeywords.length} fallbackReason=${fallbackReason || 'none'} fallbackAdded=${fallbackKeywords.length}`,
+    `[keyword-refine] cache=miss mode=${mode} provider=${providerUsed || 'local'} model=${modelUsed || 'none'} raw=${rawKeywords.length} prompt=${promptKeywords.length} sections=${counts.promptSectionCount} purpose=${counts.appPurposeCount} users=${counts.targetUsersCount} features=${counts.featureLineCount} core=${counts.coreFeatureCount} useCases=${counts.useCaseCount} pain=${counts.painPointCount} competitorTerms=${counts.competitorRepeatedTermCount} rawExcerpt=${counts.rawDescriptionExcerptLength} promptChars=${promptCharCount} promptTokens=${promptApproxTokenCount} modelOut=${modelKeywords.length} sanitized=${modelKeywords.length} fallbackReason=${fallbackReason || 'none'} fallbackAdded=${fallbackKeywords.length}`,
   );
 
   keywordRefinementCache.set(cacheKey, payload);
@@ -8565,18 +8821,12 @@ function buildDiscoveryPayloadFromCacheEntry(
         Boolean(outcome) && outcome.rank > 0 && outcome.rank <= profile.searchDepth,
     );
 
-  const rankings = validRankings
-    .filter((candidate) =>
-      shouldAdmitDiscoveryCandidate(
-        mode,
-        candidate.featureQuality,
-        candidate.displayQuality,
-      ),
-    )
-    .sort((a, b) => {
-      if (a.rank !== b.rank) return a.rank - b.rank;
-      return b.relevance - a.relevance;
-    })
+  const rankings = selectDiscoveryDiverseRankings(
+    validRankings,
+    mode,
+    profile.searchDepth,
+    profile.finalRankingLimit,
+  )
     .map(({ keyword, rank, demand, volume, difficulty, relevance, confidence }) => ({
       keyword,
       rank,
@@ -8585,13 +8835,17 @@ function buildDiscoveryPayloadFromCacheEntry(
       difficulty,
       relevance,
       confidence,
+      verificationStatus: 'verified' as const,
     }))
-    .slice(0, profile.finalRankingLimit);
 
   const rankedKeywordSet = new Set(rankings.map((ranking) => normalizeKeyword(ranking.keyword)));
-  const suggestions = candidatePool
-    .filter((candidate) => !rankedKeywordSet.has(normalizeKeyword(candidate.keyword)))
-    .slice(0, profile.finalRankingLimit)
+  const suggestionCandidates = candidatePool
+    .filter((candidate) => !rankedKeywordSet.has(normalizeKeyword(candidate.keyword)));
+  const suggestions = selectDiscoveryDiverseSuggestions(
+    suggestionCandidates,
+    mode,
+    profile.finalRankingLimit,
+  )
     .map(({ keyword, baseline }) => ({
       keyword,
       demand: baseline.demand,
@@ -8599,6 +8853,7 @@ function buildDiscoveryPayloadFromCacheEntry(
       difficulty: baseline.difficulty,
       relevance: baseline.relevance,
       confidence: baseline.confidence,
+      verificationStatus: 'unverified' as const,
     }));
 
   return {
@@ -8920,22 +9175,41 @@ async function discoverRankedKeywords(input: {
               );
             }
           } else {
-            const results: any[] = await runWithDeadline(
-              () => searchStore(
-                candidate.keyword,
-                input.store,
-                input.country,
-                profile.searchDepth,
-                { useFailureCache: false, webFallbackOnEmpty: true, webFallbackOnError: true },
-                verificationDeadlineAt,
-              ),
+            const allowProxyVerification = shouldUseDiscoveryProxyVerification(
+              candidate,
+              candidateIndex,
+              profile,
+            );
+            rank = await getAppleAppStoreRankWithFallback(
+              candidate.keyword,
+              input.appId,
+              input.country,
+              profile.initialSearchDepth,
               verificationDeadlineAt,
               'The app store search is taking too long. Please try again.',
+              'discovery',
+              {
+                proxyFallbackOnNotRanked: allowProxyVerification,
+              },
             );
-            const index = results.findIndex((app) =>
-              String(app.appId) === String(input.appId) || String(app.id) === String(input.appId),
-            );
-            rank = index === -1 ? -1 : index + 1;
+
+            if (
+              rank === -1 &&
+              shouldExtendDiscoveryDepth(candidate, candidateIndex, profile)
+            ) {
+              rank = await getAppleAppStoreRankWithFallback(
+                candidate.keyword,
+                input.appId,
+                input.country,
+                profile.searchDepth,
+                verificationDeadlineAt,
+                'The app store search is taking too long. Please try again.',
+                'discovery',
+                {
+                  proxyFallbackOnNotRanked: allowProxyVerification,
+                },
+              );
+            }
           }
 
           if (rank !== -1) {
@@ -8975,25 +9249,20 @@ async function discoverRankedKeywords(input: {
       ),
     );
 
-    if (
-      profile.earlyExitRankings !== null &&
-      validRankings.length >= profile.earlyExitRankings &&
-      checkedKeywords >= profile.minCheckedKeywords
-    ) {
+    const displayedRankingCount = selectDiscoveryDiverseRankings(
+      validRankings,
+      input.mode,
+      profile.searchDepth,
+      profile.finalRankingLimit,
+    ).length;
+
+    if (displayedRankingCount >= profile.finalRankingLimit) {
       break;
     }
   }
 
-  const admittedRankings = validRankings
-    .filter((candidate) =>
-      shouldAdmitDiscoveryCandidate(
-        input.mode,
-        candidate.featureQuality,
-        candidate.displayQuality,
-      ),
-    );
   const rankings = selectDiscoveryDiverseRankings(
-    admittedRankings,
+    validRankings,
     input.mode,
     profile.searchDepth,
     profile.finalRankingLimit,

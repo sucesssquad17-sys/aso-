@@ -55,20 +55,24 @@ import {
   buildDiscoveryWarnings,
   resolveDiscoveryResponseStatus,
 } from '../src/lib/discoveryResponse';
+import {
+  findAppleSearchResultIndex,
+  getNormalizedAppleTargetIds,
+} from '../src/lib/appleAppMatching';
 
 const discoveryPromptLimits: DiscoveryPromptLimits = {
-  promptCandidateLimit: 40,
-  featureSummaryLimit: 10,
+  promptCandidateLimit: 80,
+  featureSummaryLimit: 20,
   outputKeywordLimit: 28,
   outputTokenLimit: 384,
   minimumUsableCount: 10,
-  appPurposeLimit: 2,
-  targetUsersLimit: 2,
-  coreFeaturesLimit: 4,
-  useCasesLimit: 3,
-  painPointsLimit: 2,
+  appPurposeLimit: 4,
+  targetUsersLimit: 4,
+  coreFeaturesLimit: 8,
+  useCasesLimit: 7,
+  painPointsLimit: 5,
   competitorRepeatedTermsLimit: 8,
-  rawDescriptionExcerptChars: 220,
+  rawDescriptionExcerptChars: 1800,
 };
 
 const fallback: TrackingSchedule = {
@@ -938,7 +942,7 @@ test('deep discovery admits broader semantic candidates than fast mode', () => {
 
   assert.equal(
     shouldAdmitDiscoveryCandidate('fast', broadSemanticCandidate, 12),
-    false,
+    true,
   );
   assert.equal(
     shouldAdmitDiscoveryCandidate('deep', broadSemanticCandidate, 12),
@@ -964,9 +968,52 @@ test('deep discovery admits broader semantic candidates than fast mode', () => {
   );
 });
 
+test('discovery mode cache trimming reflects updated candidate breadth and visible ranking limits', () => {
+  const deepPayload = {
+    rankings: Array.from({ length: 36 }, (_, index) => ({
+      keyword: `keyword ${index + 1}`,
+      rank: index + 1,
+      demand: 90 - index,
+      volume: 90 - index,
+      difficulty: 60,
+      relevance: 90 - index,
+      confidence: 'high' as const,
+    })),
+    suggestions: Array.from({ length: 36 }, (_, index) => ({
+      keyword: `suggestion ${index + 1}`,
+      demand: 70 - index,
+      volume: 70 - index,
+      difficulty: 50,
+      relevance: 80 - index,
+      confidence: 'medium' as const,
+    })),
+    checkedKeywords: 44,
+    candidateCount: 220,
+    searchDepth: 180,
+    failedLookups: 0,
+    mode: 'deep' as const,
+    loadedAt: '2026-06-30T12:00:00.000Z',
+  };
+
+  const fastPayload = trimDiscoveryPayloadForMode(deepPayload, 'fast');
+  const normalizedDeepPayload = trimDiscoveryPayloadForMode(deepPayload, 'deep');
+
+  assert.equal(fastPayload.rankings.length, 15);
+  assert.equal(fastPayload.suggestions.length, 15);
+  assert.equal(fastPayload.checkedKeywords, 44);
+  assert.equal(fastPayload.candidateCount, 80);
+  assert.equal(fastPayload.searchDepth, 100);
+
+  assert.equal(normalizedDeepPayload.rankings.length, 36);
+  assert.equal(normalizedDeepPayload.suggestions.length, 36);
+  assert.equal(normalizedDeepPayload.checkedKeywords, 44);
+  assert.equal(normalizedDeepPayload.candidateCount, 220);
+  assert.equal(normalizedDeepPayload.searchDepth, 180);
+});
+
 test('fast discovery can reuse a cached deep payload as a trimmed subset', () => {
   const deepPayload = {
-    rankings: Array.from({ length: 14 }, (_, index) => ({
+    rankings: Array.from({ length: 24 }, (_, index) => ({
       keyword: `keyword ${index + 1}`,
       rank: index + 1,
       demand: 80 - index,
@@ -975,7 +1022,7 @@ test('fast discovery can reuse a cached deep payload as a trimmed subset', () =>
       relevance: 90 - index,
       confidence: 'high' as const,
     })),
-    suggestions: Array.from({ length: 14 }, (_, index) => ({
+    suggestions: Array.from({ length: 24 }, (_, index) => ({
       keyword: `suggestion ${index + 1}`,
       demand: 60 - index,
       volume: 60 - index,
@@ -984,7 +1031,7 @@ test('fast discovery can reuse a cached deep payload as a trimmed subset', () =>
       confidence: 'medium' as const,
     })),
     checkedKeywords: 20,
-    candidateCount: 80,
+    candidateCount: 180,
     searchDepth: 150,
     failedLookups: 0,
     mode: 'deep' as const,
@@ -994,9 +1041,9 @@ test('fast discovery can reuse a cached deep payload as a trimmed subset', () =>
   const fastPayload = trimDiscoveryPayloadForMode(deepPayload, 'fast');
 
   assert.equal(fastPayload.mode, 'fast');
-  assert.equal(fastPayload.rankings.length, 10);
-  assert.equal(fastPayload.suggestions.length, 10);
-  assert.equal(fastPayload.candidateCount, 40);
+  assert.equal(fastPayload.rankings.length, 15);
+  assert.equal(fastPayload.suggestions.length, 15);
+  assert.equal(fastPayload.candidateCount, 80);
   assert.equal(fastPayload.searchDepth, 100);
 });
 
@@ -1036,14 +1083,15 @@ test('discovery cache keys use compact metadata fingerprints', () => {
 
 test('discovery feature summary skips release-note noise and keeps stable high-signal phrases', () => {
   const summary = extractDiscoveryFeatureSummary(
-    'Build routines with a simple daily habit streak tracker. Stay focused with reminders and morning checklist flows. Bug fixes and performance improvements in this update.',
+    'Build routines with a simple daily habit streak tracker for busy adults who want consistency. Stay focused with reminders, ADHD-friendly planning, and morning checklist flows. Contact support at help@habitflow.app. Read our privacy policy for details. Bug fixes and performance improvements in this update.',
     6,
   );
 
-  assert.ok(summary.includes('build routines with simple daily habit streak tracker'));
-  assert.ok(summary.includes('stay focused with reminders and morning checklist flows'));
+  assert.ok(summary.includes('build routines with simple daily habit streak tracker for busy adults who want consistency'));
+  assert.ok(summary.includes('stay focused with reminders adhd friendly planning and morning checklist flows'));
   assert.equal(summary.some((line) => line.includes('bug fixes')), false);
-  assert.equal(summary.some((line) => line.includes('performance improvements')), false);
+  assert.equal(summary.some((line) => line.includes('privacy policy')), false);
+  assert.equal(summary.some((line) => line.includes('contact support')), false);
 });
 
 test('discovery prompt sections cap repeated competitor terms and strip excluded brands', () => {
@@ -1091,7 +1139,34 @@ test('discovery local candidate expansion adds contextual mid-tail phrases witho
 
   assert.ok(candidates.includes('dating conversation starter'));
   assert.ok(candidates.includes('flirty text generator'));
+  assert.ok(candidates.length >= 8);
   assert.ok(candidates.some((candidate) => candidate.split(' ').length >= 3));
+});
+
+test('discovery raw description excerpt removes support and legal noise before truncation', () => {
+  const { sections } = buildDiscoveryPromptSections({
+    context: {
+      title: 'Habit Flow',
+      description: 'Build routines with a simple daily habit tracker for busy adults. Follow morning checklist flows, reminder nudges, and focus sessions that reduce overwhelm. Contact support at help@habitflow.app. Visit www.habitflow.app for more help. Read our privacy policy and terms. Version 4.2 includes bug fixes and performance improvements.',
+      category: 'productivity',
+      developer: 'Flow Labs',
+      store: 'android',
+      country: 'us',
+    },
+    limits: {
+      ...discoveryPromptLimits,
+      rawDescriptionExcerptChars: 120,
+    },
+    candidateKeywords: ['habit tracker', 'daily routine planner'],
+    competitorRepeatedTerms: [],
+    excludedBrandTokens: [],
+  });
+
+  assert.ok(sections.rawDescriptionExcerpt.includes('build routines with a simple daily habit tracker for busy adults'));
+  assert.equal(sections.rawDescriptionExcerpt.includes('support'), false);
+  assert.equal(sections.rawDescriptionExcerpt.includes('privacy'), false);
+  assert.equal(sections.rawDescriptionExcerpt.includes('version 4 2'), false);
+  assert.ok(sections.rawDescriptionExcerpt.length <= 120);
 });
 
 test('discovery refinement prompt uses structured sections in order and omits empty sections', () => {
@@ -1146,8 +1221,19 @@ test('discovery refinement prompt uses structured sections in order and omits em
   assert.ok(prompt.indexOf('Raw description excerpt:') < prompt.indexOf('Competitor repeated terms:'));
   assert.ok(prompt.indexOf('Competitor repeated terms:') < prompt.indexOf('Candidate keywords:'));
   assert.ok(prompt.includes('Return only a JSON array of strings. No markdown. No commentary.'));
-  assert.ok(prompt.includes('Prefer 2 to 5 word phrases.'));
-  assert.ok(prompt.includes('Cover a mix of primary, feature, audience, problem, and use-case phrases'));
+  assert.ok(prompt.includes('Allow single-word and multi-word terms when they are strongly grounded'));
+  assert.ok(prompt.includes('Do not bias toward or against a keyword because of word count alone.'));
+  assert.ok(prompt.includes('Treat the candidate list as guidance, not a closed set, and infer adjacent user-search intent'));
+  assert.ok(prompt.includes('Closely related variants are allowed when they reflect meaningfully different search intent.'));
+  assert.ok(prompt.includes('Do not stay too literal to title words if the broader app purpose supports better search phrasing.'));
+  assert.ok(prompt.includes('Prefer natural, human-searchable keywords with clear user intent grounded in this app context, regardless of phrase length.'));
+});
+
+test('discovery prompt limits keep output caps unchanged while expanding input context', () => {
+  assert.equal(discoveryPromptLimits.outputKeywordLimit, 28);
+  assert.equal(discoveryPromptLimits.outputTokenLimit, 384);
+  assert.equal(discoveryPromptLimits.promptCandidateLimit > 40, true);
+  assert.equal(discoveryPromptLimits.rawDescriptionExcerptChars > 220, true);
 });
 
 test('discovery response metadata marks partial verification and fallback states clearly', () => {
@@ -1175,6 +1261,56 @@ test('discovery response metadata marks partial verification and fallback states
     resolveDiscoveryResponseStatus({ fallback: true, warnings: fallbackWarnings }),
     'fallback',
   );
+});
+
+test('apple target id normalization resolves numeric, id-prefixed, url, and bundle identifiers', () => {
+  assert.deepEqual(
+    Array.from(getNormalizedAppleTargetIds('123456789').identifiers).sort(),
+    ['123456789', 'id123456789'],
+  );
+  assert.deepEqual(
+    Array.from(getNormalizedAppleTargetIds('id123456789').identifiers).sort(),
+    ['123456789', 'id123456789'],
+  );
+  assert.deepEqual(
+    Array.from(
+      getNormalizedAppleTargetIds('https://apps.apple.com/us/app/example-app/id123456789').identifiers,
+    ).sort(),
+    [
+      '123456789',
+      'https://apps.apple.com/us/app/example-app/id123456789',
+      'id123456789',
+    ],
+  );
+  assert.deepEqual(
+    Array.from(getNormalizedAppleTargetIds('com.example.app').identifiers).sort(),
+    ['com.example.app'],
+  );
+});
+
+test('apple search result matching accepts numeric ids, id-prefixed ids, urls, and bundle ids', () => {
+  const results = [
+    { id: 456, title: 'Other App' },
+    {
+      id: 123456789,
+      appId: '123456789',
+      bundleId: 'com.example.app',
+      url: 'https://apps.apple.com/us/app/example-app/id123456789',
+      title: 'Example App',
+    },
+  ];
+
+  assert.equal(findAppleSearchResultIndex(results, '123456789'), 1);
+  assert.equal(findAppleSearchResultIndex(results, 'id123456789'), 1);
+  assert.equal(
+    findAppleSearchResultIndex(
+      results,
+      'https://apps.apple.com/us/app/example-app/id123456789',
+    ),
+    1,
+  );
+  assert.equal(findAppleSearchResultIndex(results, 'com.example.app'), 1);
+  assert.equal(findAppleSearchResultIndex(results, '999999999'), -1);
 });
 
 test('active-limit helper always allows tracking when no keywords are paused', () => {

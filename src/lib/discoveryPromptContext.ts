@@ -59,7 +59,13 @@ export type DiscoveryPromptSectionCounts = {
 };
 
 const RELEASE_NOTE_PATTERN =
-  /\b(update|updated|version|release|bug|bugs|fix|fixed|fixes|crash|performance|privacy|policy|terms)\b/i;
+  /\b(update|updated|version|release|bug|bugs|fix|fixed|fixes|crash|performance|changelog|whats new|what's new|new in this version)\b/i;
+const LEGAL_OR_SUPPORT_PATTERN =
+  /\b(privacy|policy|terms|conditions|support|contact|help center|helpdesk|customer service|email us|reach us|website|visit|follow us)\b/i;
+const URL_OR_HANDLE_PATTERN =
+  /\b(?:https?:\/\/|www\.|@[a-z0-9_]+|[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,})\b/i;
+const GENERIC_MARKETING_FILLER_PATTERN =
+  /\b(best app|easy to use|user friendly|seamless|ultimate|all in one|one stop|powerful|amazing|beautiful|intuitive|effortless|premium experience)\b/i;
 const AUDIENCE_MARKERS = new Set([
   "adhd",
   "adult",
@@ -284,24 +290,63 @@ function splitDescriptionChunks(description: string | undefined) {
     .filter(Boolean);
 }
 
+function isNoisyDescriptionChunk(chunk: string) {
+  const normalized = normalizeKeyword(chunk);
+  if (!normalized) {
+    return true;
+  }
+
+  if (
+    RELEASE_NOTE_PATTERN.test(normalized) ||
+    LEGAL_OR_SUPPORT_PATTERN.test(normalized) ||
+    URL_OR_HANDLE_PATTERN.test(normalized)
+  ) {
+    return true;
+  }
+
+  const tokenCount = tokenize(normalized).length;
+  if (tokenCount < 2) {
+    return true;
+  }
+
+  const genericTokenCount = tokenize(normalized).filter((token) => HIGH_VOLUME_TERMS.has(token)).length;
+  if (genericTokenCount >= Math.max(4, tokenCount - 1)) {
+    return true;
+  }
+
+  if (GENERIC_MARKETING_FILLER_PATTERN.test(normalized) && tokenCount <= 8) {
+    return true;
+  }
+
+  return false;
+}
+
 function scoreDescriptionChunk(chunk: string) {
-  const rawWords = normalizeKeyword(chunk)
+  const normalizedChunk = normalizeKeyword(chunk);
+  if (!normalizedChunk || isNoisyDescriptionChunk(normalizedChunk)) {
+    return null;
+  }
+
+  const rawWords = normalizedChunk
     .split(" ")
     .filter((word) => word.length > 2);
-  const tokens = tokenize(chunk).filter((token) => token.length > 2);
-  if (tokens.length < 2 || rawWords.length < 2 || RELEASE_NOTE_PATTERN.test(chunk)) {
+  const tokens = tokenize(normalizedChunk).filter((token) => token.length > 2);
+  if (tokens.length < 2 || rawWords.length < 2) {
     return null;
   }
 
   const meaningfulTokenCount = tokens.filter((token) => !HIGH_VOLUME_TERMS.has(token)).length;
   const score =
     meaningfulTokenCount * 3 +
-    Math.min(tokens.length, 6) +
-    (tokens.length >= 4 && tokens.length <= 8 ? 3 : 0);
+    Math.min(tokens.length, 10) +
+    (tokens.length >= 4 && tokens.length <= 14 ? 3 : 0) +
+    (lineHasAnyMarker(normalizedChunk, AUDIENCE_MARKERS) ? 2 : 0) +
+    (lineHasAnyMarker(normalizedChunk, USE_CASE_MARKERS) ? 2 : 0) +
+    (lineHasAnyMarker(normalizedChunk, PAIN_POINT_MARKERS) ? 2 : 0);
 
   return {
     score,
-    text: rawWords.slice(0, 10).join(" "),
+    text: rawWords.slice(0, 22).join(" "),
     tokens,
   };
 }
@@ -403,7 +448,23 @@ function buildRawDescriptionExcerpt(description: string | undefined, charLimit: 
     return "";
   }
 
-  const excerpt = normalizeKeyword(description)
+  const chunks = splitDescriptionChunks(description)
+    .filter((chunk) => !isNoisyDescriptionChunk(chunk));
+  if (chunks.length === 0) {
+    return "";
+  }
+
+  const seen = new Set<string>();
+  const excerpt = chunks
+    .filter((chunk) => {
+      const normalized = normalizeKeyword(chunk);
+      if (!normalized || seen.has(normalized)) {
+        return false;
+      }
+      seen.add(normalized);
+      return true;
+    })
+    .join(". ")
     .replace(/\s+/g, " ")
     .trim();
   if (!excerpt) {
@@ -452,11 +513,11 @@ function buildPhraseWindows(
     const words = normalizeKeyword(line)
       .split(" ")
       .filter(Boolean);
-    if (words.length < 2) {
+    if (words.length === 0) {
       continue;
     }
 
-    for (let size = Math.min(4, words.length); size >= 2; size -= 1) {
+    for (let size = Math.min(4, words.length); size >= 1; size -= 1) {
       for (let start = 0; start <= words.length - size; start += 1) {
         const phraseWords = words.slice(start, start + size);
         if (
@@ -469,7 +530,7 @@ function buildPhraseWindows(
         const phrase = phraseWords.join(" ");
         const phraseTokens = tokenize(phrase);
         if (
-          phraseTokens.length < 2 ||
+          phraseTokens.length === 0 ||
           phraseTokens.every((token) => HIGH_VOLUME_TERMS.has(token)) ||
           !phraseTokens.some((token) => anchorTokens.has(token)) ||
           !phraseTokens.some((token) => !HIGH_VOLUME_TERMS.has(token))
@@ -543,8 +604,8 @@ export function buildDiscoveryContextCandidateKeywords(input: {
     [
       ...seedPackCandidates,
       ...phraseWindowCandidates,
-      ...useCases.filter((line) => line.split(" ").length >= 2 && line.split(" ").length <= 5),
-      ...painPointsSolved.filter((line) => line.split(" ").length >= 2 && line.split(" ").length <= 5),
+      ...useCases,
+      ...painPointsSolved,
     ].filter(isDiscoveryKeywordCandidate),
     totalLimit,
   );
@@ -712,11 +773,11 @@ export function buildDiscoveryRefinementPrompt(input: {
     "Rules:",
     "1. Return only a JSON array of strings. No markdown. No commentary.",
     `2. Include at most ${input.limits.outputKeywordLimit} keywords.`,
-    "3. Use the app purpose, audience, use cases, pain points, and competitor repetition to discover concrete ASO phrases instead of generic head terms.",
-    "4. Prefer natural head, mid-tail, and long-tail phrases with clear user intent grounded in this app context.",
+    "3. Use the app purpose, audience, use cases, pain points, and competitor repetition to discover concrete ASO phrases and nearby high-intent search variants, not just the obvious head terms.",
+    "4. Prefer natural, human-searchable keywords with clear user intent grounded in this app context, regardless of phrase length. Treat the candidate list as guidance, not a closed set, and infer adjacent user-search intent from the app context when it is strongly plausible.",
     "5. Exclude junk, release-note phrasing, unrelated broad terms, and competitor-brand phrases.",
-    "6. Prefer 2 to 5 word phrases. Only include a single-word term when it is clearly category-specific and strongly grounded in the title or category.",
-    "7. Cover a mix of primary, feature, audience, problem, and use-case phrases without repeating the same stem in tiny variations.",
+    "6. Allow single-word and multi-word terms when they are strongly grounded in the title, category, semantic app intent, or real user search behavior. Do not bias toward or against a keyword because of word count alone.",
+    "7. Cover a mix of primary, feature, audience, problem, and use-case phrases. Closely related variants are allowed when they reflect meaningfully different search intent. Do not stay too literal to title words if the broader app purpose supports better search phrasing.",
     "8. Keep each keyword phrase natural and human-searchable, with a maximum of 8 words.",
   ];
 

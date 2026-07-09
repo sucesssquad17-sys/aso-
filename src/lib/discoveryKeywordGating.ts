@@ -97,9 +97,9 @@ export function hasStrongDiscoverySignal(
   return (
     features.exactTitleMatch > 0 ||
     features.exactTitleSegment > 0 ||
-    features.orderedTitleCoverage >= 0.75 ||
-    features.semanticCoverage >= 0.5 ||
-    features.categorySemanticCoverage >= 0.5
+    features.orderedTitleCoverage >= 0.55 ||
+    features.semanticCoverage >= 0.35 ||
+    features.categorySemanticCoverage >= 0.35
   );
 }
 
@@ -113,14 +113,14 @@ export function shouldAdmitDiscoveryCandidate(
   const thresholds =
     mode === "deep"
       ? {
-          displayQuality: 10,
-          semanticCoverage: 0.25,
-          categorySemanticCoverage: 0.25,
+          displayQuality: 0,
+          semanticCoverage: 0.12,
+          categorySemanticCoverage: 0.12,
         }
       : {
-          displayQuality: 20,
-          semanticCoverage: 0.35,
-          categorySemanticCoverage: 0.35,
+          displayQuality: 8,
+          semanticCoverage: 0.18,
+          categorySemanticCoverage: 0.18,
         };
 
   return (

@@ -10582,6 +10582,12 @@ function AuthenticatedApp({
     if (visibleWorkspaceMode === "reports") {
       return [];
     }
+    if (visibleWorkspaceMode === "single" && !selectedApp) {
+      return [];
+    }
+    if (visibleWorkspaceMode === "compare" && compareAnalyzedCount === 0) {
+      return [];
+    }
     if (visibleWorkspaceMode === "tracked") {
       const trackedStatusPills = getTrackedStatusPills(
         trackedDashboardStats.pendingCount,
@@ -10782,7 +10788,7 @@ function AuthenticatedApp({
   ]);
   const isLightTheme = themeMode === "light";
   const discoveryCardBaseClass =
-    "px-4 py-2.5 pr-12 rounded-xl text-sm flex flex-col gap-1.5 relative group transition-all hover:shadow-lg hover:-translate-y-0.5";
+    "px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl text-sm flex flex-col gap-2 transition-all hover:shadow-lg hover:-translate-y-0.5";
   const rankedKeywordCardClass = isLightTheme
     ? `${discoveryCardBaseClass} border border-sky-200/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(238,247,253,0.84))] text-slate-800 hover:border-sky-400/70 hover:shadow-sky-200/60`
     : `${discoveryCardBaseClass} bg-cyan-950/40 border border-cyan-500/20 text-cyan-300 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
@@ -10790,8 +10796,8 @@ function AuthenticatedApp({
     ? `${discoveryCardBaseClass} border border-cyan-200/80 bg-[linear-gradient(180deg,rgba(247,253,255,0.94),rgba(233,247,252,0.86))] text-slate-800 hover:border-cyan-400/65 hover:shadow-cyan-200/55`
     : `${discoveryCardBaseClass} bg-app-surface-muted/70 border border-cyan-500/20 text-cyan-200 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
   const discoveryMetricRowClass = isLightTheme
-    ? "flex items-center gap-2.5 text-xs text-sky-700/80 font-semibold"
-    : "flex items-center gap-2.5 text-xs text-cyan-400/80 font-medium";
+    ? "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] sm:text-xs text-sky-700/80 font-semibold"
+    : "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] sm:text-xs text-cyan-400/80 font-medium";
   const getDiscoveryTrackButtonClass = (
     isTracked: boolean,
     tone: "ranked" | "suggestion",
@@ -11421,8 +11427,12 @@ function AuthenticatedApp({
                                 boxShadow: "0 4px 12px rgba(34, 211, 238,0.25)",
                               }
                             : {
-                                background: "rgba(30,41,59,0.6)",
-                                borderColor: "rgba(51,65,85,0.5)",
+                                background: isLightTheme
+                                  ? "rgba(241,245,249,0.96)"
+                                  : "rgba(30,41,59,0.6)",
+                                borderColor: isLightTheme
+                                  ? "rgba(148,163,184,0.45)"
+                                  : "rgba(51,65,85,0.5)",
                               }
                         }
                       >
@@ -11441,8 +11451,12 @@ function AuthenticatedApp({
                                   boxShadow: "0 4px 12px rgba(34, 211, 238,0.25)",
                                 }
                               : {
-                                  background: "rgba(30,41,59,0.6)",
-                                  borderColor: "rgba(51,65,85,0.5)",
+                                  background: isLightTheme
+                                    ? "rgba(241,245,249,0.96)"
+                                    : "rgba(30,41,59,0.6)",
+                                  borderColor: isLightTheme
+                                    ? "rgba(148,163,184,0.45)"
+                                    : "rgba(51,65,85,0.5)",
                                 }
                           }
                         >
@@ -15444,74 +15458,50 @@ function AuthenticatedApp({
                             key={i}
                             className={rankedKeywordCardClass}
                           >
-                            {" "}
-                            <div className="flex items-center gap-2">
-                              {" "}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex items-start gap-2">
                               {selectedApp?.icon && (
                                 <img
                                   src={selectedApp.icon}
                                   alt=""
-                                  className={`w-5 h-5 rounded-md shadow-sm ${
+                                  className={`mt-0.5 h-5 w-5 shrink-0 rounded-md shadow-sm ${
                                     isLightTheme
                                       ? "border border-sky-200/80"
                                       : "border border-cyan-500/30"
                                   }`}
                                   referrerPolicy="no-referrer"
                                 />
-                              )}{" "}
-                              <span className="font-semibold">{r.keyword}</span>{" "}
+                              )}
+                              <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+                                <span className="truncate text-sm font-semibold leading-tight">
+                                  {r.keyword}
+                                </span>
                               <span
                                 className={
                                   isLightTheme
-                                    ? "bg-sky-100 text-sky-700 text-xs px-2 py-0.5 rounded-md font-bold border border-sky-200/80"
-                                    : "bg-cyan-500/20 text-cyan-300 text-xs px-2 py-0.5 rounded-md font-bold"
+                                    ? "shrink-0 rounded-md border border-sky-200/80 bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700 sm:text-xs"
+                                    : "shrink-0 rounded-md bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-300 sm:text-xs"
                                 }
                               >
                                 #{r.rank}
-                              </span>{" "}
-                            </div>{" "}
-                            <div className={discoveryMetricRowClass}>
-                              {" "}
-                              {getEstimatedDemand(r) !== undefined && (
-                                <span title="Estimated Volume">
-                                  Est. Vol: {getEstimatedDemand(r)}
-                                </span>
-                              )}{" "}
-                              {r.difficulty !== undefined && (
-                                <span title="Estimated Ranking Difficulty">
-                                  Est. Diff: {r.difficulty}
-                                </span>
-                              )}{" "}
-                              {r.relevance !== undefined && (
-                                <span title="Estimated App Relevance">
-                                  Est. Rel: {r.relevance}
-                                </span>
-                              )}{" "}
-
-                            </div>{" "}
-                            <div
-                              className={`absolute top-2 right-2 flex items-center gap-1 transition-all ${
-                                isMobileViewport
-                                  ? "opacity-100"
-                                  : "-top-3 -right-2 opacity-0 group-hover:opacity-100"
-                              }`}
-                            >
-                              {" "}
+                              </span>
+                              </div>
+                              </div>
                               <button
                                 onClick={() =>
                                   selectedApp &&
-                            openTrackCountryPicker(
-                              r.keyword,
-                              selectedApp,
-                              storeType,
-                              country,
-                              r.rank,
-                              true,
-                              "own",
-                              "discovery",
-                            )
-                          }
-                                className={getDiscoveryTrackButtonClass(
+                                  openTrackCountryPicker(
+                                    r.keyword,
+                                    selectedApp,
+                                    storeType,
+                                    country,
+                                    r.rank,
+                                    true,
+                                    "own",
+                                    "discovery",
+                                  )
+                                }
+                                className={`${getDiscoveryTrackButtonClass(
                                   trackedKeywordGroupKeys.has(
                                     getTrackedKeywordGroupKey({
                                       keyword: r.keyword,
@@ -15520,7 +15510,7 @@ function AuthenticatedApp({
                                     }),
                                   ),
                                   "ranked",
-                                )}
+                                )} shrink-0 self-start`}
                                 title={
                                   trackedKeywordGroupKeys.has(
                                     getTrackedKeywordGroupKey({
@@ -15533,7 +15523,6 @@ function AuthenticatedApp({
                                     : "Track Keyword"
                                 }
                               >
-                                {" "}
                                 {trackedKeywordGroupKeys.has(
                                   getTrackedKeywordGroupKey({
                                     keyword: r.keyword,
@@ -15541,12 +15530,29 @@ function AuthenticatedApp({
                                     store: storeType,
                                   }),
                                 ) ? (
-                                  <BellRing className="w-3.5 h-3.5" />
+                                  <BellRing className="h-3.5 w-3.5" />
                                 ) : (
-                                  <Bell className="w-3.5 h-3.5" />
-                                )}{" "}
-                              </button>{" "}
-                            </div>{" "}
+                                  <Bell className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                            <div className={discoveryMetricRowClass}>
+                              {getEstimatedDemand(r) !== undefined && (
+                                <span title="Estimated Volume">
+                                  Est. Vol: {getEstimatedDemand(r)}
+                                </span>
+                              )}
+                              {r.difficulty !== undefined && (
+                                <span title="Estimated Ranking Difficulty">
+                                  Est. Diff: {r.difficulty}
+                                </span>
+                              )}
+                              {r.relevance !== undefined && (
+                                <span title="Estimated App Relevance">
+                                  Est. Rel: {r.relevance}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         ))}{" "}
                       </div>
@@ -15558,64 +15564,36 @@ function AuthenticatedApp({
                             key={i}
                             className={suggestionKeywordCardClass}
                           >
-                            {" "}
-                            <div className="flex items-center gap-2">
-                              {" "}
-                              <span className="font-semibold">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+                              <span className="truncate text-sm font-semibold leading-tight">
                                 {r.keyword}
-                              </span>{" "}
+                              </span>
                               <span
                                 className={
                                   isLightTheme
-                                    ? "bg-cyan-100 text-cyan-700 text-xs px-2 py-0.5 rounded-md font-bold border border-cyan-200/80"
-                                    : "bg-cyan-500/15 text-cyan-300 text-xs px-2 py-0.5 rounded-md font-bold"
+                                    ? "shrink-0 rounded-md border border-cyan-200/80 bg-cyan-100 px-2 py-0.5 text-[11px] font-bold text-cyan-700 sm:text-xs"
+                                    : "shrink-0 rounded-md bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-300 sm:text-xs"
                                 }
                               >
                                 Suggestion
-                              </span>{" "}
-                            </div>{" "}
-                            <div className={discoveryMetricRowClass}>
-                              {" "}
-                              {getEstimatedDemand(r) !== undefined && (
-                                <span title="Estimated Volume">
-                                  Est. Vol: {getEstimatedDemand(r)}
-                                </span>
-                              )}{" "}
-                              {r.difficulty !== undefined && (
-                                <span title="Estimated Ranking Difficulty">
-                                  Est. Diff: {r.difficulty}
-                                </span>
-                              )}{" "}
-                              {r.relevance !== undefined && (
-                                <span title="Estimated App Relevance">
-                                  Est. Rel: {r.relevance}
-                                </span>
-                              )}{" "}
-
-                            </div>{" "}
-                            <div
-                              className={`absolute top-2 right-2 flex items-center gap-1 transition-all ${
-                                isMobileViewport
-                                  ? "opacity-100"
-                                  : "-top-3 -right-2 opacity-0 group-hover:opacity-100"
-                              }`}
-                            >
-                              {" "}
+                              </span>
+                              </div>
                               <button
                                 onClick={() =>
                                   selectedApp &&
-                            openTrackCountryPicker(
-                              r.keyword,
-                              selectedApp,
-                              storeType,
-                              country,
-                              -1,
-                              false,
-                              "own",
-                              "discovery",
-                            )
-                          }
-                                className={getDiscoveryTrackButtonClass(
+                                  openTrackCountryPicker(
+                                    r.keyword,
+                                    selectedApp,
+                                    storeType,
+                                    country,
+                                    -1,
+                                    false,
+                                    "own",
+                                    "discovery",
+                                  )
+                                }
+                                className={`${getDiscoveryTrackButtonClass(
                                   trackedKeywordGroupKeys.has(
                                     getTrackedKeywordGroupKey({
                                       keyword: r.keyword,
@@ -15624,7 +15602,7 @@ function AuthenticatedApp({
                                     }),
                                   ),
                                   "suggestion",
-                                )}
+                                )} shrink-0 self-start`}
                                 title={
                                   trackedKeywordGroupKeys.has(
                                     getTrackedKeywordGroupKey({
@@ -15637,7 +15615,6 @@ function AuthenticatedApp({
                                     : "Track Keyword"
                                 }
                               >
-                                {" "}
                                 {trackedKeywordGroupKeys.has(
                                   getTrackedKeywordGroupKey({
                                     keyword: r.keyword,
@@ -15645,12 +15622,29 @@ function AuthenticatedApp({
                                     store: storeType,
                                   }),
                                 ) ? (
-                                  <BellRing className="w-3.5 h-3.5" />
+                                  <BellRing className="h-3.5 w-3.5" />
                                 ) : (
-                                  <Bell className="w-3.5 h-3.5" />
-                                )}{" "}
-                              </button>{" "}
-                            </div>{" "}
+                                  <Bell className="h-3.5 w-3.5" />
+                                )}
+                              </button>
+                            </div>
+                            <div className={discoveryMetricRowClass}>
+                              {getEstimatedDemand(r) !== undefined && (
+                                <span title="Estimated Volume">
+                                  Est. Vol: {getEstimatedDemand(r)}
+                                </span>
+                              )}
+                              {r.difficulty !== undefined && (
+                                <span title="Estimated Ranking Difficulty">
+                                  Est. Diff: {r.difficulty}
+                                </span>
+                              )}
+                              {r.relevance !== undefined && (
+                                <span title="Estimated App Relevance">
+                                  Est. Rel: {r.relevance}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         ))}{" "}
                       </div>
@@ -15701,9 +15695,8 @@ function AuthenticatedApp({
                       className="rounded-2xl border text-center relative p-6"
                       style={rankingPanelStyle}
                     >
-                      {" "}
                       <p
-                        className={`text-sm mb-4 ${
+                        className={`mb-4 pr-0 text-sm sm:pr-40 ${
                           isLightTheme ? "text-slate-600" : "text-app-text-muted"
                         }`}
                       >
@@ -15715,10 +15708,8 @@ function AuthenticatedApp({
                         >
                           "{ranking.keyword}"
                         </span>
-                      </p>{" "}
-                      {/* Metrics chips */}{" "}
-                      <div className="absolute top-4 right-4 flex flex-col gap-1.5">
-                        {" "}
+                      </p>
+                      <div className="mb-4 flex flex-wrap justify-center gap-1.5 sm:absolute sm:right-4 sm:top-4 sm:mb-0 sm:max-w-[10rem] sm:justify-end">
                         {getEstimatedDemand(ranking) !== undefined && (
                           <span
                             className="metric-chip badge-cyan"
@@ -15726,7 +15717,7 @@ function AuthenticatedApp({
                           >
                             Est. Vol {getEstimatedDemand(ranking)}
                           </span>
-                        )}{" "}
+                        )}
                         {ranking.difficulty !== undefined && (
                           <span
                             className="metric-chip badge-amber"
@@ -15734,7 +15725,7 @@ function AuthenticatedApp({
                           >
                             Est. Diff {ranking.difficulty}
                           </span>
-                        )}{" "}
+                        )}
                         {ranking.relevance !== undefined && (
                           <span
                             className="metric-chip badge-purple"
@@ -15742,12 +15733,10 @@ function AuthenticatedApp({
                           >
                             Est. Rel {ranking.relevance}
                           </span>
-                        )}{" "}
-
-                      </div>{" "}
+                        )}
+                      </div>
                       {ranking.rank !== -1 ? (
                         <div className="flex flex-col items-center gap-2">
-                          {" "}
                           {selectedApp?.icon && (
                             <img
                               src={selectedApp.icon}
@@ -15759,13 +15748,13 @@ function AuthenticatedApp({
                               }`}
                               referrerPolicy="no-referrer"
                             />
-                          )}{" "}
+                          )}
                           <div
                             className="rank-number"
                             style={{ fontSize: "4rem" }}
                           >
                             #{ranking.rank}
-                          </div>{" "}
+                          </div>
                           <p
                             className={`text-xs ${
                               isLightTheme ? "text-slate-600" : "text-app-text-muted"
@@ -15774,7 +15763,7 @@ function AuthenticatedApp({
                             in{" "}
                             {COUNTRIES.find((c) => c.code === country)?.name ||
                               country}
-                          </p>{" "}
+                          </p>
                         </div>
                       ) : (
                         <div

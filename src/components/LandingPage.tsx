@@ -448,16 +448,29 @@ export default function LandingPage({
                   </div>
 
                   <div className="mt-6 flex flex-col justify-end">
-                    <button
-                      onClick={onGetStarted}
-                      className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
-                        plan.highlight
-                          ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
-                          : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
-                      }`}
-                    >
-                      {plan.cta}
-                    </button>
+                    {plan.contactOnly ? (
+                      <a
+                        href="mailto:vantalumstudio@gmail.com?subject=Rank%20Analyzer%20Pro%20Sales"
+                        className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
+                          plan.highlight
+                            ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
+                            : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
+                        }`}
+                      >
+                        {plan.cta}
+                      </a>
+                    ) : (
+                      <button
+                        onClick={onGetStarted}
+                        className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
+                          plan.highlight
+                            ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
+                            : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
+                        }`}
+                      >
+                        {plan.cta}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
