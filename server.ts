@@ -160,6 +160,11 @@ import {
   getNormalizedAppleResultIds,
   getNormalizedAppleTargetIds,
 } from './src/lib/appleAppMatching';
+import {
+  buildPlayStoreFetchInit,
+  resolveGooglePlayRankWithFallback,
+  type GooglePlayRankLogEvent,
+} from './src/lib/googlePlayProxyRouting';
 
 if (process.env.NODE_ENV !== 'production') {
   process.env.DISABLE_HMR = 'true';
@@ -5384,7 +5389,15 @@ async function refreshDailyTrackingLease(
   );
 }
 
-async function fetchPlayStoreHtml(path: string, country: string, retries = 2, timeoutMs = PLAY_STORE_FETCH_TIMEOUT_MS) {
+async function fetchPlayStoreHtml(
+  path: string,
+  country: string,
+  retries = 2,
+  timeoutMs = PLAY_STORE_FETCH_TIMEOUT_MS,
+  options?: {
+    useProxy?: boolean;
+  },
+) {
   const gl = country.toUpperCase();
   const url = new URL(`https://play.google.com${path}`);
   if (!url.searchParams.has('hl')) url.searchParams.set('hl', 'en_US');
@@ -5394,14 +5407,11 @@ async function fetchPlayStoreHtml(path: string, country: string, retries = 2, ti
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const response = await fetch(url.toString(), {
-        signal: AbortSignal.timeout(timeoutMs),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-        },
-        ...(playStoreFetchDispatcher
-          ? { dispatcher: playStoreFetchDispatcher }
-          : {}),
+        ...buildPlayStoreFetchInit({
+          timeoutMs,
+          useProxy: options?.useProxy === true,
+          dispatcher: playStoreFetchDispatcher,
+        }),
       } as RequestInit & { dispatcher?: UndiciDispatcher });
 
       if (!response.ok && response.status !== 404) {
@@ -5561,12 +5571,19 @@ function parsePlayStoreRankFromHtml(html: string, targetAppId: string, depth: nu
   return -1;
 }
 
-async function getGooglePlayRankWeb(keyword: string, appId: string, country: string, depth: number) {
+async function getGooglePlayRankWeb(
+  keyword: string,
+  appId: string,
+  country: string,
+  depth: number,
+  useProxy = false,
+) {
   const { html } = await fetchPlayStoreHtml(
     `/store/search?c=apps&q=${encodeURIComponent(keyword)}`,
     country,
     1,
     RANKING_FETCH_TIMEOUT_MS,
+    { useProxy },
   );
   return parsePlayStoreRankFromHtml(html, appId, depth);
 }
@@ -5607,76 +5624,42 @@ async function getGooglePlayRankWithFallback(
     proxyFirst?: boolean;
   },
 ) {
-  if (options?.proxyFirst === true && googlePlayProxyRequestOptions.agent) {
-    console.warn(
-      `[${contextLabel}] Using proxy-first Google Play rank lookup for "${keyword}".`,
+  const logGooglePlayRankAttempt = ({
+    keyword,
+    country,
+    contextLabel,
+    transport,
+    method,
+    rank,
+  }: GooglePlayRankLogEvent) => {
+    console.info(
+      `[${contextLabel}] Google Play rank keyword="${keyword}" country="${country}" transport=${transport} method=${method} rank=${rank}`,
     );
-    try {
-      const proxyRank = await getGooglePlayRankViaSearch(
-        keyword,
-        appId,
-        country,
-        depth,
-        googlePlayProxyRequestOptions,
-        deadlineAt,
-        failureMessage,
-      );
-      if (proxyRank !== -1) {
-        return proxyRank;
-      }
+  };
 
-      console.warn(
-        `[${contextLabel}] Proxy-first rank lookup returned not ranked for "${keyword}", retrying direct web lookup.`,
-      );
-    } catch (error) {
-      console.warn(
-        `[${contextLabel}] Proxy-first rank lookup failed for "${keyword}", retrying direct web lookup.`,
-      );
-    }
-
-    return await getGooglePlayRankWeb(keyword, appId, country, depth);
-  }
-
-  try {
-    const directRank = await getGooglePlayRankWeb(keyword, appId, country, depth);
-    if (
-      directRank !== -1 ||
-      options?.proxyFallbackOnNotRanked !== true ||
-      !googlePlayProxyRequestOptions.agent
-    ) {
-      return directRank;
-    }
-
-    console.warn(
-      `[${contextLabel}] Direct rank lookup returned not ranked for "${keyword}", verifying via proxy.`,
-    );
-    return await getGooglePlayRankViaSearch(
-      keyword,
-      appId,
-      country,
-      depth,
-      googlePlayProxyRequestOptions,
-      deadlineAt,
-      failureMessage,
-    );
-  } catch (error) {
-    if (!googlePlayProxyRequestOptions.agent) {
-      throw error;
-    }
-
-    console.warn(
-      `[${contextLabel}] Direct rank lookup failed for "${keyword}", retrying via proxy.`,
-    );
-    return await getGooglePlayRankViaSearch(
-      keyword,
-      appId,
-      country,
-      depth,
-      googlePlayProxyRequestOptions,
-      deadlineAt,
-      failureMessage,
-    );
-  }
+  return await resolveGooglePlayRankWithFallback({
+    keyword,
+    country,
+    contextLabel,
+    proxyAvailable: Boolean(googlePlayProxyRequestOptions.agent),
+    proxyFallbackOnNotRanked: options?.proxyFallbackOnNotRanked,
+    proxyFirst: options?.proxyFirst,
+    directWebLookup: () =>
+      getGooglePlayRankWeb(keyword, appId, country, depth, false),
+    proxyScraperLookup: googlePlayProxyRequestOptions.agent
+      ? () =>
+          getGooglePlayRankViaSearch(
+            keyword,
+            appId,
+            country,
+            depth,
+            googlePlayProxyRequestOptions,
+            deadlineAt,
+            failureMessage,
+          )
+      : undefined,
+    log: logGooglePlayRankAttempt,
+  });
 }
 
 async function searchAppleAppStore(
@@ -8789,13 +8772,6 @@ function rankDiscoveryMetricCandidates(
   });
 
   return metricCandidates
-    .filter((candidate) =>
-      shouldAdmitDiscoveryCandidate(
-        input.mode,
-        candidate.features,
-        candidate.displayQuality,
-      ),
-    )
     .sort((a, b) => {
       if (b.baseline.relevance !== a.baseline.relevance) return b.baseline.relevance - a.baseline.relevance;
       if (a.baseline.difficulty !== b.baseline.difficulty) return a.baseline.difficulty - b.baseline.difficulty;

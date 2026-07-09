@@ -15451,7 +15451,7 @@ function AuthenticatedApp({
                       </div>
                     ) : null}
                     {autoRankings.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
                         {" "}
                         {autoRankings.map((r, i) => (
                           <div
@@ -15472,8 +15472,8 @@ function AuthenticatedApp({
                                   referrerPolicy="no-referrer"
                                 />
                               )}
-                              <div className="min-w-0 flex flex-wrap items-center gap-1.5">
-                                <span className="truncate text-sm font-semibold leading-tight">
+                              <div className="min-w-0 flex flex-1 flex-wrap items-start gap-1.5">
+                                <span className="workspace-mobile-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-tight sm:truncate">
                                   {r.keyword}
                                 </span>
                               <span
@@ -15557,7 +15557,7 @@ function AuthenticatedApp({
                         ))}{" "}
                       </div>
                     ) : keywordSuggestions.length > 0 ? (
-                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
                         {" "}
                         {keywordSuggestions.map((r, i) => (
                           <div
@@ -15565,8 +15565,8 @@ function AuthenticatedApp({
                             className={suggestionKeywordCardClass}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex flex-wrap items-center gap-1.5">
-                              <span className="truncate text-sm font-semibold leading-tight">
+                              <div className="min-w-0 flex flex-1 flex-wrap items-start gap-1.5">
+                              <span className="workspace-mobile-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-tight sm:truncate">
                                 {r.keyword}
                               </span>
                               <span

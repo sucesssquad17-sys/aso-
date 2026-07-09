@@ -1,6 +1,6 @@
 export const DISCOVERY_CACHE_TTL = 1000 * 60 * 30;
 export const DISCOVERY_CANDIDATE_CACHE_TTL = 1000 * 60 * 30;
-export const DISCOVERY_CACHE_VERSION = "v26";
+export const DISCOVERY_CACHE_VERSION = "v27";
 
 export type DiscoveryMode = "fast" | "deep";
 

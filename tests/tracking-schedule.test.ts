@@ -59,6 +59,9 @@ import {
   findAppleSearchResultIndex,
   getNormalizedAppleTargetIds,
 } from '../src/lib/appleAppMatching';
+import {
+  getSortedCandidateTerms,
+} from '../src/lib/keywordMetrics';
 
 const discoveryPromptLimits: DiscoveryPromptLimits = {
   promptCandidateLimit: 80,
@@ -922,9 +925,32 @@ test('discovery sanitizer allows broader exploratory terms while rejecting obvio
   assert.equal(isDiscoveryKeywordCandidate('free dating app'), true);
   assert.equal(isDiscoveryKeywordCandidate('pro wingman support'), true);
   assert.equal(isDiscoveryKeywordCandidate('how to start flirting'), true);
+  assert.equal(isDiscoveryKeywordCandidate('message app'), true);
+  assert.equal(isDiscoveryKeywordCandidate('budget manager'), true);
+  assert.equal(isDiscoveryKeywordCandidate('follower stats'), true);
   assert.equal(isDiscoveryKeywordCandidate('release notes'), false);
   assert.equal(isDiscoveryKeywordCandidate('bug fixes'), false);
   assert.equal(isDiscoveryKeywordCandidate('dating advice for'), false);
+});
+
+test('candidate sorter keeps mixed exploratory phrases and prefers longer ties over heads', () => {
+  const sorted = getSortedCandidateTerms(
+    new Map([
+      ['chat', 10],
+      ['chat app', 10],
+      ['social', 12],
+      ['social media app', 10],
+      ['budget manager', 9],
+      ['message app', 9],
+      ['support chat', 8],
+    ]),
+    new Set<string>(),
+  ).map(([term]) => term);
+
+  assert.equal(sorted.includes('budget manager'), true);
+  assert.equal(sorted.includes('message app'), true);
+  assert.equal(sorted.indexOf('chat app') < sorted.indexOf('chat'), true);
+  assert.equal(sorted.indexOf('social media app') < sorted.indexOf('social'), true);
 });
 
 test('deep discovery admits broader semantic candidates than fast mode', () => {

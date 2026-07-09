@@ -49,6 +49,16 @@ const PURE_TRASH_WORDS = new Set([
   "experience",
 ]);
 
+const SOFT_NOISE_WORDS = new Set([
+  "update",
+  "updates",
+  "updated",
+  "feature",
+  "features",
+  "bugfix",
+  "bugfixes",
+]);
+
 const FILLERS = new Set([
   "and",
   "the",
@@ -84,8 +94,22 @@ export function isDiscoveryKeywordCandidate(input: unknown): input is string {
 
   const words = trimmed.split(/\s+/).filter(Boolean);
   if (words.length === 0 || words.length > 8) return false;
-  if (words.some((word) => BAD_STEMS.has(word))) return false;
-  if (words.some((word) => PURE_TRASH_WORDS.has(word))) return false;
+  const noisyWordCount = words.filter(
+    (word) =>
+      BAD_STEMS.has(word) ||
+      PURE_TRASH_WORDS.has(word) ||
+      SOFT_NOISE_WORDS.has(word),
+  ).length;
+  if (
+    noisyWordCount === words.length ||
+    (words.length === 1 &&
+      noisyWordCount === 1)
+  ) {
+    return false;
+  }
+  if (words.length >= 3 && noisyWordCount >= Math.ceil(words.length / 2)) {
+    return false;
+  }
   if (words.length > 1 && FILLERS.has(words[words.length - 1])) return false;
 
   return true;

@@ -262,7 +262,7 @@ export function getSortedCandidateTerms(
     .filter(([term]) => {
       const parts = term.split(" ");
       const nonBrandParts = parts.filter((part) => !ownTitleTokens.has(part));
-      if (new Set(parts).size !== parts.length) {
+      if (parts.length > 1 && new Set(parts).size !== parts.length) {
         return false;
       }
       if (
@@ -273,7 +273,7 @@ export function getSortedCandidateTerms(
       ) {
         return false;
       }
-      if (parts.some((part) => JUNK_MODIFIER_TERMS.has(part))) {
+      if (parts.every((part) => JUNK_MODIFIER_TERMS.has(part))) {
         return false;
       }
       if (
@@ -294,8 +294,22 @@ export function getSortedCandidateTerms(
       return true;
     })
     .sort((a, b) => {
+      const scoreCandidate = ([term, weight]: [string, number]) => {
+        const parts = term.split(" ");
+        const nonGenericParts = parts.filter((part) => !HIGH_VOLUME_TERMS.has(part));
+        const headPenalty =
+          parts.length === 1 && HIGH_VOLUME_TERMS.has(parts[0]) ? 4 : 0;
+        const specificityBonus =
+          Math.min(6, nonGenericParts.length * 2) +
+          (parts.length >= 2 ? 3 : 0) +
+          (parts.length >= 3 ? 2 : 0);
+        return weight + specificityBonus - headPenalty;
+      };
+
+      const scoreDelta = scoreCandidate(b) - scoreCandidate(a);
+      if (scoreDelta !== 0) return scoreDelta;
       if (b[1] !== a[1]) return b[1] - a[1];
-      return a[0].length - b[0].length;
+      return b[0].length - a[0].length;
     });
 }
 
