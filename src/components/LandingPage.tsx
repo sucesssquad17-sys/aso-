@@ -16,11 +16,17 @@ import {
 import {
   PUBLIC_BILLING_PLANS,
   PRICING_INCLUDED_CAPABILITIES,
+  formatBillingAmountFromMinorUnits,
+  getAvailableBillingIntervals,
+  getPlanPrice,
   getPlanPriceLabel,
+  getYearlyMonthlyEquivalentLabel,
+  type BillingInterval,
   type BillingPricingCatalog,
 } from "../lib/billing";
 import type { ThemeMode } from "../lib/theme";
 import BrandMark from "./BrandMark";
+import SupportEmailLink from "./SupportEmailLink";
 import ThemeToggle from "./ThemeToggle";
 
 interface LandingPageProps {
@@ -132,11 +138,26 @@ export default function LandingPage({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [pricingCatalog, setPricingCatalog] =
     React.useState<BillingPricingCatalog | null>(null);
+  const availableIntervals = getAvailableBillingIntervals(pricingCatalog);
+  const [selectedInterval, setSelectedInterval] =
+    React.useState<BillingInterval>("yearly");
 
   const pricingCards = PUBLIC_BILLING_PLANS.map((plan) => ({
     ...plan,
     badge: plan.badge === "Popular" ? "Most Popular" : plan.badge,
   }));
+
+  React.useEffect(() => {
+    if (!pricingCatalog) {
+      return;
+    }
+    const nextDefault = availableIntervals.includes("yearly")
+      ? "yearly"
+      : availableIntervals[0] || "monthly";
+    if (!availableIntervals.includes(selectedInterval)) {
+      setSelectedInterval(nextDefault);
+    }
+  }, [availableIntervals, pricingCatalog, selectedInterval]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -397,13 +418,68 @@ export default function LandingPage({
             </p>
           </div>
 
+          <div className="mt-6 flex justify-center">
+            <div className="inline-flex rounded-full border border-app-border/80 bg-app-surface-muted/70 p-1">
+              {(["monthly", "yearly"] as BillingInterval[])
+                .filter((interval) => availableIntervals.includes(interval))
+                .map((interval) => {
+                  const isActive = selectedInterval === interval;
+                  return (
+                    <button
+                      key={interval}
+                      type="button"
+                      onClick={() => setSelectedInterval(interval)}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors sm:px-5 sm:py-2.5 sm:text-sm ${
+                        isActive
+                          ? "bg-cyan-500 text-slate-950"
+                          : "text-app-text-muted hover:text-app-text"
+                      }`}
+                    >
+                      {interval === "yearly" ? "Yearly" : "Monthly"}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+
           <div className="mx-auto mt-8 grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {pricingCards.map((plan) => {
-              const priceLabel = getPlanPriceLabel(pricingCatalog, plan, "monthly");
-              const displayPrice = splitPriceLabel(
-                priceLabel,
-                plan.contactOnly ? "Custom" : "Loading",
+              const priceLabel = getPlanPriceLabel(
+                pricingCatalog,
+                plan,
+                selectedInterval,
               );
+              const selectedPrice = getPlanPrice(
+                pricingCatalog,
+                plan,
+                selectedInterval,
+              );
+              const yearlyDisplayAmount =
+                selectedInterval === "yearly"
+                  ? getYearlyMonthlyEquivalentLabel(pricingCatalog, plan)
+                  : null;
+              const yearlyTotalLabel =
+                selectedInterval === "yearly"
+                  ? formatBillingAmountFromMinorUnits(
+                      selectedPrice?.amount,
+                      selectedPrice?.currency,
+                    )
+                  : null;
+              const displayPrice =
+                selectedInterval === "yearly" && yearlyDisplayAmount
+                  ? { amount: yearlyDisplayAmount, cadence: "/mo" }
+                  : splitPriceLabel(
+                      priceLabel,
+                      plan.contactOnly ? "Custom" : "Loading",
+                    );
+              const billingSubtext =
+                plan.contactOnly
+                  ? null
+                  : selectedInterval === "yearly"
+                    ? yearlyTotalLabel
+                      ? `billed annually at ${yearlyTotalLabel}/year`
+                      : "billed annually"
+                    : "billed monthly";
 
               return (
                 <div
@@ -433,7 +509,10 @@ export default function LandingPage({
                     ) : null}
                   </div>
 
-                  <p className="mt-3 text-xs leading-6 text-app-text-muted">{plan.description}</p>
+                  <p className="mt-2 min-h-[1.25rem] text-[11px] leading-5 text-app-text-muted">
+                    {billingSubtext || "custom terms"}
+                  </p>
+                  <p className="mt-2 text-xs leading-6 text-app-text-muted">{plan.description}</p>
 
                   <div className="mt-5 flex-1 space-y-2.5">
                     {plan.features.map((point) => (
@@ -449,8 +528,8 @@ export default function LandingPage({
 
                   <div className="mt-6 flex flex-col justify-end">
                     {plan.contactOnly ? (
-                      <a
-                        href="mailto:vantalumstudio@gmail.com?subject=Rank%20Analyzer%20Pro%20Sales"
+                      <SupportEmailLink
+                        subject="Rank Analyzer Pro Sales"
                         className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
                           plan.highlight
                             ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
@@ -458,7 +537,7 @@ export default function LandingPage({
                         }`}
                       >
                         {plan.cta}
-                      </a>
+                      </SupportEmailLink>
                     ) : (
                       <button
                         onClick={onGetStarted}

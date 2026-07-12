@@ -2939,6 +2939,20 @@ function formatCompetitorAsoValue(
   return value.length > 120 ? `${value.slice(0, 117)}...` : value;
 }
 
+function getCompetitorAsoScreenshotPreviewList(
+  value: string | string[] | null,
+  limit = 3,
+) {
+  return Array.isArray(value)
+    ? value
+        .filter(
+          (entry): entry is string =>
+            typeof entry === "string" && entry.trim().length > 0,
+        )
+        .slice(0, limit)
+    : [];
+}
+
 type CompetitorAsoAlertGroupView = {
   groupId: string;
   title: string;
@@ -11147,6 +11161,7 @@ function AuthenticatedApp({
                           setSearchResults([]);
                           setHasSearched(false);
                         }}
+                        aria-label="Clear app search"
                         className="absolute right-4 top-1/2 -translate-y-1/2 text-app-text-muted hover:text-app-text-muted transition-colors p-1 rounded-full hover:bg-app-surface-muted bg-app-surface-muted"
                       >
                         <X className="w-4 h-4" />
@@ -11206,6 +11221,7 @@ function AuthenticatedApp({
                                   clearCompetitorDraftAnalysis();
                                   setCompetitorDraftOwnApp(null);
                                 }}
+                                aria-label="Remove selected app"
                                 className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -11249,10 +11265,11 @@ function AuthenticatedApp({
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      removeCompetitorDraftApp(
+                                    removeCompetitorDraftApp(
                                         getCompareAppKey(app, storeType),
                                       )
                                     }
+                                    aria-label={`Remove ${app.title} from rival apps`}
                                     className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -11672,6 +11689,7 @@ function AuthenticatedApp({
               <div className="workspace-mobile-only flex items-center gap-2">
                 <button
                   onClick={onSignOut}
+                  aria-label="Sign out"
                   className="h-8 w-8 overflow-hidden rounded-full border border-app-border/50 bg-app-surface-strong focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-950 sm:h-9 sm:w-9"
                   title="Sign out"
                 >
@@ -11698,6 +11716,7 @@ function AuthenticatedApp({
                 {notificationPermission !== "granted" && (
                   <button
                     onClick={requestNotificationPermission}
+                    aria-label="Enable push notifications"
                     className="workspace-icon-button text-amber-300"
                     title="Enable Push Notifications"
                   >
@@ -11707,6 +11726,7 @@ function AuthenticatedApp({
                 {!isDemoMode && (
                   <button
                     onClick={() => setViewMode("upgrade")}
+                    aria-label="View plans"
                     className="workspace-icon-button"
                     title="View plans"
                   >
@@ -11715,6 +11735,7 @@ function AuthenticatedApp({
                 )}
                 <button
                   onClick={onSignOut}
+                  aria-label="Sign out"
                   className="workspace-icon-button"
                   title="Sign out"
                 >
@@ -11726,6 +11747,7 @@ function AuthenticatedApp({
                       setIsConfirmingDeleteAccount((prev) => !prev);
                       setDeleteAccountConfirmationInput("");
                     }}
+                    aria-label="Delete account"
                     className={cn(
                       "workspace-icon-button",
                       isConfirmingDeleteAccount && "border-red-500/20 bg-red-500/10 text-red-300",
@@ -11897,6 +11919,7 @@ function AuthenticatedApp({
                 {notificationPermission !== "granted" && (
                   <button
                     onClick={requestNotificationPermission}
+                    aria-label="Enable push notifications"
                     className="workspace-mobile-only workspace-icon-button text-amber-300"
                     title="Enable Push Notifications"
                   >
@@ -11906,6 +11929,7 @@ function AuthenticatedApp({
                 {!isDemoMode && (
                   <button
                     onClick={() => setViewMode("upgrade")}
+                    aria-label="View plans"
                     className="workspace-mobile-only workspace-icon-button"
                     title="View plans"
                   >
@@ -11914,6 +11938,7 @@ function AuthenticatedApp({
                 )}
                 <button
                   onClick={onSignOut}
+                  aria-label="Sign out"
                   className="workspace-mobile-only workspace-icon-button"
                   title="Sign out"
                 >
@@ -11939,6 +11964,7 @@ function AuthenticatedApp({
                     }
                   }}
                   disabled={isDeletingAccount}
+                  aria-label="Delete account"
                   className="workspace-mobile-only workspace-icon-button disabled:opacity-60"
                   title="Delete account"
                 >
@@ -12950,13 +12976,59 @@ function AuthenticatedApp({
                       groupAsoSnapshotCount >= groupAsoExpectedSnapshotCount;
                     const groupAsoLatestSnapshotAt =
                       groupAsoSnapshots[0]?.capturedAt || null;
+                    const groupAsoFieldCounts =
+                      groupAsoDiffs.reduce<Record<CompetitorAsoFieldName, number>>(
+                        (counts, diff) => {
+                          diff.changedFields.forEach((field) => {
+                            counts[field] += 1;
+                          });
+                          return counts;
+                        },
+                        {
+                          title: 0,
+                          description: 0,
+                          icon: 0,
+                          category: 0,
+                          screenshots: 0,
+                        },
+                      );
+                    const groupAsoChangedFieldEntries = (
+                      [
+                        "title",
+                        "description",
+                        "screenshots",
+                        "icon",
+                        "category",
+                      ] as CompetitorAsoFieldName[]
+                    )
+                      .map((field) => ({
+                        field,
+                        count: groupAsoFieldCounts[field],
+                      }))
+                      .filter((entry) => entry.count > 0)
+                      .sort(
+                        (a, b) =>
+                          b.count - a.count ||
+                          getCompetitorAsoFieldLabel(a.field).localeCompare(
+                            getCompetitorAsoFieldLabel(b.field),
+                          ),
+                      );
+                    const groupAsoChangedFieldSummary =
+                      groupAsoChangedFieldEntries.length > 0
+                        ? groupAsoChangedFieldEntries
+                            .slice(0, 3)
+                            .map((entry) => getCompetitorAsoFieldLabel(entry.field))
+                            .join(", ")
+                        : null;
                     const groupAsoStatus =
                       groupAsoDiffs.length > 0
                         ? {
                             tone: "border-emerald-500/20 bg-emerald-500/10 text-emerald-100",
                             title: "Changes detected",
                             message:
-                              "Recent ASO metadata changes were detected for this competitor group.",
+                              groupAsoChangedFieldSummary
+                                ? `Recent ASO metadata changes were detected for this competitor group: ${groupAsoChangedFieldSummary}.`
+                                : "Recent ASO metadata changes were detected for this competitor group.",
                           }
                         : groupAsoSnapshotCount === 0
                           ? {
@@ -13205,6 +13277,21 @@ function AuthenticatedApp({
                               </span>{" "}
                               {groupAsoStatus.message}
                             </div>
+                            {groupAsoChangedFieldEntries.length > 0 ? (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {groupAsoChangedFieldEntries.map((entry) => (
+                                  <span
+                                    key={`${card.group.groupId}:aso-field:${entry.field}`}
+                                    className="rounded-full border border-app-border/60 bg-app-surface/60 px-3 py-1.5 text-[11px] font-semibold text-app-text"
+                                  >
+                                    {getCompetitorAsoFieldLabel(entry.field)}{" "}
+                                    <span className="text-app-text-muted">
+                                      {entry.count}
+                                    </span>
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
                             <div
                               className={`competitor-aso-filters mt-4 grid gap-3 xl:grid-cols-[220px_220px_minmax(0,1fr)] ${groupAsoDiffs.length === 0 ? "hidden sm:grid" : ""}`}
                             >
@@ -13323,7 +13410,7 @@ function AuthenticatedApp({
                                         {diff.changedFields.map((field) => (
                                           <span
                                             key={`${diff.diffId}:${field}`}
-                                            className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-2 py-1 text-[10px] font-semibold text-app-text"
+                                            className="inline-flex self-start rounded-full border border-app-border/60 bg-app-surface-muted/70 px-2 py-1 text-[10px] font-semibold text-app-text"
                                           >
                                             {getCompetitorAsoFieldLabel(field)}
                                           </span>
@@ -13354,6 +13441,30 @@ function AuthenticatedApp({
                                                     change.previousValue,
                                                   )}
                                                 </div>
+                                                {change.field ===
+                                                  "screenshots" &&
+                                                getCompetitorAsoScreenshotPreviewList(
+                                                  change.previousValue,
+                                                ).length > 0 ? (
+                                                  <div className="mt-2 flex flex-wrap gap-2">
+                                                    {getCompetitorAsoScreenshotPreviewList(
+                                                      change.previousValue,
+                                                    ).map((src, index) => (
+                                                      <img
+                                                        key={`${diff.diffId}:${change.field}:previous:${index}`}
+                                                        src={src}
+                                                        alt=""
+                                                        loading="lazy"
+                                                        referrerPolicy="no-referrer"
+                                                        className="h-16 w-9 rounded-lg border border-app-border/60 bg-app-surface object-cover"
+                                                        onError={(event) => {
+                                                          event.currentTarget.style.display =
+                                                            "none";
+                                                        }}
+                                                      />
+                                                    ))}
+                                                  </div>
+                                                ) : null}
                                               </div>
                                               <div>
                                                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
@@ -13365,6 +13476,30 @@ function AuthenticatedApp({
                                                     change.currentValue,
                                                   )}
                                                 </div>
+                                                {change.field ===
+                                                  "screenshots" &&
+                                                getCompetitorAsoScreenshotPreviewList(
+                                                  change.currentValue,
+                                                ).length > 0 ? (
+                                                  <div className="mt-2 flex flex-wrap gap-2">
+                                                    {getCompetitorAsoScreenshotPreviewList(
+                                                      change.currentValue,
+                                                    ).map((src, index) => (
+                                                      <img
+                                                        key={`${diff.diffId}:${change.field}:current:${index}`}
+                                                        src={src}
+                                                        alt=""
+                                                        loading="lazy"
+                                                        referrerPolicy="no-referrer"
+                                                        className="h-16 w-9 rounded-lg border border-app-border/60 bg-app-surface object-cover"
+                                                        onError={(event) => {
+                                                          event.currentTarget.style.display =
+                                                            "none";
+                                                        }}
+                                                      />
+                                                    ))}
+                                                  </div>
+                                                ) : null}
                                               </div>
                                             </div>
                                           </div>

@@ -26,6 +26,7 @@ import {
   Zap,
   Target,
 } from "lucide-react";
+import SupportEmailLink from "../../components/SupportEmailLink";
 import {
   type BillingAccessState,
   PUBLIC_BILLING_PLANS,
@@ -298,10 +299,10 @@ export function UpgradePage({
 
     if (plan.contactOnly) {
       return (
-        <a href="mailto:vantalumstudio@gmail.com" className={normalCta}>
+        <SupportEmailLink subject="Rank Analyzer Pro Sales" className={normalCta}>
           <Mail className="h-4 w-4" />
           {plan.cta}
-        </a>
+        </SupportEmailLink>
       );
     }
 
@@ -842,12 +843,12 @@ export function UpgradePage({
           <span className="flex items-center gap-2">
             <Headphones className="h-3.5 w-3.5 text-app-text-muted" />
             <span>Questions? </span>
-            <a
-              href="mailto:vantalumstudio@gmail.com"
+            <SupportEmailLink
+              subject="Rank Analyzer Pro Support"
               className="text-slate-700 underline-offset-2 transition-colors hover:text-slate-900 hover:underline dark:text-app-text-muted dark:hover:text-app-text"
             >
               Contact support
-            </a>
+            </SupportEmailLink>
           </span>
           <span className="hidden sm:inline">·</span>
           <span className="flex items-center gap-2">

@@ -1,4 +1,5 @@
 import React from "react";
+import SupportEmailLink from "../../components/SupportEmailLink";
 import {
   ArrowLeft,
   Loader2,
@@ -182,7 +183,7 @@ export function PrivacyPolicyPage({
       <p>
         For support, billing, or sales questions, contact
         {" "}
-        <a href="mailto:vantalumstudio@gmail.com">vantalumstudio@gmail.com</a>.
+        <SupportEmailLink>vantalumstudio@gmail.com</SupportEmailLink>.
       </p>
     </LegalDocumentScreen>
   );
@@ -234,7 +235,7 @@ export function TermsPage({
       <p>
         You may cancel a subscription through the billing portal when available
         or by contacting{" "}
-        <a href="mailto:vantalumstudio@gmail.com">vantalumstudio@gmail.com</a>. Cancellation generally stops future renewals
+        <SupportEmailLink>vantalumstudio@gmail.com</SupportEmailLink>. Cancellation generally stops future renewals
         but does not automatically create a refund for charges already incurred.
         Refund decisions, if offered, are handled case by case and may depend on
         payment-provider rules, trial use, abuse review, and applicable law.
@@ -283,7 +284,7 @@ export function TermsPage({
       <p>
         For support, billing, or sales questions, contact
         {" "}
-        <a href="mailto:vantalumstudio@gmail.com">vantalumstudio@gmail.com</a>.
+        <SupportEmailLink>vantalumstudio@gmail.com</SupportEmailLink>.
       </p>
     </LegalDocumentScreen>
   );

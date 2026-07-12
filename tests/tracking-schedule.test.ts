@@ -930,6 +930,8 @@ test('discovery sanitizer allows broader exploratory terms while rejecting obvio
   assert.equal(isDiscoveryKeywordCandidate('follower stats'), true);
   assert.equal(isDiscoveryKeywordCandidate('release notes'), false);
   assert.equal(isDiscoveryKeywordCandidate('bug fixes'), false);
+  assert.equal(isDiscoveryKeywordCandidate('latest changelog'), false);
+  assert.equal(isDiscoveryKeywordCandidate('patch notes'), false);
   assert.equal(isDiscoveryKeywordCandidate('dating advice for'), false);
 });
 

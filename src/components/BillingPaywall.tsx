@@ -11,6 +11,7 @@ import {
   Star,
   Zap,
 } from "lucide-react";
+import SupportEmailLink from "./SupportEmailLink";
 import {
   PUBLIC_BILLING_PLANS,
   DEFAULT_PUBLIC_BILLING_PLAN_IDS,
@@ -510,13 +511,13 @@ export function BillingPaywall({
 
                   <div className="mt-auto min-h-[84px] space-y-3">
                     {plan.contactOnly ? (
-                      <a
-                        href="mailto:vantalumstudio@gmail.com"
+                      <SupportEmailLink
+                        subject="Rank Analyzer Pro Sales"
                         className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.04] px-4 py-3 text-sm font-bold text-app-text transition-colors hover:bg-white/[0.08]"
                       >
                         <Mail className="h-4 w-4" />
                         {actionLabel}
-                      </a>
+                      </SupportEmailLink>
                     ) : (
                       <div className="space-y-2">
                         <button

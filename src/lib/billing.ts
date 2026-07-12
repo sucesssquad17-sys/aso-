@@ -185,3 +185,61 @@ export function getPlanPriceLabel(
 
   return null;
 }
+
+export function getPlanPrice(
+  billingStatus: BillingStatus | BillingPricingCatalog | null,
+  plan: BillingPlanDefinition,
+  interval: BillingInterval,
+): BillingPlanPrice | null {
+  if (plan.id === "free" || plan.id === "agency") {
+    return null;
+  }
+
+  return billingStatus?.planPricing?.[plan.id]?.[interval] || null;
+}
+
+export function formatBillingAmountFromMinorUnits(
+  amount: number | null | undefined,
+  currency: string | null | undefined,
+  options?: {
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+  },
+) {
+  if (typeof amount !== "number" || !currency) {
+    return null;
+  }
+
+  try {
+    const formatter = new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currency.trim().toUpperCase(),
+      minimumFractionDigits: options?.minimumFractionDigits,
+      maximumFractionDigits: options?.maximumFractionDigits,
+    });
+    const fractionDigits =
+      formatter.resolvedOptions().maximumFractionDigits;
+    return formatter.format(amount / 10 ** fractionDigits);
+  } catch {
+    return null;
+  }
+}
+
+export function getYearlyMonthlyEquivalentLabel(
+  billingStatus: BillingStatus | BillingPricingCatalog | null,
+  plan: BillingPlanDefinition,
+) {
+  const yearlyPrice = getPlanPrice(billingStatus, plan, "yearly");
+  if (
+    !yearlyPrice ||
+    typeof yearlyPrice.amount !== "number" ||
+    !yearlyPrice.currency
+  ) {
+    return null;
+  }
+
+  return formatBillingAmountFromMinorUnits(yearlyPrice.amount / 12, yearlyPrice.currency, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}

@@ -2549,7 +2549,10 @@ function sanitizeCompetitorAsoLatestSnapshots(
                   (entry): entry is string => typeof entry === 'string' && entry.trim().length > 0,
                 ),
               ),
-            ).slice(0, 10)
+            )
+                .map((entry) => canonicalizeAsoScreenshotUrl(entry))
+                .filter((entry) => entry.length > 0)
+                .slice(0, 40)
           : [],
       },
     }];
@@ -3512,22 +3515,53 @@ function normalizeAsoTextValue(input: unknown, maxLength = 4000) {
     : '';
 }
 
+function canonicalizeAsoScreenshotUrl(input: unknown) {
+  if (typeof input !== 'string') {
+    return '';
+  }
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    const url = new URL(trimmed);
+    url.search = '';
+    url.hash = '';
+    let normalized = url.toString();
+
+    if (
+      url.hostname.includes('googleusercontent.com') ||
+      url.hostname.includes('mzstatic.com')
+    ) {
+      normalized = normalized.replace(/=([a-z0-9_-]+(?:-[a-z0-9_-]+)*)$/i, '');
+    }
+
+    return normalized;
+  } catch {
+    return trimmed
+      .replace(/[?#].*$/, '')
+      .replace(/=([a-z0-9_-]+(?:-[a-z0-9_-]+)*)$/i, '');
+  }
+}
+
 function normalizeAsoScreenshotList(input: unknown, iconUrl?: string) {
   if (!Array.isArray(input)) {
     return [];
   }
   const seen = new Set<string>();
+  const normalizedIcon = canonicalizeAsoScreenshotUrl(iconUrl);
   return input.flatMap((entry) => {
-    if (typeof entry !== 'string') {
+    const normalized = canonicalizeAsoScreenshotUrl(entry);
+    if (!normalized) {
       return [];
     }
-    const normalized = entry.trim();
-    if (!normalized || normalized === iconUrl || seen.has(normalized)) {
+    if (normalized === normalizedIcon || seen.has(normalized)) {
       return [];
     }
     seen.add(normalized);
     return [normalized];
-  }).slice(0, 10);
+  }).slice(0, 40);
 }
 
 function extractPlayFallbackScreenshots(html: string, iconUrl?: string) {
