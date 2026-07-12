@@ -63,7 +63,7 @@ export function WorkspacePageIntro({
   dense?: boolean;
 }) {
   return (
-    <div className={cn("workspace-page-intro workspace-surface relative overflow-visible", compact && "workspace-page-intro-compact", dense && "workspace-page-intro-dense")}>
+    <div className={cn("workspace-page-intro relative overflow-visible", compact && "workspace-page-intro-compact", dense && "workspace-page-intro-dense")}>
       <div className={cn("workspace-page-intro-main relative z-10", compact && "workspace-page-intro-main-compact", dense && "workspace-page-intro-main-dense")}>
         <div className={cn("workspace-page-intro-icon hidden sm:inline-flex", compact && "workspace-page-intro-icon-compact", dense && "workspace-page-intro-icon-dense")}>
           <Icon className="h-5 w-5" />
