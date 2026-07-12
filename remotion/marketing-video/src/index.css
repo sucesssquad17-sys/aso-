@@ -1,0 +1,13 @@
+html,
+body,
+#remotion-root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #07111f;
+}
+
+* {
+  box-sizing: border-box;
+}
