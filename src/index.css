@@ -27,6 +27,12 @@
   --workspace-padding-desktop: 1.5rem;
   --workspace-radius-mobile: 1rem;
   --workspace-radius-desktop: 1.5rem;
+  --workspace-surface: rgba(8, 15, 28, 0.98);
+  --workspace-surface-muted: rgba(10, 18, 35, 0.92);
+  --workspace-surface-strong: rgba(7, 14, 28, 0.98);
+  --workspace-border: rgba(93, 122, 158, 0.22);
+  --workspace-text: #f8fafc;
+  --workspace-text-muted: #94a3b8;
   --bg-primary: #030b18;
   --bg-secondary: #081325;
   --bg-card: rgba(10, 18, 35, 0.97);
@@ -44,9 +50,9 @@
   --gradient-cyan: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);
   --gradient-purple: linear-gradient(135deg, #a855f7 0%, #6366f1 100%);
 
-  --shadow-glow-cyan: 0 0 30px rgba(34, 211, 238, 0.2), 0 0 60px rgba(34, 211, 238, 0.08);
-  --shadow-card: 0 4px 24px rgba(2, 6, 23, 0.6), 0 1px 2px rgba(2, 6, 23, 0.4);
-  --shadow-card-hover: 0 8px 40px rgba(2, 6, 23, 0.7), 0 2px 6px rgba(2, 6, 23, 0.5);
+  --shadow-glow-cyan: 0 0 22px rgba(34, 211, 238, 0.16), 0 0 44px rgba(34, 211, 238, 0.06);
+  --shadow-card: 0 4px 18px rgba(2, 6, 23, 0.5), 0 1px 2px rgba(2, 6, 23, 0.32);
+  --shadow-card-hover: 0 8px 30px rgba(2, 6, 23, 0.58), 0 2px 6px rgba(2, 6, 23, 0.42);
 
   --radius-card: 20px;
   --radius-btn: 12px;
@@ -69,6 +75,12 @@ html[data-theme="light"] {
   --bg-card-hover: rgba(248, 250, 252, 0.98);
   --border-primary: rgba(148, 163, 184, 0.35);
   --border-glow: rgba(34, 211, 238, 0.18);
+  --workspace-surface: rgba(255, 255, 255, 0.92);
+  --workspace-surface-muted: rgba(248, 250, 252, 0.9);
+  --workspace-surface-strong: rgba(238, 247, 253, 0.84);
+  --workspace-border: rgba(132, 160, 190, 0.4);
+  --workspace-text: #0f172a;
+  --workspace-text-muted: #64748b;
   --shadow-card: 0 18px 48px rgba(148, 163, 184, 0.18), 0 2px 8px rgba(15, 23, 42, 0.08);
   --shadow-card-hover: 0 22px 56px rgba(148, 163, 184, 0.2), 0 4px 12px rgba(15, 23, 42, 0.1);
 }
@@ -1717,11 +1729,11 @@ select {
 .workspace-success-banner,
 .workspace-panel,
 .workspace-bookmark-card {
-  border: 1px solid rgba(93, 122, 158, 0.22);
-  background: linear-gradient(180deg, rgba(8, 15, 28, 0.98), rgba(7, 12, 24, 0.97));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 22px 54px rgba(2, 6, 23, 0.42);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--workspace-border);
+  background: linear-gradient(180deg, var(--workspace-surface), var(--workspace-surface-strong));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 16px 38px rgba(2, 6, 23, 0.32);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
 
 .workspace-popover {
@@ -3781,6 +3793,48 @@ html:not([data-theme="dark"]) .app-chip {
 /* =========================================
    STANDARDIZED WORKSPACE PRIMITIVES
    ========================================= */
+
+.workspace-surface {
+  color: var(--workspace-text);
+  background-color: var(--workspace-surface);
+}
+
+.workspace-card {
+  border: 1px solid var(--workspace-border);
+  border-radius: var(--workspace-radius-mobile);
+}
+
+.workspace-muted {
+  color: var(--workspace-text-muted);
+  background-color: var(--workspace-surface-muted);
+}
+
+.workspace-strong {
+  color: var(--workspace-text);
+  background-color: var(--workspace-surface-strong);
+}
+
+.workspace-border {
+  border-color: var(--workspace-border);
+}
+
+.workspace-button {
+  transition: color var(--transition-base), background-color var(--transition-base), border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.workspace-nav-surface {
+  border-color: var(--workspace-border);
+}
+
+.workspace-empty-state {
+  color: var(--workspace-text);
+}
+
+@media (min-width: 640px) {
+  .workspace-card {
+    border-radius: var(--workspace-radius-desktop);
+  }
+}
 
 .workspace-panel, .workspace-panel-muted, .workspace-panel-strong {
   border-radius: var(--workspace-radius-mobile);

@@ -34,9 +34,9 @@ export function WorkspacePanel({
   return (
     <section
       className={cn(
-        "workspace-panel",
-        tone === "muted" && "workspace-panel-muted",
-        tone === "strong" && "workspace-panel-strong",
+        "workspace-surface workspace-card workspace-panel",
+        tone === "muted" && "workspace-muted workspace-panel-muted",
+        tone === "strong" && "workspace-strong workspace-panel-strong",
         className,
       )}
     >
@@ -63,7 +63,7 @@ export function WorkspacePageIntro({
   dense?: boolean;
 }) {
   return (
-    <div className={cn("workspace-page-intro relative overflow-visible", compact && "workspace-page-intro-compact", dense && "workspace-page-intro-dense")}>
+    <div className={cn("workspace-page-intro workspace-surface relative overflow-visible", compact && "workspace-page-intro-compact", dense && "workspace-page-intro-dense")}>
       <div className={cn("workspace-page-intro-main relative z-10", compact && "workspace-page-intro-main-compact", dense && "workspace-page-intro-main-dense")}>
         <div className={cn("workspace-page-intro-icon hidden sm:inline-flex", compact && "workspace-page-intro-icon-compact", dense && "workspace-page-intro-icon-dense")}>
           <Icon className="h-5 w-5" />
@@ -97,11 +97,11 @@ export function WorkspaceMetricCard({
   dense?: boolean;
 }) {
   return (
-    <div className={cn("workspace-metric-card flex flex-col", compact && "workspace-metric-card-compact", dense && "workspace-metric-card-dense", `workspace-metric-${accent}`)}>
-      <div className={cn("workspace-metric-label mb-0.5 !text-[9px] sm:!text-[10px]", dense && "workspace-metric-label-dense")}>{label}</div>
-      <div className={cn("workspace-metric-value !text-[1.15rem] sm:!text-3xl", compact && "workspace-metric-value-compact", dense && "workspace-metric-value-dense")}>{value}</div>
+    <div className={cn("workspace-card workspace-metric-card flex flex-col", compact && "workspace-metric-card-compact", dense && "workspace-metric-card-dense", `workspace-metric-${accent}`)}>
+      <div className={cn("workspace-metric-label mb-0.5 !text-[10px] sm:!text-[10px]", dense && "workspace-metric-label-dense")}>{label}</div>
+      <div className={cn("workspace-metric-value !text-[1.25rem] sm:!text-3xl", compact && "workspace-metric-value-compact", dense && "workspace-metric-value-dense")}>{value}</div>
       {hint ? (
-        <div className={cn("workspace-metric-hint mt-auto pt-1 !text-[9px] leading-tight sm:pt-1.5 sm:!text-[11px] line-clamp-2", compact && "workspace-metric-hint-compact", dense && "workspace-metric-hint-dense")}>
+        <div className={cn("workspace-metric-hint mt-auto pt-1 !text-[10px] leading-tight sm:pt-1.5 sm:!text-[11px] line-clamp-2", compact && "workspace-metric-hint-compact", dense && "workspace-metric-hint-dense")}>
           {hint}
         </div>
       ) : null}
@@ -142,7 +142,7 @@ export function WorkspaceNavButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "workspace-nav-button",
+        "workspace-button workspace-nav-button",
         active && "workspace-nav-button-active",
         compact && "workspace-nav-button-compact",
       )}
@@ -177,7 +177,7 @@ export function WorkspaceEmptyBlock({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="workspace-empty-block px-5 py-6 sm:px-8 sm:py-8">
+    <div className="workspace-surface workspace-card workspace-empty-state workspace-empty-block px-5 py-6 sm:px-8 sm:py-8">
       <div className="workspace-empty-icon h-11 w-11 sm:h-14 sm:w-14">
         <Icon className="h-6 w-6" />
       </div>
@@ -198,7 +198,7 @@ export function MobileBottomNav({
   onTabChange: (id: WorkspaceViewMode) => void;
 }) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-app-border dark:bg-app-surface/95 md:hidden">
+    <nav className="workspace-surface workspace-nav-surface fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-app-border dark:bg-app-surface/95 md:hidden">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeId === tab.id;
@@ -208,18 +208,18 @@ export function MobileBottomNav({
             type="button"
             onClick={() => onTabChange(tab.id)}
             className={cn(
-              "relative flex min-h-[48px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 transition-colors active:scale-95",
+              "workspace-button relative flex min-h-[48px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 transition-colors active:scale-95",
               isActive
                 ? "text-cyan-600 dark:text-cyan-400"
                 : "text-app-text-muted hover:text-slate-900 dark:text-app-text-muted dark:hover:text-app-text",
             )}
           >
             <Icon className="h-5 w-5" />
-            <span className="text-[10px] font-medium leading-none">
+            <span className="text-[11px] font-medium leading-none">
               {tab.shortLabel || tab.label}
             </span>
             {typeof tab.badge === "number" && tab.badge > 0 && (
-              <span className="absolute right-2 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-white shadow-sm">
+              <span className="workspace-badge absolute right-2 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-white shadow-sm">
                 {tab.badge > 99 ? "99+" : tab.badge}
               </span>
             )}
@@ -248,7 +248,7 @@ export function MobileDataCard({
   return (
     <div
       className={cn(
-        "workspace-panel workspace-mobile-data-card !gap-2 !p-3 sm:!gap-3 sm:!p-4 md:hidden",
+        "workspace-surface workspace-card workspace-mobile-data-card !gap-2 !p-3 sm:!gap-3 sm:!p-4 md:hidden",
         className,
       )}
     >
@@ -273,13 +273,13 @@ export function MobileDataCard({
       </div>
 
       {metrics && metrics.length > 0 && (
-        <div className="grid grid-cols-2 gap-1.5 rounded-lg bg-slate-50 p-2 dark:bg-app-surface/50 sm:gap-3 sm:p-3">
+        <div className="workspace-muted grid grid-cols-2 gap-1.5 rounded-lg bg-slate-50 p-2 dark:bg-app-surface/50 sm:gap-3 sm:p-3">
           {metrics.map((metric, i) => (
             <div key={i} className="flex flex-col gap-0.5">
-              <span className="text-[9px] font-medium uppercase tracking-wider text-app-text-muted sm:text-[10px]">
+              <span className="text-[10px] font-medium uppercase tracking-wider text-app-text-muted sm:text-[10px]">
                 {metric.label}
               </span>
-              <span className="text-xs font-semibold text-slate-900 dark:text-app-text sm:text-sm">
+              <span className="text-sm font-semibold text-slate-900 dark:text-app-text sm:text-sm">
                 {metric.value}
               </span>
             </div>
