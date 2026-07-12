@@ -3586,6 +3586,12 @@ function AuthenticatedApp({
     }[]
   >([]);
   const [isDiscoveringKeywords, setIsDiscoveringKeywords] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveryRunMeta, setDiscoveryRunMeta] = useState<{
+    checkedKeywords?: number;
+    candidateCount?: number;
+    failedLookups?: number;
+  }>({});
   const [discoveryMode, setDiscoveryMode] = useState<DiscoveryMode>("fast");
   const [viewMode, setViewMode] = useState<WorkspaceViewMode | "charts">(
     "single",
@@ -7153,6 +7159,7 @@ function AuthenticatedApp({
   ) => {
     const activeMode = options?.mode ?? discoveryMode;
     setIsDiscoveringKeywords(true);
+    setDiscoveryError(null);
     try {
       const payload = await fetchDiscoveryForApp(
         app,
@@ -7163,6 +7170,11 @@ function AuthenticatedApp({
       if (!payload) return;
       setAutoRankings(payload.rankings);
       setKeywordSuggestions(payload.suggestions);
+      setDiscoveryRunMeta({
+        checkedKeywords: payload.checkedKeywords,
+        candidateCount: payload.candidateCount,
+        failedLookups: payload.failedLookups,
+      });
       updateTrackedAppAnalysisSnapshot(app, currentStore, currentCountry, payload);
       if (options?.force) {
         const summary =
@@ -7187,8 +7199,10 @@ function AuthenticatedApp({
       }
     } catch (err) {
       logError(err, { context: "discoverKeywords", appTitle: app.title });
+      const message = "Keyword discovery could not complete. Try rerunning the scan.";
+      setDiscoveryError(message);
       toast.error(
-        "Keyword discovery could not complete. Try rerunning the scan.",
+        message,
       );
     } finally {
       setIsDiscoveringKeywords(false);
@@ -7451,6 +7465,8 @@ function AuthenticatedApp({
     setRanking(null);
     setAutoRankings([]);
     setKeywordSuggestions([]);
+    setDiscoveryError(null);
+    setDiscoveryRunMeta({});
     try {
       const normalizedDetails = await loadAppDetailsForContext(
         app,
@@ -10817,20 +10833,157 @@ function AuthenticatedApp({
     tone: "ranked" | "suggestion",
   ) =>
     isLightTheme
-      ? `bg-white/95 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${
+      ? `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-white/95 px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
           isTracked
             ? "border-amber-300/80 hover:bg-amber-50 text-amber-600"
             : tone === "ranked"
               ? "border-emerald-300/80 hover:bg-emerald-50 text-emerald-600"
               : "border-sky-300/80 hover:bg-sky-50 text-sky-600"
         }`
-      : `bg-app-surface-muted/90 border rounded-full p-1.5 shadow-sm transition-all hover:scale-110 ${
+      : `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-app-surface-muted/90 px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
           isTracked
             ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400"
             : tone === "ranked"
               ? "border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400"
               : "border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400"
         }`;
+  const renderDiscoveryKeywordCard = (
+    keywordItem: RankedKeyword | KeywordSuggestion,
+    index: number,
+    isVerified: boolean,
+  ) => {
+    const trackedKey = getTrackedKeywordGroupKey({
+      keyword: keywordItem.keyword,
+      appId: selectedAppTrackedId || "",
+      store: storeType,
+    });
+    const isTracked = trackedKeywordGroupKeys.has(trackedKey);
+    const rank = isVerified ? (keywordItem as RankedKeyword).rank : undefined;
+
+    return (
+      <div
+        key={`${isVerified ? "ranked" : "suggested"}-${keywordItem.keyword}-${index}`}
+        className={cn(
+          isVerified ? rankedKeywordCardClass : suggestionKeywordCardClass,
+          "workspace-discovery-card",
+        )}
+      >
+        <div className="flex min-w-0 items-start justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            {isVerified && selectedApp?.icon ? (
+              <img
+                src={selectedApp.icon}
+                alt=""
+                className={`mt-0.5 h-5 w-5 shrink-0 rounded-md shadow-sm ${
+                  isLightTheme
+                    ? "border border-sky-200/80"
+                    : "border border-cyan-500/30"
+                }`}
+                referrerPolicy="no-referrer"
+              />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-start gap-1.5">
+                <span className="workspace-mobile-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-tight sm:truncate">
+                  {keywordItem.keyword}
+                </span>
+                <span
+                  className={
+                    isVerified
+                      ? isLightTheme
+                        ? "shrink-0 rounded-md border border-emerald-200/80 bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 sm:text-xs"
+                        : "shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 sm:text-xs"
+                      : isLightTheme
+                        ? "shrink-0 rounded-md border border-cyan-200/80 bg-cyan-100 px-2 py-0.5 text-[11px] font-bold text-cyan-700 sm:text-xs"
+                        : "shrink-0 rounded-md bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-300 sm:text-xs"
+                  }
+                >
+                  {isVerified ? `#${rank}` : "Suggested keyword"}
+                </span>
+              </div>
+              <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-app-text-muted">
+                {isVerified ? "Verified ranking" : "Not checked yet"}
+              </div>
+            </div>
+          </div>
+          {isVerified ? (
+            <button
+              type="button"
+              onClick={() =>
+                selectedApp &&
+                openTrackCountryPicker(
+                  keywordItem.keyword,
+                  selectedApp,
+                  storeType,
+                  country,
+                  rank ?? -1,
+                  true,
+                  "own",
+                  "discovery",
+                )
+              }
+              className={getDiscoveryTrackButtonClass(isTracked, "ranked")}
+              title={isTracked ? "Track more countries" : "Track keyword"}
+              aria-label={isTracked ? "Track more countries" : "Track keyword"}
+            >
+              {isTracked ? (
+                <BellRing className="h-3.5 w-3.5" />
+              ) : (
+                <Bell className="h-3.5 w-3.5" />
+              )}
+            </button>
+          ) : null}
+        </div>
+        <div className={discoveryMetricRowClass}>
+          {getEstimatedDemand(keywordItem) !== undefined && (
+            <span title="Estimated Volume">
+              Est. Vol: {getEstimatedDemand(keywordItem)}
+            </span>
+          )}
+          {keywordItem.difficulty !== undefined && (
+            <span title="Estimated Ranking Difficulty">
+              Est. Diff: {keywordItem.difficulty}
+            </span>
+          )}
+          {keywordItem.relevance !== undefined && (
+            <span title="Estimated App Relevance">
+              Est. Rel: {keywordItem.relevance}
+            </span>
+          )}
+        </div>
+        {!isVerified ? (
+          <button
+            type="button"
+            onClick={() =>
+              selectedApp &&
+              openTrackCountryPicker(
+                keywordItem.keyword,
+                selectedApp,
+                storeType,
+                country,
+                -1,
+                false,
+                "own",
+                "discovery",
+              )
+            }
+            className={cn(
+              getDiscoveryTrackButtonClass(isTracked, "suggestion"),
+              "w-full text-[11px] font-semibold sm:text-xs",
+            )}
+            title={isTracked ? "Track more countries" : "Track keyword to monitor daily"}
+          >
+            {isTracked ? (
+              <BellRing className="h-3.5 w-3.5" />
+            ) : (
+              <Bell className="h-3.5 w-3.5" />
+            )}
+            {isTracked ? "Tracking" : "Track to monitor daily"}
+          </button>
+        ) : null}
+      </div>
+    );
+  };
   const rankingPanelStyle = isLightTheme
     ? {
         background:
@@ -11435,7 +11588,7 @@ function AuthenticatedApp({
                       {" "}
                       <button
                         onClick={() => setSelectedCategory(null)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
+                        className={`min-h-11 px-3 py-2 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
                         style={
                           selectedCategory === null
                             ? {
@@ -11459,7 +11612,7 @@ function AuthenticatedApp({
                         <button
                           key={cat}
                           onClick={() => setSelectedCategory(cat)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
+                          className={`min-h-11 px-3 py-2 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
                           style={
                             selectedCategory === cat
                               ? {
@@ -15499,9 +15652,9 @@ function AuthenticatedApp({
                 {viewMode === "single" && selectedApp && renderSearchSection(true)}
                 {" "}
                 {/* Keyword Ranking Checker */}{" "}
-                <div className="card-glow p-7">
+                <div className="workspace-analysis-panel card-glow p-4 sm:p-6 lg:p-7">
                   {" "}
-                  <h3 className="section-header mb-6">
+                  <h3 className="section-header mb-2">
                     {" "}
                     <span
                       className="section-header-icon"
@@ -15516,23 +15669,23 @@ function AuthenticatedApp({
                         style={{ color: "#10b981" }}
                       />{" "}
                     </span>{" "}
-                    Live Keyword Ranking{" "}
+                    Keyword discovery{" "}
                   </h3>{" "}
+                  <p className="max-w-2xl text-xs text-app-text-muted sm:text-sm">
+                    Verified rankings come first. Suggested keywords are shown separately so you can decide what to track next.
+                  </p>
                   {/* Auto Discovered Rankings */}{" "}
-                  <div className="mb-7">
+                  <div className="workspace-discovery-block mb-7 mt-5">
                     {" "}
-                    <h4 className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-4">
-                      Currently Ranking For - Auto-Discovered
+                    <h4 className="text-xs font-bold uppercase tracking-widest text-app-text-muted mb-3">
+                      Discovery scan
                     </h4>{" "}
                     <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       {" "}
-                      <p className="text-xs text-app-text-muted">
-                        {" "}
-                        Fast mode checks fewer candidates in the top 100. Deep
-                        mode scans a wider keyword set and checks deeper
-                        rankings.{" "}
+                      <p className="max-w-xl text-xs text-app-text-muted">
+                        Fast is quicker; Deep checks a wider candidate set. Switch modes without losing the current results.
                       </p>{" "}
-                      <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         {" "}
                         <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
                           {" "}
@@ -15553,7 +15706,7 @@ function AuthenticatedApp({
                                   );
                                 }
                               }}
-                              className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${discoveryMode === mode ? "bg-cyan-500/20 text-cyan-300" : "text-app-text-muted hover:text-app-text"}`}
+                              className={`min-h-11 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${discoveryMode === mode ? "bg-cyan-500/20 text-cyan-300" : "text-app-text-muted hover:text-app-text"}`}
                             >
                               {" "}
                               {mode}{" "}
@@ -15564,7 +15717,7 @@ function AuthenticatedApp({
                           type="button"
                           onClick={rerunKeywordDiscovery}
                           disabled={!selectedApp || isDiscoveringKeywords}
-                          className="inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/15 disabled:opacity-50"
+                          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 px-3 py-2 text-xs font-semibold text-cyan-300 transition-colors hover:bg-cyan-500/15 disabled:opacity-50 sm:w-auto"
                         >
                           {" "}
                           {isDiscoveringKeywords ? (
@@ -15576,218 +15729,85 @@ function AuthenticatedApp({
                         </button>{" "}
                       </div>{" "}
                     </div>{" "}
-                    {isDiscoveringKeywords ? (
-                      <div className="flex items-center gap-2 text-sm text-app-text-muted">
-                        {" "}
-                        <Loader2 className="w-4 h-4 animate-spin" />{" "}
-                        {discoveryMode === "deep"
-                          ? "Running deep keyword discovery. This can take a little longer..."
-                          : "Discovering keywords. This can take a little longer..."}{" "}
+                    <div className="workspace-discovery-status-row" role="status" aria-live="polite">
+                      <div className="flex min-w-0 items-center gap-2 text-sm text-app-text-muted">
+                        {isDiscoveringKeywords ? (
+                          <Loader2 className="h-4 w-4 shrink-0 animate-spin text-cyan-400" />
+                        ) : discoveryRunMeta.failedLookups ? (
+                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
+                        ) : (
+                          <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
+                        )}
+                        <span className="truncate">
+                          {isDiscoveringKeywords
+                            ? `Running ${discoveryMode} discovery. Existing results stay visible while this refreshes.`
+                            : discoveryRunMeta.failedLookups
+                              ? `Partial scan: ${discoveryRunMeta.failedLookups} lookup${discoveryRunMeta.failedLookups === 1 ? "" : "s"} need retry.`
+                              : discoveryRunMeta.checkedKeywords && discoveryRunMeta.candidateCount
+                                ? `Checked ${discoveryRunMeta.checkedKeywords}/${discoveryRunMeta.candidateCount} candidates.`
+                                : "Verified rankings and keyword ideas for this app."}
+                        </span>
+                      </div>
+                    </div>
+                    {discoveryError ? (
+                      <div className="workspace-discovery-error mt-3" role="alert">
+                        <AlertCircle className="h-4 w-4 shrink-0" />
+                        <span>{discoveryError}</span>
                       </div>
                     ) : null}
-                    {autoRankings.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-                        {" "}
-                        {autoRankings.map((r, i) => (
-                          <div
-                            key={i}
-                            className={rankedKeywordCardClass}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex items-start gap-2">
-                              {selectedApp?.icon && (
-                                <img
-                                  src={selectedApp.icon}
-                                  alt=""
-                                  className={`mt-0.5 h-5 w-5 shrink-0 rounded-md shadow-sm ${
-                                    isLightTheme
-                                      ? "border border-sky-200/80"
-                                      : "border border-cyan-500/30"
-                                  }`}
-                                  referrerPolicy="no-referrer"
-                                />
-                              )}
-                              <div className="min-w-0 flex flex-1 flex-wrap items-start gap-1.5">
-                                <span className="workspace-mobile-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-tight sm:truncate">
-                                  {r.keyword}
-                                </span>
-                              <span
-                                className={
-                                  isLightTheme
-                                    ? "shrink-0 rounded-md border border-sky-200/80 bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-700 sm:text-xs"
-                                    : "shrink-0 rounded-md bg-cyan-500/20 px-2 py-0.5 text-[11px] font-bold text-cyan-300 sm:text-xs"
-                                }
-                              >
-                                #{r.rank}
-                              </span>
-                              </div>
-                              </div>
-                              <button
-                                onClick={() =>
-                                  selectedApp &&
-                                  openTrackCountryPicker(
-                                    r.keyword,
-                                    selectedApp,
-                                    storeType,
-                                    country,
-                                    r.rank,
-                                    true,
-                                    "own",
-                                    "discovery",
-                                  )
-                                }
-                                className={`${getDiscoveryTrackButtonClass(
-                                  trackedKeywordGroupKeys.has(
-                                    getTrackedKeywordGroupKey({
-                                      keyword: r.keyword,
-                                      appId: selectedAppTrackedId || "",
-                                      store: storeType,
-                                    }),
-                                  ),
-                                  "ranked",
-                                )} shrink-0 self-start`}
-                                title={
-                                  trackedKeywordGroupKeys.has(
-                                    getTrackedKeywordGroupKey({
-                                      keyword: r.keyword,
-                                      appId: selectedAppTrackedId || "",
-                                      store: storeType,
-                                    }),
-                                  )
-                                    ? "Track More Countries"
-                                    : "Track Keyword"
-                                }
-                              >
-                                {trackedKeywordGroupKeys.has(
-                                  getTrackedKeywordGroupKey({
-                                    keyword: r.keyword,
-                                    appId: selectedAppTrackedId || "",
-                                    store: storeType,
-                                  }),
-                                ) ? (
-                                  <BellRing className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Bell className="h-3.5 w-3.5" />
-                                )}
-                              </button>
+                    <div className={cn("workspace-discovery-results mt-4 space-y-4", isDiscoveringKeywords && "opacity-75")}>
+                      {autoRankings.length > 0 ? (
+                        <section className="workspace-discovery-section" aria-labelledby="verified-rankings-heading">
+                          <div className="workspace-discovery-section-heading">
+                            <div>
+                              <h5 id="verified-rankings-heading" className="text-sm font-semibold text-app-text">
+                                Verified rankings
+                              </h5>
+                              <p className="mt-0.5 text-xs text-app-text-muted">
+                                Keywords where this app currently ranks.
+                              </p>
                             </div>
-                            <div className={discoveryMetricRowClass}>
-                              {getEstimatedDemand(r) !== undefined && (
-                                <span title="Estimated Volume">
-                                  Est. Vol: {getEstimatedDemand(r)}
-                                </span>
-                              )}
-                              {r.difficulty !== undefined && (
-                                <span title="Estimated Ranking Difficulty">
-                                  Est. Diff: {r.difficulty}
-                                </span>
-                              )}
-                              {r.relevance !== undefined && (
-                                <span title="Estimated App Relevance">
-                                  Est. Rel: {r.relevance}
-                                </span>
-                              )}
-                            </div>
+                            <span className="workspace-status-chip">{autoRankings.length} checked</span>
                           </div>
-                        ))}{" "}
-                      </div>
-                    ) : keywordSuggestions.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-3">
-                        {" "}
-                        {keywordSuggestions.map((r, i) => (
-                          <div
-                            key={i}
-                            className={suggestionKeywordCardClass}
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex flex-1 flex-wrap items-start gap-1.5">
-                              <span className="workspace-mobile-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-tight sm:truncate">
-                                {r.keyword}
-                              </span>
-                              <span
-                                className={
-                                  isLightTheme
-                                    ? "shrink-0 rounded-md border border-cyan-200/80 bg-cyan-100 px-2 py-0.5 text-[11px] font-bold text-cyan-700 sm:text-xs"
-                                    : "shrink-0 rounded-md bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-300 sm:text-xs"
-                                }
-                              >
-                                Suggestion
-                              </span>
-                              </div>
-                              <button
-                                onClick={() =>
-                                  selectedApp &&
-                                  openTrackCountryPicker(
-                                    r.keyword,
-                                    selectedApp,
-                                    storeType,
-                                    country,
-                                    -1,
-                                    false,
-                                    "own",
-                                    "discovery",
-                                  )
-                                }
-                                className={`${getDiscoveryTrackButtonClass(
-                                  trackedKeywordGroupKeys.has(
-                                    getTrackedKeywordGroupKey({
-                                      keyword: r.keyword,
-                                      appId: selectedAppTrackedId || "",
-                                      store: storeType,
-                                    }),
-                                  ),
-                                  "suggestion",
-                                )} shrink-0 self-start`}
-                                title={
-                                  trackedKeywordGroupKeys.has(
-                                    getTrackedKeywordGroupKey({
-                                      keyword: r.keyword,
-                                      appId: selectedAppTrackedId || "",
-                                      store: storeType,
-                                    }),
-                                  )
-                                    ? "Track More Countries"
-                                    : "Track Keyword"
-                                }
-                              >
-                                {trackedKeywordGroupKeys.has(
-                                  getTrackedKeywordGroupKey({
-                                    keyword: r.keyword,
-                                    appId: selectedAppTrackedId || "",
-                                    store: storeType,
-                                  }),
-                                ) ? (
-                                  <BellRing className="h-3.5 w-3.5" />
-                                ) : (
-                                  <Bell className="h-3.5 w-3.5" />
-                                )}
-                              </button>
-                            </div>
-                            <div className={discoveryMetricRowClass}>
-                              {getEstimatedDemand(r) !== undefined && (
-                                <span title="Estimated Volume">
-                                  Est. Vol: {getEstimatedDemand(r)}
-                                </span>
-                              )}
-                              {r.difficulty !== undefined && (
-                                <span title="Estimated Ranking Difficulty">
-                                  Est. Diff: {r.difficulty}
-                                </span>
-                              )}
-                              {r.relevance !== undefined && (
-                                <span title="Estimated App Relevance">
-                                  Est. Rel: {r.relevance}
-                                </span>
-                              )}
-                            </div>
+                          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                            {autoRankings.map((keywordItem, index) =>
+                              renderDiscoveryKeywordCard(keywordItem, index, true),
+                            )}
                           </div>
-                        ))}{" "}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-app-text-muted">
-                        No ranked keywords or suggestions discovered yet.
-                      </p>
-                    )}{" "}
+                        </section>
+                      ) : null}
+                      {keywordSuggestions.length > 0 ? (
+                        <section className="workspace-discovery-section workspace-discovery-section-suggested" aria-labelledby="suggested-keywords-heading">
+                          <div className="workspace-discovery-section-heading">
+                            <div>
+                              <h5 id="suggested-keywords-heading" className="text-sm font-semibold text-app-text">
+                                Suggested keywords
+                              </h5>
+                              <p className="mt-0.5 text-xs text-app-text-muted">
+                                Not checked yet. Track to monitor daily.
+                              </p>
+                            </div>
+                            <span className="workspace-status-chip">{keywordSuggestions.length} ideas</span>
+                          </div>
+                          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+                            {keywordSuggestions.map((keywordItem, index) =>
+                              renderDiscoveryKeywordCard(keywordItem, index, false),
+                            )}
+                          </div>
+                        </section>
+                      ) : null}
+                      {!isDiscoveringKeywords && autoRankings.length === 0 && keywordSuggestions.length === 0 ? (
+                        <div className="workspace-discovery-empty">
+                          <Search className="h-5 w-5 text-cyan-400" />
+                          <div>
+                            <p className="font-semibold text-app-text">No discovery results yet</p>
+                            <p className="mt-1 text-xs text-app-text-muted">
+                              Run a scan to load verified rankings and suggested keywords.
+                            </p>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>{" "}
                   </div>{" "}
                   <div className="divider my-6" />{" "}
                   <h4 className="text-xs font-bold text-app-text-muted uppercase tracking-widest mb-4">
@@ -16572,21 +16592,20 @@ function AuthenticatedApp({
                 description="Use the search composer to add apps into the compare set. Coverage, battle, and opportunity modules will populate after that."
               />
             ) : (
-              <div className="space-y-6" ref={compareExportRef}>
+              <div className="workspace-compare-view space-y-6" ref={compareExportRef}>
               {renderSearchSection(true)}
-              <WorkspacePanel tone="muted">
+              <WorkspacePanel tone="muted" className="workspace-compare-overview">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
                   <div>
                     <div className="workspace-chip-label">Compare Overview</div>
                     <h3 className="mt-1 text-lg font-semibold text-app-text">
-                      Competitive signal summary
+                      Coverage at a glance
                     </h3>
-                    <p className="mt-2 text-sm text-app-text-muted">
-                      The compare page follows the shared shell but leans into
-                      multi-app KPI framing before the deeper keyword modules.
+                    <p className="mt-2 max-w-xl text-sm text-app-text-muted">
+                      See which app has the strongest keyword footprint and where the clearest gaps are.
                     </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <WorkspaceMetricCard
                       label="Coverage Leader"
                       value={compareCoverageLeader?.app.title || "-"}
@@ -16630,10 +16649,9 @@ function AuthenticatedApp({
                     </span>{" "}
                     Compare Apps{" "}
                   </h2>{" "}
-                  <p className="mt-2 text-sm text-app-text-muted">
+                  <p className="mt-2 max-w-2xl text-sm text-app-text-muted">
                     {" "}
-                    Compare now shows keyword footprint, contested search terms,
-                    and whitespace opportunities across the whole set.{" "}
+                    Compare keyword coverage, contested terms, and whitespace opportunities across the selected set.
                   </p>{" "}
                 </div>{" "}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -16649,7 +16667,7 @@ function AuthenticatedApp({
                           if (mode === compareDiscoveryMode) return;
                           setCompareDiscoveryMode(mode);
                         }}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${compareDiscoveryMode === mode ? "bg-cyan-500/20 text-cyan-200" : "text-app-text-muted hover:text-app-text"}`}
+                        className={`min-h-11 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${compareDiscoveryMode === mode ? "bg-cyan-500/20 text-cyan-200" : "text-app-text-muted hover:text-app-text"}`}
                       >
                         {" "}
                         {mode}{" "}
@@ -16665,7 +16683,7 @@ function AuthenticatedApp({
                       })
                     }
                     disabled={isAnalyzingCompare || comparedApps.length === 0}
-                    className="btn-primary sm:w-auto w-full"
+                    className="btn-primary min-h-11 w-full sm:w-auto"
                   >
                     {" "}
                     {isAnalyzingCompare ? (
@@ -16677,7 +16695,7 @@ function AuthenticatedApp({
                   </button>{" "}
                 </div>{" "}
               </div>{" "}
-              <div className="workspace-panel !px-4 !py-3 !flex-col md:!flex-row md:!items-center md:!justify-between gap-2 text-sm text-app-text-muted">
+              <div className="workspace-compare-status-bar workspace-panel !px-4 !py-3 !flex-col md:!flex-row md:!items-center md:!justify-between gap-2 text-sm text-app-text-muted">
                 {" "}
                 <span>
                   {" "}
@@ -16829,13 +16847,15 @@ function AuthenticatedApp({
                 {compareAppInsights.map((insight) => (
                   <div
                     key={insight.compareKey}
-                    className={`workspace-panel relative transition-all hover:shadow-cyan-500/10 hover:border-app-border ${
+                    className={`workspace-compare-app-card workspace-panel relative transition-all hover:shadow-cyan-500/10 hover:border-cyan-500/30 ${
                       isMobileViewport ? "!p-3" : ""
                     }`}
                   >
                     <button
+                      type="button"
                       onClick={() => removeCompareApp(insight.appDetails)}
-                      className="absolute top-3 right-3 p-1.5 bg-app-surface-muted/80 hover:bg-red-500 hover:text-white text-app-text-muted rounded-full transition-colors shadow-sm"
+                      aria-label={`Remove ${insight.appDetails.title} from compare set`}
+                      className="workspace-compare-remove absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-app-surface-muted/80 text-app-text-muted shadow-sm transition-colors hover:bg-red-500 hover:text-white"
                     >
                       {" "}
                       <X className="w-3.5 h-3.5" />{" "}
@@ -16867,6 +16887,9 @@ function AuthenticatedApp({
                           <p className="mt-0.5 truncate text-[11px] font-medium text-app-text-muted">
                             {insight.appDetails.developer}
                           </p>
+                          <span className="workspace-compare-role-chip mt-2 inline-flex">
+                            In compare set
+                          </span>
                           <p className="mt-1 truncate text-[11px] text-app-text-muted">
                             {insight.top10}/{insight.top30}/{insight.top100} top 10/30/100
                             {" · "}
@@ -16903,8 +16926,8 @@ function AuthenticatedApp({
                           {insight.appDetails.developer}
                         </p>{" "}
                         <div className="mb-4 flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-app-border/70 bg-app-surface-muted/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
-                            Compare Set
+                          <span className="workspace-compare-role-chip">
+                            In compare set
                           </span>
                         </div>
                         <div className="w-full space-y-3 mb-4">
@@ -16988,8 +17011,8 @@ function AuthenticatedApp({
                         Search Footprint Snapshot{" "}
                       </h3>{" "}
                       <div
-                        className={`${isMobileViewport ? "h-40 p-1.5" : "h-72 p-2"} w-full min-w-0 rounded-xl`}
-                        style={{ background: "rgba(5,10,25,0.5)" }}
+                        className={`workspace-compare-chart ${isMobileViewport ? "h-40 p-1.5" : "h-72 p-2"} w-full min-w-0 rounded-xl`}
+                        style={chartSurfaceStyle}
                       >
                         {" "}
                         <ResponsiveContainer width="100%" height="100%">
@@ -17287,13 +17310,15 @@ function AuthenticatedApp({
                                   </div>{" "}
                                   <div className={`${isMobileViewport ? "line-clamp-2" : ""} mt-1 text-xs text-app-text-muted`}>
                                     {" "}
-                                    {battle.leader.appTitle} leads this battle;
-                                    gap to the next ranked app is {battle.gap}{" "}
-                                    positions.{" "}
+                                    Winner: {battle.leader.appTitle} at #{battle.leader.rank};
+                                    the next ranked app is {battle.gap} position{battle.gap === 1 ? "" : "s"} behind.{" "}
                                   </div>{" "}
                                 </div>{" "}
                                 <div className={`flex flex-wrap text-xs ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
                                   {" "}
+                                  <span className="metric-chip badge-amber">
+                                    Rank gap {battle.gap}
+                                  </span>{" "}
                                   <span className="metric-chip badge-cyan">
                                     Est. Vol {battle.averageVolume}
                                   </span>{" "}
@@ -17310,10 +17335,10 @@ function AuthenticatedApp({
                                 {battle.rankedApps.map((rankedApp) => (
                                   <span
                                     key={`${battle.keyword}-${rankedApp.appKey}`}
-                                    className={`rounded-lg border text-xs font-semibold ${isMobileViewport ? "px-2.5 py-1" : "px-3 py-1.5"} ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-app-surface-muted/80 border-app-border/80 text-app-text-muted"}`}
+                                    className={`workspace-compare-rank-chip rounded-lg border text-xs font-semibold ${isMobileViewport ? "px-2.5 py-1" : "px-3 py-1.5"} ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-app-surface-muted/80 border-app-border/80 text-app-text-muted"}`}
                                   >
                                     {" "}
-                                    {rankedApp.appTitle} #{rankedApp.rank}{" "}
+                                    {rankedApp.appTitle} #{rankedApp.rank}{rankedApp.appKey === battle.leader.appKey ? " · winner" : ""}{" "}
                                   </span>
                                 ))}{" "}
                               </div>{" "}

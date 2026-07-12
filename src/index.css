@@ -2540,8 +2540,8 @@ select {
 
   .workspace-search-result-action,
   .workspace-search-result-primary {
-    min-height: 1.85rem;
-    padding: 0.38rem 0.66rem;
+    min-height: 2.75rem;
+    padding: 0.45rem 0.66rem;
     border-radius: 0.8rem;
   }
 
@@ -2551,7 +2551,7 @@ select {
 
   .workspace-search-composer-input,
   .workspace-search-composer-submit {
-    min-height: 2.45rem;
+    min-height: 2.75rem;
   }
 
   .workspace-select-trigger,
@@ -4027,5 +4027,179 @@ html[data-theme="light"] .workspace-panel-strong {
 
   .workspace-panel-strong {
     box-shadow: 0 8px 18px rgba(2, 6, 23, 0.18);
+  }
+}
+
+.workspace-analysis-panel {
+  border-color: var(--workspace-border);
+  background: linear-gradient(180deg, var(--workspace-surface), var(--workspace-surface-strong));
+}
+
+.workspace-discovery-status-row {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--workspace-border);
+  border-radius: 0.85rem;
+  background: var(--workspace-surface-muted);
+}
+
+.workspace-discovery-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-radius: 0.85rem;
+  background: rgba(245, 158, 11, 0.08);
+  color: #fbbf24;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+html[data-theme="light"] .workspace-discovery-error {
+  border-color: rgba(180, 108, 12, 0.28);
+  background: rgba(245, 158, 11, 0.1);
+  color: #8a5200;
+}
+
+.workspace-discovery-section {
+  padding: 0.85rem;
+  border: 1px solid var(--workspace-border);
+  border-radius: 1rem;
+  background: var(--workspace-surface-muted);
+}
+
+.workspace-discovery-section-suggested {
+  border-color: rgba(34, 211, 238, 0.22);
+}
+
+.workspace-discovery-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.workspace-discovery-card {
+  min-width: 0;
+}
+
+.workspace-discovery-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem;
+  border: 1px dashed var(--workspace-border);
+  border-radius: 0.9rem;
+  color: var(--workspace-text-muted);
+}
+
+.workspace-compare-app-card {
+  min-width: 0;
+}
+
+.workspace-compare-role-chip {
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0.25rem 0.55rem;
+  border: 1px solid var(--workspace-border);
+  border-radius: 999px;
+  background: var(--workspace-surface-muted);
+  color: var(--workspace-text-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.workspace-compare-metric,
+.workspace-compare-signal {
+  min-width: 0;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--workspace-border);
+  border-radius: 0.8rem;
+  background: var(--workspace-surface-muted);
+  color: var(--workspace-text-muted);
+}
+
+.workspace-compare-metric span,
+.workspace-compare-signal span {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.workspace-compare-metric strong,
+.workspace-compare-signal strong {
+  display: block;
+  margin-top: 0.35rem;
+  overflow: hidden;
+  color: var(--workspace-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-compare-signal {
+  border-color: rgba(34, 211, 238, 0.2);
+  background: rgba(34, 211, 238, 0.06);
+}
+
+.workspace-compare-signal-muted {
+  border-color: var(--workspace-border);
+  background: var(--workspace-surface-muted);
+}
+
+.workspace-compare-chart {
+  overflow: hidden;
+}
+
+.workspace-compare-status-bar {
+  border-color: var(--workspace-border);
+  background: var(--workspace-surface-muted);
+}
+
+.workspace-compare-rank-chip {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .workspace-analysis-panel {
+    border-radius: 1rem;
+  }
+
+  .workspace-discovery-section {
+    padding: 0.7rem;
+    border-radius: 0.9rem;
+  }
+
+  .workspace-discovery-section-heading {
+    align-items: center;
+  }
+
+  .workspace-discovery-status-row {
+    padding-inline: 0.7rem;
+  }
+
+  .workspace-compare-metric,
+  .workspace-compare-signal {
+    padding: 0.55rem 0.6rem;
+  }
+
+  .workspace-compare-metric strong,
+  .workspace-compare-signal strong {
+    font-size: 0.74rem;
   }
 }
