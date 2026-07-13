@@ -96,6 +96,7 @@ import {
   WorkspaceEmptyBlock,
   WorkspacePanel,
 } from "../app/workspacePrimitives";
+import { cn } from "../../lib/utils";
 
 export type ReportMode = "my" | "competitors";
 export type ReportPeriodKey = "7d" | "30d" | "90d" | "12m" | "all";
@@ -720,6 +721,7 @@ export default function ReportsWorkspace({
     React.useState<MovementTabKey>("movers");
   const [isTrackedOverviewOpen, setIsTrackedOverviewOpen] =
     React.useState(false);
+  const [isReportFiltersOpen, setIsReportFiltersOpen] = React.useState(false);
   const [reportStoreFilter, setReportStoreFilter] = React.useState<
     StoreType | "all"
   >(initialStoreFilter || defaultStore);
@@ -1929,7 +1931,7 @@ export default function ReportsWorkspace({
       <WorkspacePanel tone="strong" className="workspace-toolbar-panel">
         <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <div className="workspace-chip-label">Reports</div>
+            <div className="workspace-chip-label">Report controls</div>
             <h2 className="mt-1 text-base lg:text-lg font-semibold text-app-text">
               Rank movement analysis
             </h2>
@@ -1975,7 +1977,24 @@ export default function ReportsWorkspace({
       {reportMode === "my" ? (
         <>
           <WorkspacePanel tone="muted" className="workspace-toolbar-panel">
-            <div className="grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-[240px_220px_280px_minmax(0,1fr)]">
+            <button
+              type="button"
+              onClick={() => setIsReportFiltersOpen((current) => !current)}
+              aria-expanded={isReportFiltersOpen}
+              className="workspace-mobile-filter-toggle mb-3 inline-flex min-h-[2.45rem] items-center justify-between rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 text-xs font-semibold text-app-text-muted md:hidden"
+            >
+              Filters
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  isReportFiltersOpen && "rotate-180",
+                )}
+              />
+            </button>
+            <div className={cn(
+              "grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-[240px_220px_280px_minmax(0,1fr)]",
+              !isReportFiltersOpen && "hidden md:grid",
+            )}>
               <select
                 value={reportStoreFilter}
                 onChange={(event) =>
@@ -2068,16 +2087,16 @@ export default function ReportsWorkspace({
                 <div className="workspace-mobile-chart h-80 w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsLineChart data={myTrendData}>
-                      <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
+                      <CartesianGrid stroke="var(--workspace-border)" vertical={false} />
                       <XAxis
                         dataKey="timestamp"
-                        tick={{ fill: "#94a3b8", fontSize: 12 }}
+                        tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <YAxis
                         domain={myTrendDomain}
-                        tick={{ fill: "#94a3b8", fontSize: 12 }}
+                        tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
                         axisLine={false}
                         tickLine={false}
                       />
@@ -2269,7 +2288,24 @@ export default function ReportsWorkspace({
       ) : (
         <>
           <WorkspacePanel tone="muted">
-            <div className="workspace-compact-controls grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+            <button
+              type="button"
+              onClick={() => setIsReportFiltersOpen((current) => !current)}
+              aria-expanded={isReportFiltersOpen}
+              className="workspace-mobile-filter-toggle mb-3 inline-flex min-h-[2.45rem] items-center justify-between rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 text-xs font-semibold text-app-text-muted md:hidden"
+            >
+              Filters
+              <ChevronDown
+                className={cn(
+                  "h-4 w-4 transition-transform",
+                  isReportFiltersOpen && "rotate-180",
+                )}
+              />
+            </button>
+            <div className={cn(
+              "workspace-compact-controls grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]",
+              !isReportFiltersOpen && "hidden md:grid",
+            )}>
               <select
                 value={competitorGroupFilter}
                 onChange={(event) => setCompetitorGroupFilter(event.target.value)}
@@ -2440,16 +2476,16 @@ export default function ReportsWorkspace({
                     <div className="workspace-mobile-chart h-80 w-full min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartsLineChart data={competitorTrendData}>
-                          <CartesianGrid stroke="rgba(148,163,184,0.12)" vertical={false} />
+                          <CartesianGrid stroke="var(--workspace-border)" vertical={false} />
                           <XAxis
                             dataKey="timestamp"
-                            tick={{ fill: "#94a3b8", fontSize: 12 }}
+                            tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
                             axisLine={false}
                             tickLine={false}
                           />
                           <YAxis
                             domain={competitorTrendDomain}
-                            tick={{ fill: "#94a3b8", fontSize: 12 }}
+                            tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
                             axisLine={false}
                             tickLine={false}
                           />

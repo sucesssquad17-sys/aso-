@@ -14398,8 +14398,33 @@ function AuthenticatedApp({
                   {bookmarks.map((b) => (
                     <div
                       key={`${b.store}-${b.appId || b.id}`}
-                      className="workspace-bookmark-card group cursor-pointer"
+                      className="workspace-bookmark-card group cursor-pointer focus:outline-none focus:ring-2 focus:ring-cyan-400/40 focus:ring-offset-2 focus:ring-offset-app-surface"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Open bookmarked app ${b.title}`}
                       onClick={() => {
+                        setStoreType(b.store);
+                        setCountry(b.country);
+                        handleSelectApp(
+                          {
+                            appId: b.appId,
+                            id: b.id,
+                            title: b.title,
+                            icon: b.icon,
+                            developer: b.developer,
+                            description: "",
+                            score: 0,
+                            url: b.url,
+                          } as AppDetails,
+                          b.store,
+                          b.country,
+                          "single",
+                        );
+                        setViewMode("single");
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.preventDefault();
                         setStoreType(b.store);
                         setCountry(b.country);
                         handleSelectApp(
@@ -14451,6 +14476,7 @@ function AuthenticatedApp({
                         </div>{" "}
                       </div>{" "}
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setBookmarks((prev) =>
@@ -14465,7 +14491,8 @@ function AuthenticatedApp({
                             ),
                           );
                         }}
-                        className="p-2 rounded-xl transition-all opacity-0 group-hover:opacity-100 hover:bg-red-500/10 text-app-text-muted hover:text-red-400"
+                        className="workspace-bookmark-remove p-2 rounded-xl transition-all hover:bg-red-500/10 text-app-text-muted hover:text-red-400"
+                        aria-label={`Remove ${b.title} bookmark`}
                       >
                         {" "}
                         <X className="w-4 h-4" />{" "}

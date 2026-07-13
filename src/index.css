@@ -2445,6 +2445,25 @@ select {
   box-shadow: 0 28px 56px rgba(2, 6, 23, 0.34);
 }
 
+.workspace-bookmark-card:focus-visible {
+  border-color: rgba(34, 211, 238, 0.45);
+}
+
+.workspace-bookmark-remove {
+  opacity: 0;
+}
+
+.workspace-bookmark-card:hover .workspace-bookmark-remove,
+.workspace-bookmark-card:focus-within .workspace-bookmark-remove {
+  opacity: 1;
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .workspace-bookmark-remove {
+    opacity: 1;
+  }
+}
+
 .workspace-mobile-filter-toggle {
   color: var(--workspace-text-muted);
 }
