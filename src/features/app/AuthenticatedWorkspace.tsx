@@ -3684,6 +3684,7 @@ function AuthenticatedApp({
   const [deleteAccountConfirmationInput, setDeleteAccountConfirmationInput] =
     useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const [allRankHistory, setAllRankHistory] = useState<RankHistoryEntry[]>([]);
   const [trackSortBy, setTrackSortBy] = useState<
     "date_added" | "last_checked" | "app" | "rank_change"
@@ -3840,8 +3841,34 @@ function AuthenticatedApp({
   const billingActivationPollRunRef = React.useRef(0);
   const seenAlertEventIdsRef = React.useRef<Set<string>>(new Set());
   const pendingAlertFetchAnnouncementRef = React.useRef(false);
+  const accountMenuRef = React.useRef<HTMLDivElement>(null);
   const deleteAccountConfirmationPhrase = "delete my account";
   const paywallDismissStorageKey = `aso-paywall-dismissed:${currentUser.uid}`;
+  useEffect(() => {
+    if (!isAccountMenuOpen) return undefined;
+
+    const closeAccountMenu = () => {
+      setIsAccountMenuOpen(false);
+      setIsConfirmingDeleteAccount(false);
+      setDeleteAccountConfirmationInput("");
+    };
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !accountMenuRef.current?.contains(target)) {
+        closeAccountMenu();
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeAccountMenu();
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isAccountMenuOpen]);
   useEffect(() => {
     if (!isDemoMode) return;
     const demoState = buildDemoWorkspaceState();
@@ -9476,7 +9503,7 @@ function AuthenticatedApp({
   };
   const removeCompareApp = (appToRemove: AppDetails) => {
     const confirmed = window.confirm(
-      `Remove "${appToRemove.title}" from this compare set?`,
+      `Remove "${appToRemove.title}" from this comparison?`,
     );
     if (!confirmed) {
       return;
@@ -10419,6 +10446,44 @@ function AuthenticatedApp({
     }),
     [bookmarks],
   );
+  const analyzeShortcutGroups = React.useMemo(() => {
+    const toAppDetails = (record: {
+      title: string;
+      appId: string;
+      id?: number;
+      icon: string;
+      developer: string;
+      category?: string;
+      url?: string;
+    }): AppDetails => ({
+      title: record.title,
+      appId: record.appId,
+      id: record.id,
+      description: "",
+      icon: record.icon,
+      score: 0,
+      developer: record.developer,
+      category: record.category,
+      url: record.url,
+    });
+    const bookmarkApps = bookmarks.slice(0, 3).map((bookmark) => ({
+      app: toAppDetails(bookmark),
+      store: bookmark.store,
+      country: bookmark.country,
+    }));
+    const trackedAppShortcuts = trackedApps
+      .filter((record) => record.kind === "own")
+      .slice(0, 3)
+      .map((record) => ({
+        app: toAppDetails(record),
+        store: record.store,
+        country,
+      }));
+    return [
+      { label: "Bookmarked apps", apps: bookmarkApps },
+      { label: "Tracked apps", apps: trackedAppShortcuts },
+    ].filter((group) => group.apps.length > 0);
+  }, [bookmarks, country, trackedApps]);
   const compareAverageRank = React.useMemo(() => {
     const avgRanks = compareAppInsights
       .map((insight) => insight.averageRank)
@@ -10441,7 +10506,7 @@ function AuthenticatedApp({
         label: "Analyze",
         shortLabel: "Analyze",
         icon: Search,
-        eyebrow: "Keyword Research",
+        eyebrow: "Keyword research",
         title: selectedApp ? selectedApp.title : "Analyze Apps",
         description: selectedApp
           ? `Context: ${selectedApp.developer} · ${findCountryName(country) || country}.`
@@ -10452,7 +10517,7 @@ function AuthenticatedApp({
         label: "Compare",
         shortLabel: "Compare",
         icon: Layers,
-        eyebrow: "Competitive Set",
+        eyebrow: "App comparison",
         title: "Compare Apps",
         description: "Compare keyword coverage and contested opportunities.",
         badge: comparedApps.length > 0 ? comparedApps.length : undefined,
@@ -10462,7 +10527,7 @@ function AuthenticatedApp({
         label: "Reports",
         shortLabel: "Reports",
         icon: BarChart3,
-        eyebrow: "Movement Analysis",
+        eyebrow: "Rank movement",
         title: "Reports",
         description: "Review movers, losers, and competitor movement by period.",
       },
@@ -10471,7 +10536,7 @@ function AuthenticatedApp({
         label: "Bookmarks",
         shortLabel: "Saved",
         icon: Bookmark,
-        eyebrow: "Quick Access",
+        eyebrow: "Saved apps",
         title: "Bookmarked Apps",
         description: "Keep priority apps one click away for quick re-entry.",
         badge: bookmarks.length > 0 ? bookmarks.length : undefined,
@@ -10481,7 +10546,7 @@ function AuthenticatedApp({
         label: "Competitors",
         shortLabel: "Rivals",
         icon: Globe,
-        eyebrow: "Battle Groups",
+        eyebrow: "Competitor tracking",
         title: "Competitor Groups",
         description: "Discover a rival, compare keyword coverage, and track changes in one place.",
         badge:
@@ -10494,7 +10559,7 @@ function AuthenticatedApp({
         label: "Tracked",
         shortLabel: "Tracked",
         icon: Bell,
-        eyebrow: "Daily Monitoring",
+        eyebrow: "Daily monitoring",
         title: "Tracked Keywords",
         description: "Monitor rank movement, region coverage, and refresh health.",
         badge:
@@ -10553,11 +10618,11 @@ function AuthenticatedApp({
     () => ({
       single: {
         title: "Analyze",
-        description: "Search an app for keywords.",
+        description: "Find keyword opportunities and track app rankings.",
       },
       compare: {
-        title: "Compare",
-        description: "Compare apps for keywords.",
+        title: "Compare Apps",
+        description: "Compare keyword coverage and discover ranking gaps.",
       },
       bookmarks: {
         title: "Bookmarks",
@@ -11282,7 +11347,13 @@ function AuthenticatedApp({
               {!isCompact && (
 <div className="workspace-search-composer-header mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
-                  <div className="workspace-chip-label">Search Composer</div>
+                  <div className="workspace-chip-label">
+                    {visibleWorkspaceMode === "single"
+                      ? "Find an app"
+                      : visibleWorkspaceMode === "compare"
+                        ? "Add apps to compare"
+                        : "Discover competitors"}
+                  </div>
                   <h2 className="workspace-search-composer-title mt-1 text-base font-semibold text-app-text sm:text-lg">
                     {visibleWorkspaceMode === "single"
                       ? "Find an app to analyze"
@@ -11295,19 +11366,101 @@ function AuthenticatedApp({
                       ? "Search by app name or paste a store URL."
                       : visibleWorkspaceMode === "competitors"
                         ? "Choose your app, add a rival, and analyze keyword coverage."
-                        : "Add up to five apps and compare keywords side by side."}
+                        : "Select at least two apps to compare keyword coverage."}
                   </p>
                 </div>
                 <div className="workspace-search-composer-meta flex flex-wrap gap-1.5">
-                  {visibleWorkspaceMode === "compare" && (
-                    <span className="workspace-status-chip">Max 5 apps</span>
-                  )}
                   {visibleWorkspaceMode === "competitors" && (
                     <span className="workspace-status-chip">1 own + 1 rival</span>
                   )}
                 </div>
               </div>
               )}
+              {visibleWorkspaceMode === "compare" ? (
+                <div className="workspace-compare-selection-tray" aria-label="Apps to compare">
+                  <div className="workspace-compare-selection-header">
+                    <div>
+                      <p className="workspace-chip-label">Selected apps</p>
+                      <p className="workspace-selection-count">
+                        {comparedApps.length}/5 selected
+                      </p>
+                    </div>
+                    {comparedApps.length < 5 ? (
+                      <button
+                        type="button"
+                        onClick={focusAppSearch}
+                        className="workspace-btn-ghost min-h-10 rounded-xl px-3 py-2 text-xs font-semibold"
+                      >
+                        + Add {comparedApps.length === 0 ? "first" : "another"} app
+                      </button>
+                    ) : null}
+                  </div>
+                  <div className="workspace-compare-selection-grid">
+                    {comparedApps.length === 0 ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={focusAppSearch}
+                          className="workspace-compare-slot"
+                        >
+                          <span>+ Add first app</span>
+                          <small>Search above</small>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={focusAppSearch}
+                          className="workspace-compare-slot"
+                        >
+                          <span>+ Add second app</span>
+                          <small>Search above</small>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        {comparedApps.map((app) => (
+                          <div
+                            key={getCompareAppKey(app, storeType)}
+                            className="workspace-compare-selection-card"
+                          >
+                            <img src={app.icon} alt="" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-semibold text-app-text">
+                                {app.title}
+                              </p>
+                              <p className="truncate text-xs text-app-text-muted">
+                                {app.developer}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeCompareApp(app)}
+                              aria-label={`Remove ${app.title} from comparison`}
+                              className="workspace-compare-selection-remove"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        {comparedApps.length < 5 ? (
+                          <button
+                            type="button"
+                            onClick={focusAppSearch}
+                            className="workspace-compare-slot"
+                          >
+                            <span>+ Add another app</span>
+                            <small>{5 - comparedApps.length} slot{5 - comparedApps.length === 1 ? "" : "s"} left</small>
+                          </button>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                  {comparedApps.length < 2 ? (
+                    <p className="workspace-selection-helper">
+                      Add at least two apps to compare keyword coverage.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className={`workspace-search-composer-body flex flex-col ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
                 <div className="workspace-search-composer-controls flex flex-wrap items-center gap-1.5">
                   <div className="workspace-store-toggle shrink-0">
@@ -11784,7 +11937,11 @@ function AuthenticatedApp({
                               }
                             >
                               {" "}
-                              {isComparedApp ? "Added" : "+ Compare"}{" "}
+                              {isComparedApp
+                                ? "Added"
+                                : comparedApps.length === 0
+                                  ? "Add to Compare"
+                                  : "Add Another App"}{" "}
                             </button>
                           ) : viewMode === "competitors" ? (
                             <div className="workspace-search-result-actions flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
@@ -11914,25 +12071,9 @@ function AuthenticatedApp({
                   className="workspace-brand-copy min-w-0"
                 />
               </div>
-              <div className="workspace-mobile-only flex items-center gap-2">
-                <button
-                  onClick={onSignOut}
-                  aria-label="Sign out"
-                  className="h-8 w-8 overflow-hidden rounded-full border border-app-border/50 bg-app-surface-strong focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 focus:ring-offset-slate-950 sm:h-9 sm:w-9"
-                  title="Sign out"
-                >
-                  {currentUser.photoURL ? (
-                    <img src={currentUser.photoURL} alt="Avatar" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-cyan-300">
-                      {(currentUser.displayName || currentUser.email || "?").charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </button>
-              </div>
             </div>
             <div className="workspace-topbar-controls">
-              <div className="workspace-desktop-only workspace-utility-chip">
+              <div className="workspace-desktop-only workspace-utility-chip workspace-legacy-account-actions">
                 <div className="min-w-0">
                   <p className="workspace-chip-label">Signed in as</p>
                   <p className="truncate text-sm font-semibold text-app-text max-w-[180px]">
@@ -12053,7 +12194,7 @@ function AuthenticatedApp({
                   userStateHydrated &&
                   hasAcceptedLegal &&
                   completedOnboardingStepCount < onboardingSteps.length && (
-                    <div className="relative">
+                    <div className="relative workspace-setup-wrapper">
                       <button
                         onClick={() => setIsSetupGuideOpen((prev) => !prev)}
                         className={cn(
@@ -12144,11 +12285,200 @@ function AuthenticatedApp({
                   onToggle={onToggleTheme}
                   className="workspace-theme-toggle"
                 />
+                <div ref={accountMenuRef} className="workspace-account-menu-root relative">
+                  <button
+                    type="button"
+                    aria-haspopup="menu"
+                    aria-expanded={isAccountMenuOpen}
+                    aria-label="Open account menu"
+                    className="workspace-account-trigger"
+                    onClick={() => {
+                      setIsAccountMenuOpen((previous) => !previous);
+                      setIsConfirmingDeleteAccount(false);
+                      setDeleteAccountConfirmationInput("");
+                    }}
+                  >
+                    <span className="workspace-account-avatar">
+                      {currentUser.photoURL ? (
+                        <img src={currentUser.photoURL} alt="" />
+                      ) : (
+                        (currentUser.displayName || currentUser.email || "?")
+                          .charAt(0)
+                          .toUpperCase()
+                      )}
+                    </span>
+                    <span className="workspace-account-trigger-copy">
+                      <span className="workspace-chip-label">Signed in as</span>
+                      <span className="truncate text-xs font-semibold text-app-text">
+                        {currentUser.displayName ||
+                          currentUser.email ||
+                          "Authenticated user"}
+                      </span>
+                    </span>
+                    <MoreHorizontal className="h-4 w-4 shrink-0" />
+                  </button>
+                  {isAccountMenuOpen ? (
+                    <div
+                      className="workspace-account-menu"
+                      role="menu"
+                      aria-label="Account menu"
+                    >
+                      <div className="workspace-account-menu-header">
+                        <p className="workspace-chip-label">Account information</p>
+                        <p className="mt-1 truncate text-sm font-semibold text-app-text">
+                          {currentUser.displayName ||
+                            currentUser.email ||
+                            "Authenticated user"}
+                        </p>
+                        {currentUser.email ? (
+                          <p className="mt-0.5 truncate text-xs text-app-text-muted">
+                            {currentUser.email}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="workspace-account-menu-section">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="workspace-account-menu-item"
+                          onClick={() => {
+                            if (notificationPermission !== "granted") {
+                              void requestNotificationPermission();
+                            }
+                            setIsAccountMenuOpen(false);
+                          }}
+                        >
+                          <BellRing className="h-4 w-4 shrink-0" />
+                          <span>Notifications</span>
+                          <span className="workspace-account-menu-item-status">
+                            {notificationPermission === "granted"
+                              ? "Enabled"
+                              : "Enable"}
+                          </span>
+                        </button>
+                        {!isDemoMode ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="workspace-account-menu-item"
+                            onClick={() => {
+                              setViewMode("upgrade");
+                              setIsAccountMenuOpen(false);
+                            }}
+                          >
+                            <CreditCard className="h-4 w-4 shrink-0" />
+                            <span>Billing / plans</span>
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="workspace-account-menu-item"
+                          onClick={onToggleTheme}
+                        >
+                          <span className="workspace-account-menu-theme-dot" />
+                          <span>Theme</span>
+                          <span className="workspace-account-menu-item-status">
+                            {themeMode === "light" ? "Light" : "Dark"}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="workspace-account-menu-item"
+                          onClick={() => {
+                            setIsAccountMenuOpen(false);
+                            void onSignOut();
+                          }}
+                        >
+                          <LogOut className="h-4 w-4 shrink-0" />
+                          <span>Sign out</span>
+                        </button>
+                      </div>
+                      <div className="workspace-account-menu-danger">
+                        {!isConfirmingDeleteAccount ? (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            className="workspace-account-menu-item workspace-account-menu-item-danger"
+                            onClick={() => {
+                              setIsConfirmingDeleteAccount(true);
+                              setDeleteAccountConfirmationInput("");
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 shrink-0" />
+                            <span>Delete account</span>
+                          </button>
+                        ) : (
+                          <div className="workspace-account-delete-confirm">
+                            <p className="text-sm font-semibold text-red-500">
+                              Delete this account?
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-app-text-muted">
+                              This removes your saved workspace data and Firebase login.
+                            </p>
+                            <label className="mt-3 block text-xs text-app-text-muted">
+                              Type{" "}
+                              <span className="font-semibold text-app-text">
+                                {deleteAccountConfirmationPhrase}
+                              </span>{" "}
+                              to confirm.
+                              <input
+                                type="text"
+                                value={deleteAccountConfirmationInput}
+                                onChange={(event) =>
+                                  setDeleteAccountConfirmationInput(event.target.value)
+                                }
+                                placeholder={deleteAccountConfirmationPhrase}
+                                className="mt-2 w-full rounded-xl border border-app-border bg-app-surface-muted px-3 py-2 text-sm text-app-text outline-none focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/10"
+                              />
+                            </label>
+                            <div className="mt-3 flex gap-2">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  setIsDeletingAccount(true);
+                                  try {
+                                    await onDeleteAccount();
+                                    setIsAccountMenuOpen(false);
+                                  } finally {
+                                    setIsDeletingAccount(false);
+                                    setIsConfirmingDeleteAccount(false);
+                                    setDeleteAccountConfirmationInput("");
+                                  }
+                                }}
+                                disabled={
+                                  isDeletingAccount ||
+                                  deleteAccountConfirmationInput.trim().toLowerCase() !==
+                                    deleteAccountConfirmationPhrase
+                                }
+                                className="flex-1 rounded-lg bg-red-600/95 py-2 text-xs font-bold text-white transition-colors disabled:opacity-60"
+                              >
+                                {isDeletingAccount ? "Deleting..." : "Delete"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsConfirmingDeleteAccount(false);
+                                  setDeleteAccountConfirmationInput("");
+                                }}
+                                disabled={isDeletingAccount}
+                                className="workspace-secondary-button flex-1 py-2 text-xs disabled:opacity-60"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 {notificationPermission !== "granted" && (
                   <button
                     onClick={requestNotificationPermission}
                     aria-label="Enable push notifications"
-                    className="workspace-mobile-only workspace-icon-button text-amber-300"
+                    className="workspace-mobile-only workspace-legacy-mobile-action workspace-icon-button text-amber-300"
                     title="Enable Push Notifications"
                   >
                     <BellRing className="h-4 w-4" />
@@ -12158,7 +12488,7 @@ function AuthenticatedApp({
                   <button
                     onClick={() => setViewMode("upgrade")}
                     aria-label="View plans"
-                    className="workspace-mobile-only workspace-icon-button"
+                    className="workspace-mobile-only workspace-legacy-mobile-action workspace-icon-button"
                     title="View plans"
                   >
                     <CreditCard className="h-4 w-4" />
@@ -12167,7 +12497,7 @@ function AuthenticatedApp({
                 <button
                   onClick={onSignOut}
                   aria-label="Sign out"
-                  className="workspace-mobile-only workspace-icon-button"
+                  className="workspace-mobile-only workspace-legacy-mobile-action workspace-icon-button"
                   title="Sign out"
                 >
                   <LogOut className="h-4 w-4" />
@@ -12193,7 +12523,7 @@ function AuthenticatedApp({
                   }}
                   disabled={isDeletingAccount}
                   aria-label="Delete account"
-                  className="workspace-mobile-only workspace-icon-button disabled:opacity-60"
+                  className="workspace-mobile-only workspace-legacy-mobile-action workspace-icon-button disabled:opacity-60"
                   title="Delete account"
                 >
                   {isDeletingAccount ? (
@@ -12372,7 +12702,12 @@ function AuthenticatedApp({
             )}
             <WorkspacePanel className="workspace-page-header-panel" tone="strong">
                 <WorkspacePageIntro
-                  eyebrow={activeWorkspacePage.eyebrow}
+                  eyebrow={
+                    visibleWorkspaceMode === "single" ||
+                    visibleWorkspaceMode === "compare"
+                      ? ""
+                      : activeWorkspacePage.eyebrow
+                  }
                   title={
                     isDenseWorkspaceLandingSummary &&
                     activeWorkspaceLandingCopy?.title
@@ -12396,12 +12731,21 @@ function AuthenticatedApp({
                           "workspace-page-context-dense",
                       )}
                     >
-                      <span className="workspace-status-chip">
-                        {storeType === "ios" ? "iOS" : "Play"}
-                      </span>
-                      <span className="workspace-status-chip">
-                        {findCountryName(country) || country}
-                      </span>
+                      {((visibleWorkspaceMode === "single" && !selectedApp) ||
+                        (visibleWorkspaceMode === "compare" && comparedApps.length === 0)) ? (
+                        <span className="workspace-context-line">
+                          {storeType === "ios" ? "iOS" : "Play"} · {findCountryName(country) || country}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="workspace-status-chip">
+                            {storeType === "ios" ? "iOS" : "Play"}
+                          </span>
+                          <span className="workspace-status-chip">
+                            {findCountryName(country) || country}
+                          </span>
+                        </>
+                      )}
                       {visibleWorkspaceMode === "tracked" ? (
                         <span
                           className={cn(
@@ -15780,11 +16124,63 @@ function AuthenticatedApp({
             </div>
           )}{" "}
           {viewMode === "single" && !selectedApp && (
-            <WorkspaceEmptyBlock
-              icon={Search}
-              title="No app selected yet"
-              description="Search above to load an app workspace. Once selected, this page switches into keyword, chart, and tracking analysis for that app."
-            />
+            <section
+              className="workspace-empty-compact workspace-surface workspace-card"
+              aria-labelledby="analyze-empty-title"
+            >
+              <div className="workspace-empty-compact-header">
+                <div className="workspace-empty-icon-compact">
+                  <Search className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <h2 id="analyze-empty-title" className="workspace-empty-compact-title">
+                    No app selected
+                  </h2>
+                  <p className="workspace-empty-compact-description">
+                    Search above to analyze keyword rankings, discover opportunities, and start tracking.
+                  </p>
+                </div>
+              </div>
+              {analyzeShortcutGroups.length > 0 ? (
+                <div className="workspace-shortcut-groups">
+                  {analyzeShortcutGroups.map((group) => (
+                    <div key={group.label}>
+                      <p className="workspace-chip-label">{group.label}</p>
+                      <div className="workspace-shortcut-grid">
+                        {group.apps.map((shortcut) => (
+                          <button
+                            key={shortcut.store + "-" + shortcut.app.appId}
+                            type="button"
+                            className="workspace-shortcut-card"
+                            onClick={() =>
+                              void handleSelectApp(
+                                shortcut.app,
+                                shortcut.store,
+                                shortcut.country,
+                              )
+                            }
+                          >
+                            <img src={shortcut.app.icon} alt="" />
+                            <span className="workspace-shortcut-card-copy">
+                              <span className="block truncate text-sm font-semibold text-app-text">
+                                {shortcut.app.title}
+                              </span>
+                              <span className="block truncate text-xs text-app-text-muted">
+                                {shortcut.app.developer}
+                              </span>
+                              <span className="workspace-shortcut-meta">
+                                {shortcut.store === "ios" ? "iOS" : "Play"} · {findCountryName(shortcut.country) || shortcut.country}
+                              </span>
+                            </span>
+                            <span className="workspace-shortcut-action">Analyze</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
           )}
           {/* Selected App Dashboard */}{" "}
           {viewMode === "single" && selectedApp && (
@@ -16866,11 +17262,7 @@ function AuthenticatedApp({
           {viewMode === "compare" && (
             <>
             {comparedApps.length === 0 ? (
-              <WorkspaceEmptyBlock
-                icon={Layers}
-                title="No compare set yet"
-                description="Use the search composer to add apps into the compare set. Coverage, battle, and opportunity modules will populate after that."
-              />
+              null
             ) : (
                <div className="workspace-compare-view space-y-6" ref={compareExportRef}>
                <div ref={compareSearchRef}>{renderSearchSection(true)}</div>
@@ -16878,7 +17270,7 @@ function AuthenticatedApp({
                  <div className="flex flex-col gap-3">
                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                      <div className="min-w-0">
-                       <div className="workspace-chip-label">Compare workspace</div>
+                       <div className="workspace-chip-label">Apps to compare</div>
                        <h3 className="mt-1 text-lg font-semibold text-app-text">
                          Compare Apps
                        </h3>
@@ -16939,7 +17331,7 @@ function AuthenticatedApp({
                         className={`min-h-11 rounded-lg px-3 py-2 text-xs font-semibold uppercase tracking-wide transition-colors disabled:opacity-50 ${compareDiscoveryMode === mode ? "bg-cyan-500/20 text-cyan-200" : "text-app-text-muted hover:text-app-text"}`}
                       >
                         {" "}
-                        {mode}{" "}
+                        {mode === "fast" ? "Quick Scan" : "Deep Scan"}{" "}
                       </button>
                     ))}{" "}
                   </div>{" "}
@@ -16960,7 +17352,7 @@ function AuthenticatedApp({
                     ) : (
                       <RefreshCw className="w-4 h-4" />
                     )}{" "}
-                    Refresh Compare{" "}
+                    {compareAnalyzedCount === 0 ? "Compare Apps" : "Refresh Compare"}{" "}
                   </button>{" "}
                 </div>{" "}
               </div>{" "}
@@ -16970,7 +17362,7 @@ function AuthenticatedApp({
                   {" "}
                   Analysis mode:{" "}
                   <span className="font-semibold text-app-text uppercase">
-                    {compareDiscoveryMode}
+                    {compareDiscoveryMode === "fast" ? "Quick Scan" : "Deep Scan"}
                   </span>{" "}
                 </span>{" "}
                 <span>

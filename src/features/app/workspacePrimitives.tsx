@@ -54,7 +54,7 @@ export function WorkspacePageIntro({
   compact = false,
   dense = false,
 }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
   description: string;
   icon: LucideIcon;
@@ -69,7 +69,7 @@ export function WorkspacePageIntro({
           <Icon className="h-5 w-5" />
         </div>
         <div className="min-w-0">
-          <div className="workspace-page-eyebrow">{eyebrow}</div>
+          {eyebrow ? <div className="workspace-page-eyebrow">{eyebrow}</div> : null}
           <h1 className={cn("workspace-page-title", compact && "workspace-page-title-compact", dense && "workspace-page-title-dense")}>{title}</h1>
           <p className={cn("workspace-page-description", compact && "workspace-page-description-compact", dense && "workspace-page-description-dense")}>{description}</p>
         </div>
