@@ -3719,6 +3719,8 @@ function AuthenticatedApp({
   );
   const [activeCompetitorAsoAlertGroupId, setActiveCompetitorAsoAlertGroupId] =
     useState<string | null>(null);
+  const [activeCompetitorKeywordAlertGroupKey, setActiveCompetitorKeywordAlertGroupKey] =
+    useState<string | null>(null);
   const [competitorAsoDiffs, setCompetitorAsoDiffs] = useState<
     CompetitorAsoDiffRecord[]
   >([]);
@@ -7183,11 +7185,7 @@ function AuthenticatedApp({
           typeof payload.candidateCount === "number"
             ? ` after checking ${payload.checkedKeywords}/${payload.candidateCount} candidates`
             : "");
-        if (payload.rankings.length === 0 && payload.suggestions.length > 0) {
-          toast.info(
-            `${summary}. Showing ${payload.suggestions.length} keyword suggestion${payload.suggestions.length === 1 ? "" : "s"} instead.`,
-          );
-        } else if (payload.rankings.length === 0) {
+        if (payload.rankings.length === 0) {
           toast.info(`${summary}. No ranked keywords found in this scan.`);
         } else if ((payload.failedLookups ?? 0) > 0) {
           toast.info(
@@ -10144,6 +10142,51 @@ function AuthenticatedApp({
         : null,
     [activeAlertGroup],
   );
+  const activeCompetitorKeywordAlertTarget = React.useMemo(() => {
+    if (!activeCompetitorKeywordAlertGroupKey) {
+      return null;
+    }
+    for (const keywordGroups of processedCompetitorTrackedKeywordGroupsByGroupId.values()) {
+      const keywordGroup = keywordGroups.find(
+        (entry) => entry.groupKey === activeCompetitorKeywordAlertGroupKey,
+      );
+      if (!keywordGroup) {
+        continue;
+      }
+      const parentGroup = competitorGroups.find(
+        (entry) => entry.groupId === keywordGroup.groupId,
+      );
+      if (!parentGroup) {
+        return null;
+      }
+      return {
+        mode: "keyword" as const,
+        group: {
+          groupId: keywordGroup.groupId,
+          keyword: keywordGroup.keyword,
+          appId: parentGroup.ownApp.appId,
+          appTitle: parentGroup.ownApp.title,
+          store: keywordGroup.store,
+          countries: keywordGroup.countries,
+          countryViews: [],
+          index: 0,
+          lastChecked: keywordGroup.lastCheckedAt || "",
+          improvement: 0,
+          targetAppIds: Array.from(
+            new Set([
+              parentGroup.ownApp.appId,
+              ...parentGroup.competitors.map((app) => app.appId),
+            ]),
+          ),
+        },
+      };
+    }
+    return null;
+  }, [
+    activeCompetitorKeywordAlertGroupKey,
+    competitorGroups,
+    processedCompetitorTrackedKeywordGroupsByGroupId,
+  ]);
   const activeCompetitorAsoAlertTarget = React.useMemo(
     () =>
       activeCompetitorAsoAlertGroup
@@ -10756,33 +10799,27 @@ function AuthenticatedApp({
     }
     return [
       {
-          label: "Discovered Rankings",
-          value: autoRankings.length,
-          hint: selectedAppAnalysisSnapshot
-            ? `${selectedAppAnalysisSnapshot.top10} in top 10`
-            : "Auto results",
+        label: "Discovered Rankings",
+        value: autoRankings.length,
+        hint: selectedAppAnalysisSnapshot
+          ? `${selectedAppAnalysisSnapshot.top10} in top 10`
+          : "Auto results",
         accent: "cyan" as const,
       },
       {
-          label: "Suggestions",
-          value: keywordSuggestions.length,
-          hint: "Opportunities",
-        accent: "violet" as const,
-      },
-      {
-          label: "Average Rank",
-          value: selectedAppAnalysisSnapshot?.averageRank
-            ? selectedAppAnalysisSnapshot.averageRank.toFixed(1)
-            : "-",
-          hint: selectedAppAnalysisSnapshot
-            ? `${selectedAppAnalysisSnapshot.top100} ranked keywords`
-            : "Run scan",
+        label: "Average Rank",
+        value: selectedAppAnalysisSnapshot?.averageRank
+          ? selectedAppAnalysisSnapshot.averageRank.toFixed(1)
+          : "-",
+        hint: selectedAppAnalysisSnapshot
+          ? `${selectedAppAnalysisSnapshot.top100} ranked keywords`
+          : "Run scan",
         accent: "cyan" as const,
       },
       {
-          label: "Chart Position",
-          value: selectedAppChartEntry ? `#${selectedAppChartEntry.position}` : "-",
-          hint: selectedChartCategory?.label || "Chart",
+        label: "Chart Position",
+        value: selectedAppChartEntry ? `#${selectedAppChartEntry.position}` : "-",
+        hint: selectedChartCategory?.label || "Chart",
         accent: "amber" as const,
       },
     ];
@@ -10802,7 +10839,6 @@ function AuthenticatedApp({
     competitorGroupStats.withSnapshots,
     competitorRankedPairs,
     isMobileViewport,
-    keywordSuggestions.length,
     selectedAppAnalysisSnapshot,
     selectedAppChartEntry,
     selectedChartCategory?.label,
@@ -10822,35 +10858,21 @@ function AuthenticatedApp({
   const rankedKeywordCardClass = isLightTheme
     ? `${discoveryCardBaseClass} border border-sky-200/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(238,247,253,0.84))] text-slate-800 hover:border-sky-400/70 hover:shadow-sky-200/60`
     : `${discoveryCardBaseClass} bg-cyan-950/40 border border-cyan-500/20 text-cyan-300 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
-  const suggestionKeywordCardClass = isLightTheme
-    ? `${discoveryCardBaseClass} border border-cyan-200/80 bg-[linear-gradient(180deg,rgba(247,253,255,0.94),rgba(233,247,252,0.86))] text-slate-800 hover:border-cyan-400/65 hover:shadow-cyan-200/55`
-    : `${discoveryCardBaseClass} bg-app-surface-muted/70 border border-cyan-500/20 text-cyan-200 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
-  const discoveryMetricRowClass = isLightTheme
-    ? "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] sm:text-xs text-sky-700/80 font-semibold"
-    : "flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11px] sm:text-xs text-cyan-400/80 font-medium";
-  const getDiscoveryTrackButtonClass = (
-    isTracked: boolean,
-    tone: "ranked" | "suggestion",
-  ) =>
+  const getDiscoveryTrackButtonClass = (isTracked: boolean) =>
     isLightTheme
       ? `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-white/95 px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
           isTracked
             ? "border-amber-300/80 hover:bg-amber-50 text-amber-600"
-            : tone === "ranked"
-              ? "border-emerald-300/80 hover:bg-emerald-50 text-emerald-600"
-              : "border-sky-300/80 hover:bg-sky-50 text-sky-600"
+            : "border-emerald-300/80 hover:bg-emerald-50 text-emerald-600"
         }`
       : `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-app-surface-muted/90 px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
           isTracked
             ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400"
-            : tone === "ranked"
-              ? "border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400"
-              : "border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-400"
+            : "border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400"
         }`;
   const renderDiscoveryKeywordCard = (
-    keywordItem: RankedKeyword | KeywordSuggestion,
+    keywordItem: RankedKeyword,
     index: number,
-    isVerified: boolean,
   ) => {
     const trackedKey = getTrackedKeywordGroupKey({
       keyword: keywordItem.keyword,
@@ -10858,19 +10880,25 @@ function AuthenticatedApp({
       store: storeType,
     });
     const isTracked = trackedKeywordGroupKeys.has(trackedKey);
-    const rank = isVerified ? (keywordItem as RankedKeyword).rank : undefined;
+    const rank = keywordItem.rank;
+    const estimatedDemand = getEstimatedDemand(keywordItem);
+    const metricItems = [
+      { label: "Vol", value: estimatedDemand },
+      { label: "Diff", value: keywordItem.difficulty },
+      { label: "Rel", value: keywordItem.relevance },
+    ].filter(
+      (item): item is { label: string; value: number } =>
+        typeof item.value === "number",
+    );
 
     return (
       <div
-        key={`${isVerified ? "ranked" : "suggested"}-${keywordItem.keyword}-${index}`}
-        className={cn(
-          isVerified ? rankedKeywordCardClass : suggestionKeywordCardClass,
-          "workspace-discovery-card",
-        )}
+        key={`ranked-${keywordItem.keyword}-${index}`}
+        className={cn(rankedKeywordCardClass, "workspace-discovery-card")}
       >
         <div className="flex min-w-0 items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">
-            {isVerified && selectedApp?.icon ? (
+            {selectedApp?.icon ? (
               <img
                 src={selectedApp.icon}
                 alt=""
@@ -10884,74 +10912,24 @@ function AuthenticatedApp({
             ) : null}
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 flex-wrap items-start gap-1.5">
-                <span className="workspace-mobile-clamp-2 min-w-0 flex-1 text-sm font-semibold leading-tight sm:truncate">
+                <span className="workspace-discovery-keyword min-w-0 flex-1 text-sm font-semibold leading-tight">
                   {keywordItem.keyword}
                 </span>
                 <span
                   className={
-                    isVerified
-                      ? isLightTheme
-                        ? "shrink-0 rounded-md border border-emerald-200/80 bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 sm:text-xs"
-                        : "shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 sm:text-xs"
-                      : isLightTheme
-                        ? "shrink-0 rounded-md border border-cyan-200/80 bg-cyan-100 px-2 py-0.5 text-[11px] font-bold text-cyan-700 sm:text-xs"
-                        : "shrink-0 rounded-md bg-cyan-500/15 px-2 py-0.5 text-[11px] font-bold text-cyan-300 sm:text-xs"
+                    isLightTheme
+                      ? "shrink-0 rounded-md border border-emerald-200/80 bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 sm:text-xs"
+                      : "shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 sm:text-xs"
                   }
                 >
-                  {isVerified ? `#${rank}` : "Suggested keyword"}
+                  #{rank}
                 </span>
               </div>
               <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-app-text-muted">
-                {isVerified ? "Verified ranking" : "Not checked yet"}
+                Verified ranking
               </div>
             </div>
           </div>
-          {isVerified ? (
-            <button
-              type="button"
-              onClick={() =>
-                selectedApp &&
-                openTrackCountryPicker(
-                  keywordItem.keyword,
-                  selectedApp,
-                  storeType,
-                  country,
-                  rank ?? -1,
-                  true,
-                  "own",
-                  "discovery",
-                )
-              }
-              className={getDiscoveryTrackButtonClass(isTracked, "ranked")}
-              title={isTracked ? "Track more countries" : "Track keyword"}
-              aria-label={isTracked ? "Track more countries" : "Track keyword"}
-            >
-              {isTracked ? (
-                <BellRing className="h-3.5 w-3.5" />
-              ) : (
-                <Bell className="h-3.5 w-3.5" />
-              )}
-            </button>
-          ) : null}
-        </div>
-        <div className={discoveryMetricRowClass}>
-          {getEstimatedDemand(keywordItem) !== undefined && (
-            <span title="Estimated Volume">
-              Est. Vol: {getEstimatedDemand(keywordItem)}
-            </span>
-          )}
-          {keywordItem.difficulty !== undefined && (
-            <span title="Estimated Ranking Difficulty">
-              Est. Diff: {keywordItem.difficulty}
-            </span>
-          )}
-          {keywordItem.relevance !== undefined && (
-            <span title="Estimated App Relevance">
-              Est. Rel: {keywordItem.relevance}
-            </span>
-          )}
-        </div>
-        {!isVerified ? (
           <button
             type="button"
             onClick={() =>
@@ -10961,25 +10939,42 @@ function AuthenticatedApp({
                 selectedApp,
                 storeType,
                 country,
-                -1,
-                false,
+                rank,
+                true,
                 "own",
                 "discovery",
               )
             }
-            className={cn(
-              getDiscoveryTrackButtonClass(isTracked, "suggestion"),
-              "w-full text-[11px] font-semibold sm:text-xs",
-            )}
-            title={isTracked ? "Track more countries" : "Track keyword to monitor daily"}
+            className={getDiscoveryTrackButtonClass(isTracked)}
+            title={isTracked ? "Track more countries" : "Track keyword"}
+            aria-label={isTracked ? "Track more countries" : "Track keyword"}
           >
             {isTracked ? (
               <BellRing className="h-3.5 w-3.5" />
             ) : (
               <Bell className="h-3.5 w-3.5" />
             )}
-            {isTracked ? "Tracking" : "Track to monitor daily"}
           </button>
+        </div>
+        {metricItems.length > 0 ? (
+          <div className="workspace-discovery-metrics" aria-label="Keyword metrics">
+            {metricItems.map((metric) => (
+              <span
+                key={metric.label}
+                className="workspace-discovery-metric"
+                title={
+                  metric.label === "Vol"
+                    ? "Estimated Volume"
+                    : metric.label === "Diff"
+                      ? "Estimated Ranking Difficulty"
+                      : "Estimated App Relevance"
+                }
+              >
+                <span className="workspace-discovery-metric-label">{metric.label}</span>
+                <strong className="workspace-discovery-metric-value">{metric.value}</strong>
+              </span>
+            ))}
+          </div>
         ) : null}
       </div>
     );
@@ -13373,7 +13368,7 @@ function AuthenticatedApp({
                                 </button>
                               </div>
                             </div>
-                            <div className="mt-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
+                            <div className="competitor-aso-metrics mt-4 grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4">
                               <div className="workspace-metric-card flex flex-col p-3 sm:p-5">
                                 <div className="workspace-chip-label mb-1 !text-[10px] sm:!text-[11px]">
                                   Total Changes
@@ -13532,8 +13527,8 @@ function AuthenticatedApp({
                                   : "No ASO changes match the current filters."}
                               </div>
                             ) : (
-                              <div className="workspace-panel mt-4 overflow-x-auto !p-0">
-                                <div className="grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                              <div className="workspace-panel competitor-aso-diff-table mt-4 overflow-hidden !p-0">
+                                <div className="competitor-aso-diff-header grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                   <div>Detected</div>
                                   <div>App</div>
                                   <div>Country</div>
@@ -13544,22 +13539,22 @@ function AuthenticatedApp({
                                   {filteredGroupAsoDiffs.map((diff) => (
                                     <div
                                       key={diff.diffId}
-                                      className="grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/80 px-4 py-3 text-sm text-app-text-muted last:border-b-0"
+                                      className="competitor-aso-diff-row grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/80 px-4 py-3 text-sm text-app-text-muted last:border-b-0"
                                     >
-                                      <div className="text-xs text-app-text-muted">
+                                      <div className="competitor-aso-diff-detected text-xs text-app-text-muted">
                                         {formatTrackingChartDateTime(
                                           diff.detectedAt,
                                         )}
                                       </div>
-                                      <div className="min-w-0">
+                                      <div className="competitor-aso-diff-app min-w-0">
                                         <p className="truncate font-semibold text-app-text">
                                           {diff.appTitle}
                                         </p>
                                       </div>
-                                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-app-text-muted">
+                                      <div className="competitor-aso-diff-country text-xs font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                                         {diff.country}
                                       </div>
-                                      <div className="flex flex-wrap gap-1">
+                                      <div className="competitor-aso-diff-fields flex flex-wrap gap-1">
                                         {diff.changedFields.map((field) => (
                                           <span
                                             key={`${diff.diffId}:${field}`}
@@ -13569,7 +13564,7 @@ function AuthenticatedApp({
                                           </span>
                                         ))}
                                       </div>
-                                      <div className="space-y-2">
+                                      <div className="competitor-aso-diff-details min-w-0 space-y-2">
                                         {diff.changes.map((change) => (
                                           <div
                                             key={`${diff.diffId}:${change.field}`}
@@ -13879,6 +13874,20 @@ function AuthenticatedApp({
                                               <span className="hidden sm:inline">Edit Countries</span>
                                             </button>
                                           )}
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setActiveCompetitorKeywordAlertGroupKey(
+                                                keywordGroup.groupKey,
+                                              )
+                                            }
+                                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-cyan-400/25 bg-cyan-500/10 px-3 py-2 text-[11px] font-semibold text-cyan-200 transition-colors hover:border-cyan-400/45 hover:bg-cyan-500/15"
+                                            aria-label={`Manage keyword alerts for ${keywordGroup.keyword}`}
+                                            title="Manage keyword alerts"
+                                          >
+                                            <Bell className="h-3.5 w-3.5" />
+                                            <span>Alerts</span>
+                                          </button>
                                           {keywordCardState.showCountrySwitcher && (
                                             <select
                                               value={trackedKeyword.country}
@@ -15672,7 +15681,7 @@ function AuthenticatedApp({
                     Keyword discovery{" "}
                   </h3>{" "}
                   <p className="max-w-2xl text-xs text-app-text-muted sm:text-sm">
-                    Verified rankings come first. Suggested keywords are shown separately so you can decide what to track next.
+                    Discovery results include only keywords currently verified for this app.
                   </p>
                   {/* Auto Discovered Rankings */}{" "}
                   <div className="workspace-discovery-block mb-7 mt-5">
@@ -15745,7 +15754,7 @@ function AuthenticatedApp({
                               ? `Partial scan: ${discoveryRunMeta.failedLookups} lookup${discoveryRunMeta.failedLookups === 1 ? "" : "s"} need retry.`
                               : discoveryRunMeta.checkedKeywords && discoveryRunMeta.candidateCount
                                 ? `Checked ${discoveryRunMeta.checkedKeywords}/${discoveryRunMeta.candidateCount} candidates.`
-                                : "Verified rankings and keyword ideas for this app."}
+                                : "Verified rankings for this app."}
                         </span>
                       </div>
                     </div>
@@ -15771,38 +15780,18 @@ function AuthenticatedApp({
                           </div>
                           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
                             {autoRankings.map((keywordItem, index) =>
-                              renderDiscoveryKeywordCard(keywordItem, index, true),
+                              renderDiscoveryKeywordCard(keywordItem, index),
                             )}
                           </div>
                         </section>
                       ) : null}
-                      {keywordSuggestions.length > 0 ? (
-                        <section className="workspace-discovery-section workspace-discovery-section-suggested" aria-labelledby="suggested-keywords-heading">
-                          <div className="workspace-discovery-section-heading">
-                            <div>
-                              <h5 id="suggested-keywords-heading" className="text-sm font-semibold text-app-text">
-                                Suggested keywords
-                              </h5>
-                              <p className="mt-0.5 text-xs text-app-text-muted">
-                                Not checked yet. Track to monitor daily.
-                              </p>
-                            </div>
-                            <span className="workspace-status-chip">{keywordSuggestions.length} ideas</span>
-                          </div>
-                          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-                            {keywordSuggestions.map((keywordItem, index) =>
-                              renderDiscoveryKeywordCard(keywordItem, index, false),
-                            )}
-                          </div>
-                        </section>
-                      ) : null}
-                      {!isDiscoveringKeywords && autoRankings.length === 0 && keywordSuggestions.length === 0 ? (
+                      {!isDiscoveringKeywords && autoRankings.length === 0 ? (
                         <div className="workspace-discovery-empty">
                           <Search className="h-5 w-5 text-cyan-400" />
                           <div>
                             <p className="font-semibold text-app-text">No discovery results yet</p>
                             <p className="mt-1 text-xs text-app-text-muted">
-                              Run a scan to load verified rankings and suggested keywords.
+                              Run a scan to load verified rankings.
                             </p>
                           </div>
                         </div>
@@ -18164,6 +18153,15 @@ function AuthenticatedApp({
           target={activeKeywordAlertTarget}
           rules={alertRules}
           onClose={() => setActiveAlertGroupId(null)}
+          onChange={setAlertRules}
+          notificationPermission={notificationPermission}
+          onRequestPushPermission={requestNotificationPermission}
+        />
+        <UnifiedAlertRuleManagerModal
+          isOpen={Boolean(activeCompetitorKeywordAlertTarget)}
+          target={activeCompetitorKeywordAlertTarget}
+          rules={alertRules}
+          onClose={() => setActiveCompetitorKeywordAlertGroupKey(null)}
           onChange={setAlertRules}
           notificationPermission={notificationPermission}
           onRequestPushPermission={requestNotificationPermission}

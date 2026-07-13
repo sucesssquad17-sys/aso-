@@ -28,8 +28,12 @@ type CompetitorAsoAlertGroupView = {
   countries: string[];
 };
 
+type KeywordAlertGroupView = TrackedKeywordGroupView & {
+  targetAppIds?: string[];
+};
+
 type UnifiedAlertTarget =
-  | { mode: "keyword"; group: TrackedKeywordGroupView }
+  | { mode: "keyword"; group: KeywordAlertGroupView }
   | { mode: "competitor_aso"; group: CompetitorAsoAlertGroupView };
 
 export type UnifiedAlertRuleManagerModalProps = {
@@ -313,6 +317,9 @@ export function UnifiedAlertRuleManagerModal({
             updatedAt: nowIso,
             ...(existingRule?.baselineKeys
               ? { baselineKeys: existingRule.baselineKeys }
+              : {}),
+            ...(target.group.targetAppIds?.length
+              ? { targetAppIds: target.group.targetAppIds }
               : {}),
           }
         : {

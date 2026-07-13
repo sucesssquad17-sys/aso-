@@ -775,7 +775,7 @@ export function buildDiscoveryRefinementPrompt(input: {
     `2. Include at most ${input.limits.outputKeywordLimit} keywords.`,
     "3. Use the app purpose, audience, use cases, pain points, and competitor repetition to discover concrete ASO phrases and nearby high-intent search variants, not just the obvious head terms.",
     "4. Prefer natural, human-searchable keywords with clear user intent grounded in this app context, regardless of phrase length. Treat the candidate list as guidance, not a closed set, and infer adjacent user-search intent from the app context when it is strongly plausible.",
-    "5. Exclude junk, release-note phrasing, unrelated broad terms, and competitor-brand phrases.",
+    "5. Exclude junk, release-note phrasing, unrelated broad terms, competitor-brand phrases, and lists made only from generic category labels or broad synonyms.",
     "6. Allow single-word and multi-word terms when they are strongly grounded in the title, category, semantic app intent, or real user search behavior. Do not bias toward or against a keyword because of word count alone.",
     "7. Cover a mix of primary, feature, audience, problem, and use-case phrases. Closely related variants are allowed when they reflect meaningfully different search intent. Do not stay too literal to title words if the broader app purpose supports better search phrasing.",
     "8. Keep each keyword phrase natural and human-searchable, with a maximum of 8 words.",

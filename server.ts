@@ -111,6 +111,7 @@ import {
   normalizeAlertRules,
   normalizeNotificationSettings,
 } from './src/lib/alerts';
+import { flattenCompetitorTrackedKeywordsForAlerts } from './src/lib/alertTracking';
 import {
   getWeeklyReportRangeStartIso,
   normalizeWeeklyReportSettings,
@@ -3225,8 +3226,16 @@ function mergeEditableAlertRules(current: AlertRule[], next: AlertRule[]) {
   const currentById = new Map(current.map((rule) => [rule.id, rule]));
   return next.map((rule) => {
     const existing = currentById.get(rule.id);
+    const targetAppIds =
+      Array.isArray(rule.targetAppIds) && rule.targetAppIds.length > 0
+        ? Array.from(new Set(rule.targetAppIds))
+        : [rule.appId];
     const allowedBaselineKeys = new Set(
-      rule.countries.map((country) => buildTrackedAlertCountryKey(rule, country)),
+      rule.countries.flatMap((country) =>
+        targetAppIds.map((appId) =>
+          buildTrackedAlertCountryKey(rule, country, appId),
+        ),
+      ),
     );
     return {
       ...rule,
@@ -3467,8 +3476,12 @@ function assertPlanLimitTransition(
   );
 }
 
-function buildTrackedAlertCountryKey(rule: AlertRule, country: string) {
-  return `${rule.id}:${rule.groupId}:${rule.appId}:${rule.store}:${rule.keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
+function buildTrackedAlertCountryKey(
+  rule: AlertRule,
+  country: string,
+  appId = rule.appId,
+) {
+  return `${rule.id}:${rule.groupId}:${appId}:${rule.store}:${rule.keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
 }
 
 function sanitizeAlertEventId(input: string) {
@@ -3481,8 +3494,11 @@ function buildAlertEventId(
   country: string,
   eventType: AlertConditionType,
   threshold: number | null,
+  appId = '',
 ) {
-  return sanitizeAlertEventId(`${runKey}:${ruleId}:${country}:${eventType}:${threshold ?? 0}`);
+  return sanitizeAlertEventId(
+    `${runKey}:${ruleId}:${appId}:${country}:${eventType}:${threshold ?? 0}`,
+  );
 }
 
 function createAlertRunKey(prefix: 'schedule' | 'manual' | 'test') {
@@ -4914,81 +4930,92 @@ async function evaluateAndDispatchAlertRules(
       continue;
     }
 
+    const targetAppIds =
+      Array.isArray(rule.targetAppIds) && rule.targetAppIds.length > 0
+        ? Array.from(new Set(rule.targetAppIds))
+        : [rule.appId];
     for (const country of rule.countries) {
-      const trackedKey = getComparableTrackedKey({
-        groupId: rule.groupId,
-        appId: rule.appId,
-        keyword: rule.keyword,
-        store: rule.store,
-        country,
-      });
-      const previous = previousByKey.get(trackedKey);
-      const next = nextByKey.get(trackedKey);
-      if (!next) {
-        continue;
-      }
-
-      const baselineKey = buildTrackedAlertCountryKey(rule, country);
-      const hasBaseline = rule.baselineKeys?.includes(baselineKey) ?? false;
-      const canEstablishBaseline = next.lastCheckStatus !== 'error';
-
-      for (const condition of rule.conditions) {
-        if (condition.type !== 'check_error' && !hasBaseline) {
-          continue;
-        }
-
-        if (!shouldTriggerAlertCondition(condition, previous, next)) {
-          continue;
-        }
-
-        const eventId = buildAlertEventId(
-          runKey,
-          rule.id,
-          country,
-          condition.type,
-          condition.value ?? null,
-        );
-        const event: AlertEvent = {
-          id: eventId,
-          ruleId: rule.id,
+      for (const targetAppId of targetAppIds) {
+        const trackedKey = getComparableTrackedKey({
           groupId: rule.groupId,
-          appId: rule.appId,
+          appId: targetAppId,
           keyword: rule.keyword,
           store: rule.store,
           country,
-          eventType: condition.type,
-          previousRank: previous?.lastRank ?? null,
-          currentRank: next.lastRank ?? null,
-          threshold: condition.value ?? null,
-          message: buildAlertMessage(
-            rule.keyword,
-            country,
-            condition,
-            previous?.lastRank ?? null,
-            next.lastRank ?? null,
-          ),
-          createdAt: new Date().toISOString(),
-          readAt: null,
-        };
-        if (rule.channels.inApp) {
-          const created = await persistAlertEvent(userDocRef, event);
-          if (!created) {
+        });
+        const previous = previousByKey.get(trackedKey);
+        const next = nextByKey.get(trackedKey);
+        if (!next) {
+          continue;
+        }
+
+        const baselineKey = buildTrackedAlertCountryKey(
+          rule,
+          country,
+          targetAppId,
+        );
+        const hasBaseline = rule.baselineKeys?.includes(baselineKey) ?? false;
+        const canEstablishBaseline = next.lastCheckStatus !== 'error';
+
+        for (const condition of rule.conditions) {
+          if (condition.type !== 'check_error' && !hasBaseline) {
             continue;
           }
-          createdEvents.push(event);
-        }
-        if (rule.channels.push) {
-          browserPushEvents.push(event);
-        }
-        if (rule.channels.email) {
-          emailEvents.push(event);
-        }
-      }
 
-      if (!hasBaseline && canEstablishBaseline) {
-        rule.baselineKeys = Array.from(
-          new Set([...(rule.baselineKeys || []), baselineKey]),
-        );
+          if (!shouldTriggerAlertCondition(condition, previous, next)) {
+            continue;
+          }
+
+          const eventId = buildAlertEventId(
+            runKey,
+            rule.id,
+            country,
+            condition.type,
+            condition.value ?? null,
+            targetAppId,
+          );
+          const event: AlertEvent = {
+            id: eventId,
+            ruleId: rule.id,
+            groupId: rule.groupId,
+            appId: targetAppId,
+            keyword: rule.keyword,
+            store: rule.store,
+            country,
+            eventType: condition.type,
+            previousRank: previous?.lastRank ?? null,
+            currentRank: next.lastRank ?? null,
+            threshold: condition.value ?? null,
+            message: buildAlertMessage(
+              rule.keyword,
+              country,
+              condition,
+              previous?.lastRank ?? null,
+              next.lastRank ?? null,
+            ),
+            createdAt: new Date().toISOString(),
+            readAt: null,
+          };
+          if (rule.channels.inApp) {
+            const created = await persistAlertEvent(userDocRef, event);
+            if (!created) {
+              continue;
+            }
+            createdEvents.push(event);
+          }
+          if (rule.channels.push) {
+            browserPushEvents.push(event);
+          }
+          if (rule.channels.email) {
+            emailEvents.push(event);
+          }
+        }
+
+        if (!hasBaseline && canEstablishBaseline) {
+          rule.baselineKeys = Array.from(
+            new Set([...(rule.baselineKeys || []), baselineKey]),
+          );
+        }
       }
     }
   }
@@ -5915,6 +5942,8 @@ function isDiscoveryGenericHeadLike(input: {
   orderedTitleCoverage: number;
   semanticCoverage: number;
   categorySemanticCoverage: number;
+  descriptionCoverage?: number;
+  sourceStrength?: number;
 }) {
   const tokenCount = getDiscoveryKeywordTokenCount(input.keyword);
   if (tokenCount > 2) {
@@ -5936,13 +5965,21 @@ function isDiscoveryGenericHeadLike(input: {
     }
   }
 
+  const contextualStrength = Math.max(
+    input.exactTitleMatch || 0,
+    input.exactTitleSegment || 0,
+    input.orderedTitleCoverage || 0,
+    input.semanticCoverage || 0,
+    input.descriptionCoverage || 0,
+    input.sourceStrength || 0,
+  );
+
   return (
     input.genericCoverage >= 0.65 &&
     input.exactTitleMatch <= 0 &&
     input.exactTitleSegment <= 0 &&
     input.orderedTitleCoverage < 0.75 &&
-    input.semanticCoverage < 0.55 &&
-    input.categorySemanticCoverage < 0.55 &&
+    contextualStrength < 0.58 &&
     input.displayQuality < 72
   );
 }
@@ -5980,6 +6017,16 @@ function scoreDiscoveryRankingOutcome(
   });
   const genericPenalty = clamp01(outcome.featureQuality.genericCoverage || 0) *
     (singleWordGroundingBonus > 0 || specificityBonus >= 0.52 ? 0.45 : 1);
+  const contextualStrength = Math.max(
+    titleStrength,
+    semanticStrength,
+    clamp01(outcome.featureQuality.descriptionCoverage || 0),
+  );
+  const categoryOnlyGenericPenalty =
+    clamp01(outcome.featureQuality.genericCoverage || 0) *
+    clamp01(outcome.featureQuality.categorySemanticCoverage || 0) *
+    Math.max(0, 1 - contextualStrength) *
+    0.18;
 
   return (
     rankStrength * 0.34 +
@@ -5989,7 +6036,8 @@ function scoreDiscoveryRankingOutcome(
     titleStrength * 0.08 +
     specificityBonus * 0.1 +
     singleWordGroundingBonus * 0.1 -
-    genericPenalty * 0.18
+    genericPenalty * 0.18 -
+    categoryOnlyGenericPenalty * 0.1
   );
 }
 
@@ -6021,16 +6069,42 @@ function scoreDiscoverySuggestionCandidate(candidate: DiscoveryMetricCandidate) 
   });
   const genericPenalty = clamp01(candidate.features.genericCoverage || 0) *
     (singleWordGroundingBonus > 0 || specificityBonus >= 0.52 ? 0.45 : 1);
+  const descriptionStrength = clamp01(candidate.features.descriptionCoverage || 0);
+  const sourceStrength = clamp01(candidate.features.sourceStrength || 0);
+  const contextualStrength = Math.max(
+    titleStrength,
+    semanticStrength,
+    descriptionStrength,
+    sourceStrength,
+  );
+  const categoryOnlyGenericPenalty =
+    clamp01(candidate.features.genericCoverage || 0) *
+    clamp01(candidate.features.categorySemanticCoverage || 0) *
+    Math.max(0, 1 - contextualStrength) *
+    0.28;
+  const lowIntentPenalty = [
+    "NEAR_BRAND_JUNK",
+    "LOW_INTENT_JUNK",
+    "BRAND_MODIFIER_WEAK",
+    "COMPETITOR_BRAND",
+  ].includes(candidate.features.intentType)
+    ? 0.12
+    : 0;
 
   return (
-    relevance * 0.34 +
-    displayQuality * 0.18 +
+    relevance * 0.3 +
+    displayQuality * 0.14 +
     semanticStrength * 0.14 +
+    descriptionStrength * 0.14 +
+    sourceStrength * 0.1 +
     titleStrength * 0.1 +
-    demand * 0.08 +
-    specificityBonus * 0.12 +
-    singleWordGroundingBonus * 0.12 -
-    genericPenalty * 0.18
+    clamp01(candidate.features.categorySemanticCoverage || 0) * 0.05 +
+    demand * 0.05 +
+    specificityBonus * 0.06 +
+    singleWordGroundingBonus * 0.08 -
+    genericPenalty * 0.18 -
+    categoryOnlyGenericPenalty * 0.22 -
+    lowIntentPenalty
   );
 }
 
@@ -6064,6 +6138,8 @@ function selectDiscoveryDiverseRankings(
       orderedTitleCoverage: candidate.featureQuality.orderedTitleCoverage,
       semanticCoverage: candidate.featureQuality.semanticCoverage,
       categorySemanticCoverage: candidate.featureQuality.categorySemanticCoverage,
+      descriptionCoverage: candidate.featureQuality.descriptionCoverage,
+      sourceStrength: candidate.featureQuality.sourceStrength,
     });
 
     if (isGenericHead && genericHeadCount >= genericHeadLimit) {
@@ -6122,6 +6198,8 @@ function selectDiscoveryDiverseSuggestions(
       orderedTitleCoverage: candidate.features.orderedTitleCoverage,
       semanticCoverage: candidate.features.semanticCoverage,
       categorySemanticCoverage: candidate.features.categorySemanticCoverage,
+      descriptionCoverage: candidate.features.descriptionCoverage,
+      sourceStrength: candidate.features.sourceStrength,
     });
 
     if (isGenericHead && genericHeadCount >= genericHeadLimit) {
@@ -7254,8 +7332,18 @@ async function runAllUserTrackingSchedules(
             );
             const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
               userDoc.ref,
-              state.trackedKeywords,
-              nextTrackedKeywords,
+              [
+                ...state.trackedKeywords,
+                ...flattenCompetitorTrackedKeywordsForAlerts(
+                  state.competitorTrackedKeywords,
+                ),
+              ],
+              [
+                ...nextTrackedKeywords,
+                ...flattenCompetitorTrackedKeywordsForAlerts(
+                  nextCompetitorTrackedKeywords,
+                ),
+              ],
               state.alertRules,
               state.notificationSettings,
               runKey,
@@ -8202,6 +8290,7 @@ type DiscoveryFeatureQuality = {
   genericCoverage: number;
   semanticCoverage: number;
   categorySemanticCoverage: number;
+  sourceStrength: number;
 };
 
 type DiscoveryCheckedCandidateOutcome = {
@@ -8750,6 +8839,7 @@ function toDiscoveryFeatureQuality(
     genericCoverage: features?.genericCoverage || 0,
     semanticCoverage: features?.semanticCoverage || 0,
     categorySemanticCoverage: features?.categorySemanticCoverage || 0,
+    sourceStrength: features?.sourceStrength || 0,
   };
 }
 

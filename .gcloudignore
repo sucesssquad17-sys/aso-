@@ -7,4 +7,7 @@ build
 .npm
 google-cloud-sdk
 gcloud.zip
+remotion
+scratch
+tmp
 *.log

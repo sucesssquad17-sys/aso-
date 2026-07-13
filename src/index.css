@@ -3208,9 +3208,20 @@ select {
     overflow: hidden;
     padding: 0.8rem !important;
     border-radius: 1rem !important;
+    isolation: isolate;
+    opacity: 1;
+    background: #07101f !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  html[data-theme="light"] .workspace-pdf-export-popover {
+    background: #f5f9fd !important;
+    color: #0f172a;
   }
 
   .workspace-pdf-export-body {
+    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
@@ -3575,7 +3586,7 @@ select {
 
   .competitor-aso-actions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     gap: 0.4rem;
   }
@@ -3588,8 +3599,13 @@ select {
     padding: 0.45rem 0.5rem;
     text-align: center;
     font-size: 0.68rem;
-    line-height: 1;
-    white-space: nowrap;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  .competitor-aso-actions > :last-child {
+    grid-column: 1 / -1;
   }
 
   .competitor-aso-status,
@@ -3602,6 +3618,78 @@ select {
 
   .competitor-aso-filters {
     gap: 0.45rem;
+  }
+
+  .competitor-aso-metrics {
+    gap: 0.45rem;
+  }
+
+  .competitor-aso-metrics .workspace-metric-card {
+    min-width: 0;
+    padding: 0.65rem !important;
+  }
+
+  .competitor-aso-metrics .workspace-metric-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .competitor-aso-status,
+  .competitor-aso-empty {
+    overflow-wrap: anywhere;
+  }
+
+  .competitor-aso-diff-table {
+    overflow: hidden;
+  }
+
+  .competitor-aso-diff-header {
+    display: none;
+  }
+
+  .competitor-aso-diff-table > .max-h-\[28rem\] {
+    max-height: none;
+    overflow: visible;
+  }
+
+  .competitor-aso-diff-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    min-width: 0 !important;
+    gap: 0.55rem;
+    padding: 0.7rem !important;
+  }
+
+  .competitor-aso-diff-row > :nth-child(1) {
+    grid-column: 1 / -1;
+  }
+
+  .competitor-aso-diff-row > :nth-child(2) {
+    min-width: 0;
+  }
+
+  .competitor-aso-diff-row > :nth-child(3) {
+    justify-self: end;
+    text-align: right;
+  }
+
+  .competitor-aso-diff-row > :nth-child(4),
+  .competitor-aso-diff-row > :nth-child(5) {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .competitor-aso-diff-row .competitor-aso-diff-details,
+  .competitor-aso-diff-row .competitor-aso-diff-details > *,
+  .competitor-aso-diff-row .competitor-aso-diff-details .grid {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .competitor-aso-diff-row .competitor-aso-diff-details {
+    overflow-wrap: anywhere;
   }
 
   .competitor-keyword-card {
@@ -4087,6 +4175,48 @@ html[data-theme="light"] .workspace-discovery-error {
   min-width: 0;
 }
 
+.workspace-discovery-keyword {
+  overflow-wrap: anywhere;
+}
+
+.workspace-discovery-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  min-width: 0;
+  padding-top: 0.15rem;
+}
+
+.workspace-discovery-metric {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 0.24rem;
+  overflow: hidden;
+  color: var(--workspace-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.workspace-discovery-metric-label {
+  flex: 0 0 auto;
+  color: var(--workspace-text-muted);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.workspace-discovery-metric-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--workspace-text);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .workspace-discovery-empty {
   display: flex;
   align-items: flex-start;
@@ -4187,6 +4317,34 @@ html[data-theme="light"] .workspace-discovery-error {
 
   .workspace-discovery-section-heading {
     align-items: center;
+  }
+
+  .workspace-discovery-keyword {
+    white-space: normal;
+  }
+
+  .workspace-discovery-metrics {
+    gap: 0.25rem;
+  }
+
+  .workspace-discovery-metric {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.16rem;
+    min-height: 2.35rem;
+    padding: 0.38rem 0.42rem;
+    border: 1px solid var(--workspace-border);
+    border-radius: 0.65rem;
+    background: var(--workspace-surface-muted);
+    font-size: 0.64rem;
+  }
+
+  .workspace-discovery-metric-label {
+    font-size: 0.52rem;
+  }
+
+  .workspace-discovery-metric-value {
+    font-size: 0.68rem;
   }
 
   .workspace-discovery-status-row {

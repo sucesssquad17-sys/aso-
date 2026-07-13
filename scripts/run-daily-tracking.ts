@@ -53,6 +53,7 @@ import {
   normalizeAlertRules,
   normalizeNotificationSettings,
 } from '../src/lib/alerts';
+import { flattenCompetitorTrackedKeywordsForAlerts } from '../src/lib/alertTracking';
 import {
   getWeeklyReportRangeStartIso,
   normalizeWeeklyReportSettings,
@@ -791,8 +792,12 @@ function getGlobalRunKey(date: Date) {
   return getSharedGlobalTrackingRunKey(date, DEFAULT_GLOBAL_TRACKING_TIME, GLOBAL_TRACKING_TIMEZONE);
 }
 
-function buildTrackedAlertCountryKey(rule: AlertRule, country: string) {
-  return `${rule.id}:${rule.groupId}:${rule.appId}:${rule.store}:${rule.keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
+function buildTrackedAlertCountryKey(
+  rule: AlertRule,
+  country: string,
+  appId = rule.appId,
+) {
+  return `${rule.id}:${rule.groupId}:${appId}:${rule.store}:${rule.keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
 }
 
 function sanitizeAlertEventId(input: string) {
@@ -805,8 +810,11 @@ function buildAlertEventId(
   country: string,
   eventType: AlertConditionType,
   threshold: number | null,
+  appId = '',
 ) {
-  return sanitizeAlertEventId(`${runKey}:${ruleId}:${country}:${eventType}:${threshold ?? 0}`);
+  return sanitizeAlertEventId(
+    `${runKey}:${ruleId}:${appId}:${country}:${eventType}:${threshold ?? 0}`,
+  );
 }
 
 function getComparableTrackedKey({
@@ -1692,77 +1700,90 @@ async function evaluateAndDispatchAlertRules(
       continue;
     }
 
+    const targetAppIds =
+      Array.isArray(rule.targetAppIds) && rule.targetAppIds.length > 0
+        ? Array.from(new Set(rule.targetAppIds))
+        : [rule.appId];
     for (const country of rule.countries) {
-      const trackedKey = getComparableTrackedKey({
-        groupId: rule.groupId,
-        appId: rule.appId,
-        keyword: rule.keyword,
-        store: rule.store,
-        country,
-      });
-      const previous = previousByKey.get(trackedKey);
-      const next = nextByKey.get(trackedKey);
-      if (!next) {
-        continue;
-      }
-
-      const baselineKey = buildTrackedAlertCountryKey(rule, country);
-      const hasBaseline = rule.baselineKeys?.includes(baselineKey) ?? false;
-      const canEstablishBaseline = next.lastCheckStatus !== 'error';
-
-      for (const condition of rule.conditions) {
-        if (condition.type !== 'check_error' && !hasBaseline) {
-          continue;
-        }
-        if (!shouldTriggerAlertCondition(condition, previous, next)) {
-          continue;
-        }
-
-        const event: AlertEvent = {
-          id: buildAlertEventId(
-            runKey,
-            rule.id,
-            country,
-            condition.type,
-            condition.value ?? null,
-          ),
-          ruleId: rule.id,
+      for (const targetAppId of targetAppIds) {
+        const trackedKey = getComparableTrackedKey({
           groupId: rule.groupId,
-          appId: rule.appId,
+          appId: targetAppId,
           keyword: rule.keyword,
           store: rule.store,
           country,
-          eventType: condition.type,
-          previousRank: previous?.lastRank ?? null,
-          currentRank: next.lastRank ?? null,
-          threshold: condition.value ?? null,
-          message: buildAlertMessage(
-            rule.keyword,
-            country,
-            condition,
-            previous?.lastRank ?? null,
-            next.lastRank ?? null,
-          ),
-          createdAt: new Date().toISOString(),
-          readAt: null,
-        };
-        if (rule.channels.inApp) {
-          const created = await persistAlertEvent(userDocRef, event);
-          if (!created) {
+        });
+        const previous = previousByKey.get(trackedKey);
+        const next = nextByKey.get(trackedKey);
+        if (!next) {
+          continue;
+        }
+
+        const baselineKey = buildTrackedAlertCountryKey(
+          rule,
+          country,
+          targetAppId,
+        );
+        const hasBaseline = rule.baselineKeys?.includes(baselineKey) ?? false;
+        const canEstablishBaseline = next.lastCheckStatus !== 'error';
+
+        for (const condition of rule.conditions) {
+          if (condition.type !== 'check_error' && !hasBaseline) {
             continue;
           }
-          createdEvents.push(event);
-        }
-        if (rule.channels.push) {
-          browserPushEvents.push(event);
-        }
-        if (rule.channels.email) {
-          emailEvents.push(event);
-        }
-      }
+          if (!shouldTriggerAlertCondition(condition, previous, next)) {
+            continue;
+          }
 
-      if (!hasBaseline && canEstablishBaseline) {
-        rule.baselineKeys = Array.from(new Set([...(rule.baselineKeys || []), baselineKey]));
+          const event: AlertEvent = {
+            id: buildAlertEventId(
+              runKey,
+              rule.id,
+              country,
+              condition.type,
+              condition.value ?? null,
+              targetAppId,
+            ),
+            ruleId: rule.id,
+            groupId: rule.groupId,
+            appId: targetAppId,
+            keyword: rule.keyword,
+            store: rule.store,
+            country,
+            eventType: condition.type,
+            previousRank: previous?.lastRank ?? null,
+            currentRank: next.lastRank ?? null,
+            threshold: condition.value ?? null,
+            message: buildAlertMessage(
+              rule.keyword,
+              country,
+              condition,
+              previous?.lastRank ?? null,
+              next.lastRank ?? null,
+            ),
+            createdAt: new Date().toISOString(),
+            readAt: null,
+          };
+          if (rule.channels.inApp) {
+            const created = await persistAlertEvent(userDocRef, event);
+            if (!created) {
+              continue;
+            }
+            createdEvents.push(event);
+          }
+          if (rule.channels.push) {
+            browserPushEvents.push(event);
+          }
+          if (rule.channels.email) {
+            emailEvents.push(event);
+          }
+        }
+
+        if (!hasBaseline && canEstablishBaseline) {
+          rule.baselineKeys = Array.from(
+            new Set([...(rule.baselineKeys || []), baselineKey]),
+          );
+        }
       }
     }
   }
@@ -2577,8 +2598,18 @@ async function main() {
           const refreshResult = await refreshUserTrackingDaily(state, runKey);
           const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
             userDoc.ref,
-            state.trackedKeywords,
-            refreshResult.nextState.trackedKeywords,
+            [
+              ...state.trackedKeywords,
+              ...flattenCompetitorTrackedKeywordsForAlerts(
+                state.competitorTrackedKeywords,
+              ),
+            ],
+            [
+              ...refreshResult.nextState.trackedKeywords,
+              ...flattenCompetitorTrackedKeywordsForAlerts(
+                refreshResult.nextState.competitorTrackedKeywords,
+              ),
+            ],
             state.alertRules,
             state.notificationSettings,
             runKey,
@@ -2661,8 +2692,18 @@ async function main() {
       const result = await refreshUserTrackingDaily(state, runKey);
       const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
         userDoc.ref,
-        state.trackedKeywords,
-        result.nextState.trackedKeywords,
+        [
+          ...state.trackedKeywords,
+          ...flattenCompetitorTrackedKeywordsForAlerts(
+            state.competitorTrackedKeywords,
+          ),
+        ],
+        [
+          ...result.nextState.trackedKeywords,
+          ...flattenCompetitorTrackedKeywordsForAlerts(
+            result.nextState.competitorTrackedKeywords,
+          ),
+        ],
         state.alertRules,
         state.notificationSettings,
         runKey,
