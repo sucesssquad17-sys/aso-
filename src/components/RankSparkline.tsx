@@ -29,11 +29,21 @@ function RankSparklineTooltip({ active, payload }: TooltipProps) {
   if (!active || !point) return null;
 
   return (
-    <div className="rounded-lg border border-app-border/80 bg-app-surface/95 px-2.5 py-2 text-[10px] text-app-text shadow-2xl backdrop-blur-xl">
+    <div
+      className="rounded-lg border px-2.5 py-2 text-[10px] text-app-text shadow-2xl backdrop-blur-xl"
+      style={{
+        borderColor: "var(--color-chart-tooltip-border)",
+        background: "var(--color-chart-tooltip-bg)",
+        color: "var(--color-chart-tooltip-text)",
+      }}
+    >
       <p className="font-semibold text-app-text">{point.fullTime}</p>
       <p className="mt-1 text-app-text-muted">
         Rank:{" "}
-        <span className="font-bold text-cyan-300">
+        <span
+          className="font-bold"
+          style={{ color: "var(--color-brand-hover)" }}
+        >
           {point.rawRank === -1 ? `Not in top ${point.rankDepth}` : `#${point.rank}`}
         </span>
       </p>
@@ -78,7 +88,7 @@ const RankSparkline = React.memo(function RankSparkline({
   if (chartData.length === 0 || !yDomain) {
     return (
       <div
-        className={`flex h-full items-center justify-center text-[10px] text-slate-600 ${className || ""}`.trim()}
+        className={`flex h-full items-center justify-center text-[10px] text-app-text-muted ${className || ""}`.trim()}
       >
         {emptyLabel}
       </div>
@@ -87,7 +97,11 @@ const RankSparkline = React.memo(function RankSparkline({
 
   return (
     <div
-      className={`h-full w-full overflow-hidden rounded-lg border border-slate-900/70 bg-app-surface/35 ${className || ""}`.trim()}
+      className={`h-full w-full overflow-hidden rounded-lg border ${className || ""}`.trim()}
+      style={{
+        borderColor: "var(--color-border)",
+        background: "var(--color-surface-muted)",
+      }}
       onClick={stopInteraction}
       onMouseDown={stopInteraction}
       onPointerDown={stopInteraction}
@@ -112,7 +126,7 @@ const RankSparkline = React.memo(function RankSparkline({
             content={<RankSparklineTooltip />}
             trigger="hover"
             cursor={{
-              stroke: "rgba(103, 232, 249, 0.22)",
+              stroke: "var(--color-brand-border)",
               strokeWidth: 1,
               strokeDasharray: "3 4",
             }}
@@ -136,7 +150,7 @@ const RankSparkline = React.memo(function RankSparkline({
                 ? {
                     r: 3.5,
                     fill: stroke,
-                    stroke: "#020617",
+                    stroke: "var(--color-chart-tooltip-bg)",
                     strokeWidth: 1.5,
                   }
                 : false
@@ -147,7 +161,7 @@ const RankSparkline = React.memo(function RankSparkline({
                 : {
                     r: 4,
                     fill: stroke,
-                    stroke: "#020617",
+                    stroke: "var(--color-chart-tooltip-bg)",
                     strokeWidth: 1.5,
                   }
             }

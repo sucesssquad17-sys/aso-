@@ -10936,19 +10936,19 @@ function AuthenticatedApp({
   const discoveryCardBaseClass =
     "px-3 py-3 sm:px-4 sm:py-2.5 rounded-xl text-sm flex flex-col gap-2 transition-all hover:shadow-lg hover:-translate-y-0.5";
   const rankedKeywordCardClass = isLightTheme
-    ? `${discoveryCardBaseClass} border border-sky-200/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.9),rgba(238,247,253,0.84))] text-slate-800 hover:border-sky-400/70 hover:shadow-sky-200/60`
-    : `${discoveryCardBaseClass} bg-cyan-950/40 border border-cyan-500/20 text-cyan-300 hover:shadow-cyan-500/10 hover:border-cyan-500/40`;
+    ? `${discoveryCardBaseClass} workspace-discovery-card-ranked border border-app-border bg-app-surface text-app-text hover:border-blue-200/80 hover:shadow-sm`
+    : `${discoveryCardBaseClass} border border-cyan-500/15 bg-slate-900/85 text-app-text hover:border-cyan-500/30 hover:shadow-blue-500/8`;
   const getDiscoveryTrackButtonClass = (isTracked: boolean) =>
     isLightTheme
       ? `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-white/95 px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
           isTracked
             ? "border-amber-300/80 hover:bg-amber-50 text-amber-600"
-            : "border-emerald-300/80 hover:bg-emerald-50 text-emerald-600"
+            : "border-blue-200/90 hover:bg-blue-50 text-blue-700"
         }`
       : `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-app-surface-muted/90 px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
           isTracked
             ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400"
-            : "border-emerald-500/30 hover:bg-emerald-500/20 text-emerald-400"
+            : "border-cyan-500/20 hover:bg-cyan-500/15 text-cyan-300"
         }`;
   const renderDiscoveryKeywordCard = (
     keywordItem: RankedKeyword,
@@ -10984,7 +10984,7 @@ function AuthenticatedApp({
                 alt=""
                 className={`mt-0.5 h-5 w-5 shrink-0 rounded-md shadow-sm ${
                   isLightTheme
-                    ? "border border-sky-200/80"
+                    ? "border border-app-border bg-app-surface"
                     : "border border-cyan-500/30"
                 }`}
                 referrerPolicy="no-referrer"
@@ -10998,8 +10998,8 @@ function AuthenticatedApp({
                 <span
                   className={
                     isLightTheme
-                      ? "shrink-0 rounded-md border border-emerald-200/80 bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700 sm:text-xs"
-                      : "shrink-0 rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300 sm:text-xs"
+                      ? "shrink-0 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-700 sm:text-xs"
+                      : "shrink-0 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-2 py-0.5 text-[11px] font-bold text-cyan-300 sm:text-xs"
                   }
                 >
                   #{rank}
