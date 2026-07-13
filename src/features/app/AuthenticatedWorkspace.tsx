@@ -3706,6 +3706,10 @@ function AuthenticatedApp({
   const [expandedCompetitorGroupIds, setExpandedCompetitorGroupIds] = useState<
     string[]
   >([]);
+  const [competitorWorkspaceTab, setCompetitorWorkspaceTab] = useState<
+    "build" | "saved"
+  >("build");
+  const [isTrackedControlsOpen, setIsTrackedControlsOpen] = useState(false);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
   const [notificationSettings, setNotificationSettings] =
     useState<NotificationSettings>(() =>
@@ -12535,13 +12539,49 @@ function AuthenticatedApp({
             !(visibleWorkspaceMode === "single" && selectedApp) &&
             !(visibleWorkspaceMode === "compare" && comparedApps.length > 0) &&
             !(visibleWorkspaceMode === "competitors" && competitorDraftHasAnalysis) &&
+            !(visibleWorkspaceMode === "competitors" && competitorWorkspaceTab === "saved") &&
             renderSearchSection(false)
           }          {/* Competitors Dashboard */}{" "}
           {viewMode === "competitors" && (
             <div className={isMobileViewport ? "space-y-4" : "space-y-6"} ref={competitorsExportRef}>
+              <div
+                className="workspace-view-tabs"
+                role="tablist"
+                aria-label="Competitor workspace views"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={competitorWorkspaceTab === "build"}
+                  onClick={() => setCompetitorWorkspaceTab("build")}
+                  className={cn(
+                    "workspace-view-tab",
+                    competitorWorkspaceTab === "build" && "workspace-view-tab-active",
+                  )}
+                >
+                  <Layers className="h-4 w-4" />
+                  <span>Build Group</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={competitorWorkspaceTab === "saved"}
+                  onClick={() => setCompetitorWorkspaceTab("saved")}
+                  className={cn(
+                    "workspace-view-tab",
+                    competitorWorkspaceTab === "saved" && "workspace-view-tab-active",
+                  )}
+                >
+                  <Bookmark className="h-4 w-4" />
+                  <span>Saved Groups</span>
+                  <span className="workspace-view-tab-count">
+                    {competitorDashboardCards.length}
+                  </span>
+                </button>
+              </div>
               {/* Compact Search Section for Competitors */}
-              {competitorDraftHasAnalysis && renderSearchSection(true)}
-              {competitorDraftHasAnalysis ? (
+              {competitorWorkspaceTab === "build" && competitorDraftHasAnalysis && renderSearchSection(true)}
+              {competitorWorkspaceTab === "build" && competitorDraftHasAnalysis ? (
                 <div className={`card ${isMobileViewport ? "p-2.5" : "p-5 md:p-6"}`}>
                   <div className={`flex flex-col ${isMobileViewport ? "gap-3" : "gap-5"}`}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -13008,7 +13048,7 @@ function AuthenticatedApp({
                 </div>
               ) : null}
 
-              {competitorDashboardCards.length === 0 ? (
+              {competitorWorkspaceTab === "saved" && (competitorDashboardCards.length === 0 ? (
                 <WorkspaceEmptyBlock
                   icon={Globe}
                   title="No tracked competitor groups yet"
@@ -13219,19 +13259,6 @@ function AuthenticatedApp({
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setActiveCompetitorAsoAlertGroupId(
-                                    card.group.groupId,
-                                  )
-                                }
-                                className={`competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
-                              >
-                                <Bell className="h-4 w-4" />
-                                <span className="sm:hidden">ASO</span>
-                                <span className="hidden sm:inline">ASO Alerts</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() =>
                                   toggleCompetitorGroupExpansion(
                                     card.group.groupId,
                                   )
@@ -13243,14 +13270,39 @@ function AuthenticatedApp({
                                 />
                                 {isExpanded ? "Collapse" : "Expand"}
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => removeCompetitorGroup(card.group.groupId)}
-                                className={`competitor-group-action rounded-xl border border-red-500/25 bg-red-500/10 font-semibold text-red-200 transition-colors hover:bg-red-500/20 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
-                              >
-                                <span className="sm:hidden">Remove</span>
-                                <span className="hidden sm:inline">Remove Group</span>
-                              </button>
+                              <details className="workspace-more-menu">
+                                <summary
+                                  className={`competitor-group-action inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
+                                  aria-label={`More actions for ${getCompetitorGroupLabel(card.group)}`}
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span>More</span>
+                                </summary>
+                                <div className="workspace-more-menu-popover">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setActiveCompetitorAsoAlertGroupId(
+                                        card.group.groupId,
+                                      )
+                                    }
+                                    className="workspace-more-menu-item"
+                                  >
+                                    <Bell className="h-4 w-4" />
+                                    ASO Alerts
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeCompetitorGroup(card.group.groupId)
+                                    }
+                                    className="workspace-more-menu-item workspace-more-menu-item-danger"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Remove Group
+                                  </button>
+                                </div>
+                              </details>
                             </div>
                           </div>
                         </div>
@@ -13828,26 +13880,6 @@ function AuthenticatedApp({
                                           </p>
                                         </div>
                                         <div className="competitor-keyword-actions flex flex-wrap items-center gap-2">
-                                          {keywordCardState.showEditCountries && (
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                openCompetitorTrackedKeywordCountryPicker(
-                                                  {
-                                                    groupId: keywordGroup.groupId,
-                                                    keyword: keywordGroup.keyword,
-                                                  },
-                                                )
-                                              }
-                                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted hover:text-cyan-200"
-                                              aria-label={`Edit tracked countries for ${keywordGroup.keyword}`}
-                                              title="Edit tracked countries"
-                                            >
-                                              <Globe className="h-3.5 w-3.5" />
-                                              <span className="sm:hidden">Edit</span>
-                                              <span className="hidden sm:inline">Edit Countries</span>
-                                            </button>
-                                          )}
                                           <button
                                             type="button"
                                             onClick={() =>
@@ -13910,20 +13942,47 @@ function AuthenticatedApp({
                                               {isExpanded ? "Hide Chart" : "Open Chart"}
                                             </span>
                                           </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              removeCompetitorTrackedKeywordFromGroup(
-                                                card.group.groupId,
-                                                trackedKeyword.trackedKeywordId,
-                                                trackedKeyword.keyword,
-                                                trackedKeyword.country,
-                                              )
-                                            }
-                                            className="rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-[11px] font-semibold text-red-200 transition-colors hover:bg-red-500/20"
-                                          >
-                                            Remove
-                                          </button>
+                                          <details className="workspace-more-menu">
+                                            <summary className="inline-flex min-h-[2.25rem] cursor-pointer list-none items-center justify-center gap-1.5 rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted">
+                                              <MoreHorizontal className="h-3.5 w-3.5" />
+                                              More
+                                            </summary>
+                                            <div className="workspace-more-menu-popover">
+                                              {keywordCardState.showEditCountries && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() =>
+                                                    openCompetitorTrackedKeywordCountryPicker(
+                                                      {
+                                                        groupId: keywordGroup.groupId,
+                                                        keyword: keywordGroup.keyword,
+                                                      },
+                                                    )
+                                                  }
+                                                  className="workspace-more-menu-item"
+                                                  aria-label={`Edit tracked countries for ${keywordGroup.keyword}`}
+                                                >
+                                                  <Globe className="h-4 w-4" />
+                                                  Edit Countries
+                                                </button>
+                                              )}
+                                              <button
+                                                type="button"
+                                                onClick={() =>
+                                                  removeCompetitorTrackedKeywordFromGroup(
+                                                    card.group.groupId,
+                                                    trackedKeyword.trackedKeywordId,
+                                                    trackedKeyword.keyword,
+                                                    trackedKeyword.country,
+                                                  )
+                                                }
+                                                className="workspace-more-menu-item workspace-more-menu-item-danger"
+                                              >
+                                                <Trash2 className="h-4 w-4" />
+                                                Remove
+                                              </button>
+                                            </div>
+                                          </details>
                                         </div>
                                       </div>
                                       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -14240,7 +14299,7 @@ function AuthenticatedApp({
                   })}
                 </div>
                 </div>
-              )}
+              ))}
             </div>
           )}{" "}
           {viewMode === "reports" && (
@@ -14460,7 +14519,24 @@ function AuthenticatedApp({
                             className="input-field w-full py-2 pl-9 pr-3 text-xs lg:py-2.5 lg:pl-10 lg:pr-4 lg:text-sm"
                           />
                         </div>
-                        <div className="col-span-2 sm:col-span-1 lg:col-span-1">
+                        <button
+                          type="button"
+                          onClick={() => setIsTrackedControlsOpen((previous) => !previous)}
+                          aria-expanded={isTrackedControlsOpen}
+                          className="workspace-mobile-filter-toggle col-span-2 inline-flex min-h-[2.45rem] items-center justify-between rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 text-xs font-semibold text-app-text-muted md:hidden"
+                        >
+                          Filters & actions
+                          <ChevronDown
+                            className={cn(
+                              "h-4 w-4 transition-transform",
+                              isTrackedControlsOpen && "rotate-180",
+                            )}
+                          />
+                        </button>
+                        <div className={cn(
+                          "col-span-2 sm:col-span-1 lg:col-span-1",
+                          !isTrackedControlsOpen && "hidden md:block",
+                        )}>
                           <CountrySearchSelect
                             value={trackFilterCountry}
                             onChange={setTrackFilterCountry}
@@ -14473,39 +14549,52 @@ function AuthenticatedApp({
                             className="w-full text-xs lg:text-sm"
                           />
                         </div>
-                        <select
-                          id="tracked-app-filter"
-                          name="trackedAppFilter"
-                          aria-label="Filter tracked keywords by app"
-                          value={trackFilterApp}
-                          onChange={(e) => setTrackFilterApp(e.target.value)}
-                          className="input-field py-2 w-full col-span-1 lg:col-span-1 text-xs lg:py-2.5 lg:text-sm"
-                          style={{ paddingRight: "1.5rem" }}
-                        >
-                          <option value="all">All Apps</option>
-                          {trackedAppTitles.map((title) => (
-                            <option key={title} value={title}>
-                              {title}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          id="tracked-sort"
-                          name="trackedSort"
-                          aria-label="Sort tracked keywords"
-                          value={trackSortBy}
-                          onChange={(e) => setTrackSortBy(e.target.value as any)}
-                          className="input-field py-2 w-full col-span-1 lg:col-span-1 text-xs lg:py-2.5 lg:text-sm"
-                          style={{ paddingRight: "1.5rem" }}
-                        >
-                          <option value="date_added">Newest first</option>
-                          <option value="last_checked">Recently checked</option>
-                          <option value="app">App name</option>
-                          <option value="rank_change">Biggest change</option>
-                        </select>
+                        <div className={cn(
+                          "col-span-1 lg:col-span-1",
+                          !isTrackedControlsOpen && "hidden md:block",
+                        )}>
+                          <select
+                            id="tracked-app-filter"
+                            name="trackedAppFilter"
+                            aria-label="Filter tracked keywords by app"
+                            value={trackFilterApp}
+                            onChange={(e) => setTrackFilterApp(e.target.value)}
+                            className="input-field w-full py-2 text-xs lg:py-2.5 lg:text-sm"
+                            style={{ paddingRight: "1.5rem" }}
+                          >
+                            <option value="all">All Apps</option>
+                            {trackedAppTitles.map((title) => (
+                              <option key={title} value={title}>
+                                {title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className={cn(
+                          "col-span-1 lg:col-span-1",
+                          !isTrackedControlsOpen && "hidden md:block",
+                        )}>
+                          <select
+                            id="tracked-sort"
+                            name="trackedSort"
+                            aria-label="Sort tracked keywords"
+                            value={trackSortBy}
+                            onChange={(e) => setTrackSortBy(e.target.value as any)}
+                            className="input-field w-full py-2 text-xs lg:py-2.5 lg:text-sm"
+                            style={{ paddingRight: "1.5rem" }}
+                          >
+                            <option value="date_added">Newest first</option>
+                            <option value="last_checked">Recently checked</option>
+                            <option value="app">App name</option>
+                            <option value="rank_change">Biggest change</option>
+                          </select>
+                        </div>
                       </div>
 
-                      <div className="workspace-compact-controls mt-2 flex flex-wrap items-center gap-1 lg:gap-2 lg:mt-3 text-[10px] lg:text-xs">
+                      <div className={cn(
+                        "workspace-compact-controls mt-2 flex flex-wrap items-center gap-1 text-[10px] lg:mt-3 lg:gap-2 lg:text-xs",
+                        !isTrackedControlsOpen && "hidden md:flex",
+                      )}>
                         <button
                           type="button"
                           onClick={() => setExpandedTrackedGroupIds(visibleTrackedGroupIds)}
