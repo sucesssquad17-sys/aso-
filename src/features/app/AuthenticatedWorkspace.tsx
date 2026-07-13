@@ -3710,6 +3710,11 @@ function AuthenticatedApp({
   const [competitorWorkspaceTab, setCompetitorWorkspaceTab] = useState<
     "build" | "saved"
   >("build");
+  React.useEffect(() => {
+    if (competitorGroups.length === 0) {
+      setCompetitorWorkspaceTab("build");
+    }
+  }, [competitorGroups.length]);
   const [isTrackedControlsOpen, setIsTrackedControlsOpen] = useState(false);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
   const [notificationSettings, setNotificationSettings] =
@@ -3819,6 +3824,10 @@ function AuthenticatedApp({
           failedApps: string[];
         }[]
       >)
+    | null
+  >(null);
+  const trackCompetitorDraftKeywordsRef = React.useRef<
+    | ((pendingSelection?: CompetitorDraftKeywordSelection) => Promise<void>)
     | null
   >(null);
   const isApplyingUserState = React.useRef(false);
@@ -5922,7 +5931,7 @@ function AuthenticatedApp({
       if (!normalized || byKeyword.has(normalized)) return;
       byKeyword.set(normalized, {
         keyword: battle.keyword,
-        source: "shared",
+        source: battle.leader.role === "own" ? "own_win" : "competitor_win",
         detail: `${battle.leader.appTitle} leads at #${battle.leader.rank}`,
         apps: buildCandidateApps(normalized),
       });
@@ -6036,23 +6045,16 @@ function AuthenticatedApp({
       ),
     [competitorDraftSelectedKeywords],
   );
-  const competitorDraftCanSave = Boolean(
-    competitorDraftAnalysis &&
-      competitorDraftAnalysis.appInsights.length >= 2 &&
-      competitorDraftSelectedKeywords.some(
-        (entry) => entry.selectedCountries.length > 0,
-      ),
-  );
-  const competitorDraftSaveHint = !competitorDraftOwnApp
-    ? 'Set your app first.'
+  const competitorDraftTrackingHint = !competitorDraftOwnApp
+    ? "Select your app first."
     : competitorDraftApps.length === 0
-      ? 'Add one rival app.'
+      ? "Add one competitor."
       : !competitorDraftAnalysis ||
           competitorDraftAnalysis.appInsights.length < 2
-        ? 'Analyze the group before saving it.'
+        ? "Analyze the comparison before tracking keywords."
         : competitorDraftSelectedKeywords.length === 0
-          ? 'Select at least one keyword to track.'
-          : `Ready to save ${competitorDraftSelectedKeywords.length} keyword${
+          ? "Choose Track Keyword on a result to begin."
+          : `Ready to track ${competitorDraftSelectedKeywords.length} keyword${
               competitorDraftSelectedKeywords.length === 1 ? "" : "s"
             } across ${competitorDraftSelectedCountryCount} countr${
               competitorDraftSelectedCountryCount === 1 ? "y" : "ies"
@@ -6567,14 +6569,22 @@ function AuthenticatedApp({
       return;
     }
     if (trackCountryPickerState.selectionKind === "competitor_draft") {
-      upsertCompetitorDraftKeywordSelection({
+      const pendingSelection = {
         keyword: trackCountryPickerState.keyword,
         selectedCountries: normalizedCountries,
-      });
-      setTrackCountryPickerState(null);
-      toast.success(
-        `Added "${trackCountryPickerState.keyword}" to the draft for ${normalizedCountries.length} ${normalizedCountries.length === 1 ? "country" : "countries"}. Save the group to start tracking.`,
-      );
+      } satisfies CompetitorDraftKeywordSelection;
+      const trackDraftKeywords = trackCompetitorDraftKeywordsRef.current;
+      if (!trackDraftKeywords) {
+        toast.error("Competitor tracking is not ready yet. Try again.");
+        return;
+      }
+      setIsSubmittingTrackCountries(true);
+      try {
+        await trackDraftKeywords(pendingSelection);
+      } finally {
+        setTrackCountryPickerState(null);
+        setIsSubmittingTrackCountries(false);
+      }
       return;
     }
     if (trackCountryPickerState.selectionKind === "competitor_tracked_edit") {
@@ -7589,8 +7599,8 @@ function AuthenticatedApp({
         ) || null;
       const confirmed = window.confirm(
         appToRemove
-          ? `Remove "${appToRemove.title}" from this competitor draft?`
-          : "Remove this app from the competitor draft?",
+          ? `Remove "${appToRemove.title}" from this competitor comparison?`
+          : "Remove this app from the competitor comparison?",
       );
       if (!confirmed) {
         return;
@@ -7602,23 +7612,10 @@ function AuthenticatedApp({
     },
     [clearCompetitorDraftAnalysis, competitorDraftApps, storeType],
   );
-  const addCompetitorDraftKeywords = React.useCallback((keywords: string[]) => {
-    setCompetitorDraftSelectedKeywords((prev) =>
-      normalizeCompetitorDraftKeywordSelections(
-        prev.concat(
-          keywords.map((keyword) => ({
-            keyword,
-            selectedCountries: [normalizeCountryCode(country, "us")],
-          })),
-        ),
-        country,
-      ),
-    );
-  }, [country]);
   const openCompetitorDraftKeywordCountryPicker = React.useCallback(
     (keyword: string) => {
       if (!competitorDraftOwnApp) {
-        toast.error("Set your app first.");
+        toast.error("Select your app first.");
         return;
       }
       const trimmedKeyword = keyword.trim();
@@ -7659,25 +7656,9 @@ function AuthenticatedApp({
       storeType,
     ],
   );
-  function upsertCompetitorDraftKeywordSelection(
-    selection: CompetitorDraftKeywordSelection,
-  ) {
-    setCompetitorDraftSelectedKeywords((prev) =>
-      normalizeCompetitorDraftKeywordSelections(
-        prev
-          .filter(
-            (entry) =>
-              entry.keyword.trim().toLowerCase() !==
-              selection.keyword.trim().toLowerCase(),
-          )
-          .concat(selection),
-        country,
-      ),
-    );
-  }
   const removeCompetitorDraftKeyword = React.useCallback((keyword: string) => {
     const confirmed = window.confirm(
-      `Remove "${keyword}" from this competitor draft?`,
+      `Remove "${keyword}" from the tracking selection?`,
     );
     if (!confirmed) {
       return;
@@ -8087,7 +8068,7 @@ function AuthenticatedApp({
         setCompetitorGroupError(message);
         toast.info(message);
       } else {
-        toast.success("Competitor group analysis is ready.");
+        toast.success("Competitor analysis is ready.");
       }
     } catch (err) {
       logError(err, {
@@ -8110,19 +8091,27 @@ function AuthenticatedApp({
     fetchDiscoveryForApp,
     storeType,
   ]);
-  const saveCompetitorDraftGroup = React.useCallback(async () => {
+  const trackCompetitorDraftKeywords = React.useCallback(
+    async (pendingSelection?: CompetitorDraftKeywordSelection) => {
     if (!competitorDraftOwnApp || competitorDraftApps.length === 0) {
-      toast.error("Build and analyze a competitor group first.");
+      toast.error("Choose your app and one rival before tracking a keyword.");
       return;
     }
     if (!competitorDraftAnalysis || competitorDraftAnalysis.appInsights.length < 2) {
-      toast.error("Analyze this group before saving it.");
+      toast.error("Analyze this competitor pair before tracking a keyword.");
       return;
     }
-    if (competitorDraftSelectedKeywords.length === 0) {
-      toast.error("Select at least one keyword to track for this group.");
+    const selectedKeywordEntries = normalizeCompetitorDraftKeywordSelections(
+      pendingSelection
+        ? competitorDraftSelectedKeywords.concat(pendingSelection)
+        : competitorDraftSelectedKeywords,
+      country,
+    );
+    if (selectedKeywordEntries.length === 0) {
+      toast.error("Choose at least one keyword to track.");
       return;
     }
+    setCompetitorDraftSelectedKeywords(selectedKeywordEntries);
     const groupId = createCompetitorGroupId();
     const ownApp = createCompetitorGroupAppRecord(
       competitorDraftOwnApp,
@@ -8145,7 +8134,7 @@ function AuthenticatedApp({
       mode: competitorGroupMode,
       loadedAt: nowIso,
     };
-    const selectedKeywordEntries = competitorDraftSelectedKeywords.flatMap((entry) => {
+    const trackedKeywordEntries = selectedKeywordEntries.flatMap((entry) => {
       const trimmedKeyword = entry.keyword.trim();
       if (!trimmedKeyword) return [];
       const selectedCountries = Array.from(
@@ -8161,7 +8150,7 @@ function AuthenticatedApp({
     const existingTrackedKeywords = competitorTrackedKeywords.filter(
       (record) => record.groupId === targetGroupId,
     );
-    const trackedKeywordSeeds = selectedKeywordEntries.flatMap(
+    const trackedKeywordSeeds = trackedKeywordEntries.flatMap(
       ({ keyword, selectedCountries }) =>
         selectedCountries.map((countryCode) => {
           const normalizedKeyword = keyword.toLowerCase();
@@ -8232,6 +8221,21 @@ function AuthenticatedApp({
           } satisfies CompetitorTrackedKeywordRecord;
         }),
     );
+    const newTrackedKeywordSeeds = trackedKeywordSeeds.filter(
+      (record) =>
+        !existingTrackedKeywords.some(
+          (existingRecord) =>
+            existingRecord.keyword.trim().toLowerCase() ===
+              record.keyword.trim().toLowerCase() &&
+            existingRecord.country === record.country,
+        ),
+    );
+    if (newTrackedKeywordSeeds.length === 0) {
+      setTrackCountryPickerState(null);
+      setCompetitorDraftSelectedKeywords([]);
+      toast.info("This keyword is already tracked in the selected countries.");
+      return;
+    }
     const nextGroup: CompetitorGroupRecord = {
       groupId: targetGroupId,
       store: storeType,
@@ -8310,8 +8314,8 @@ function AuthenticatedApp({
     );
     try {
       const refreshedKeywords = await refreshCompetitorTrackedKeywordBatch(
-        trackedKeywordSeeds,
-        "saveCompetitorDraftGroup_refresh",
+        newTrackedKeywordSeeds,
+        "trackCompetitorDraftKeywords_refresh",
       );
       setCompetitorTrackedKeywords((prev) =>
         mergeCompetitorTrackedKeywordCollections(
@@ -8331,23 +8335,27 @@ function AuthenticatedApp({
       resetCompetitorDraft();
       if (failedApps.length > 0) {
         toast.success(
-          `${existingGroup ? "Updated" : "Saved"} group. Some app checks failed: ${failedApps.join(", ")}.`,
+          `Tracking started. Some app checks failed: ${failedApps.join(", ")}.`,
         );
       } else {
         toast.success(
           existingGroup
-            ? "Competitor group updated with fresh keyword tracking."
-            : "Competitor group saved and keyword tracking started.",
+            ? `Keyword added to ${getCompetitorGroupLabel(nextGroup)}.`
+            : "Competitor tracking started. Your group was created automatically.",
         );
       }
     } catch (err) {
       logError(err, {
-        context: "saveCompetitorDraftGroup",
+        context: "trackCompetitorDraftKeywords",
         groupId: targetGroupId,
         store: storeType,
         country,
       });
-      toast.error("Saved the group, but failed to refresh tracked keywords.");
+      toast.error(
+        existingGroup
+          ? "The group was updated, but rank refresh failed. Try again from the tracked group."
+          : "Tracking started, but rank refresh failed. Try again from the tracked group.",
+      );
     }
   }, [
     competitorDraftAnalysis,
@@ -8367,6 +8375,7 @@ function AuthenticatedApp({
     storeType,
     trackedKeywords,
   ]);
+  trackCompetitorDraftKeywordsRef.current = trackCompetitorDraftKeywords;
   const removeCompetitorGroup = React.useCallback((groupId: string) => {
     const groupToRemove =
       competitorGroups.find((group) => group.groupId === groupId) || null;
@@ -8399,7 +8408,7 @@ function AuthenticatedApp({
     setExpandedCompetitorGroupIds((prev) =>
       prev.filter((entry) => entry !== groupId),
     );
-    toast.success("Competitor group removed.");
+    toast.success("Competitor tracking group removed.");
   }, [competitorGroups, competitorTrackedKeywords]);
   const removeCompetitorTrackedKeywordFromGroup = React.useCallback(
     (
@@ -10474,7 +10483,7 @@ function AuthenticatedApp({
         icon: Globe,
         eyebrow: "Battle Groups",
         title: "Competitor Groups",
-        description: "Build rival groups and track competitive terms in one place.",
+        description: "Discover a rival, compare keyword coverage, and track changes in one place.",
         badge:
           competitorGroupStats.groupCount > 0
             ? competitorGroupStats.groupCount
@@ -11278,14 +11287,14 @@ function AuthenticatedApp({
                     {visibleWorkspaceMode === "single"
                       ? "Find an app to analyze"
                       : visibleWorkspaceMode === "competitors"
-                        ? "Build a competitor group"
+                        ? "Discover competitors"
                         : "Search and add apps to compare"}
                   </h2>
                   <p className="workspace-search-composer-description mt-1 text-[11px] text-app-text-muted sm:text-sm">
                     {visibleWorkspaceMode === "single"
                       ? "Search by app name or paste a store URL."
                       : visibleWorkspaceMode === "competitors"
-                        ? "Pick your app and one rival, then run the group."
+                        ? "Choose your app, add a rival, and analyze keyword coverage."
                         : "Add up to five apps and compare keywords side by side."}
                   </p>
                 </div>
@@ -11399,11 +11408,11 @@ function AuthenticatedApp({
                         <div className={`rounded-xl border border-app-border/60 bg-app-surface-muted/65 ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
-                              Your App
+                              Your app
                             </p>
                             {!competitorDraftOwnApp ? (
                               <span className="text-[10px] font-semibold text-cyan-400">
-                                Required
+                                Choose first
                               </span>
                             ) : null}
                           </div>
@@ -11428,7 +11437,8 @@ function AuthenticatedApp({
                                   clearCompetitorDraftAnalysis();
                                   setCompetitorDraftOwnApp(null);
                                 }}
-                                aria-label="Remove selected app"
+                                aria-label="Change selected app"
+                                title="Change app"
                                 className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                               >
                                 <X className="h-3.5 w-3.5" />
@@ -11436,14 +11446,14 @@ function AuthenticatedApp({
                             </div>
                           ) : (
                             <p className="mt-2 text-xs text-app-text-muted">
-                              Use `Set My App` on a search result.
+                              Select your app from the results above.
                             </p>
                           )}
                         </div>
                         <div className={`rounded-xl border border-app-border/60 bg-app-surface-muted/65 ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
-                              Rival App
+                              Rival
                             </p>
                             <span className="text-[10px] font-semibold text-app-text-muted">
                               {competitorDraftApps.length}/1
@@ -11476,7 +11486,8 @@ function AuthenticatedApp({
                                         getCompareAppKey(app, storeType),
                                       )
                                     }
-                                    aria-label={`Remove ${app.title} from rival apps`}
+                                    aria-label="Change rival"
+                                    title="Change rival"
                                     className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                                   >
                                     <X className="h-3.5 w-3.5" />
@@ -11487,8 +11498,8 @@ function AuthenticatedApp({
                           ) : (
                             <p className="mt-2 text-xs text-app-text-muted">
                               {competitorDraftOwnApp
-                                ? "Use `+ Rival` on a search result."
-                                : "Select your app first."}
+                                ? "Add one competitor from the results above."
+                                : "Choose your app to find a rival."}
                             </p>
                           )}
                         </div>
@@ -11524,7 +11535,7 @@ function AuthenticatedApp({
                             ) : (
                               <RefreshCw className="w-4 h-4" />
                             )}
-                            Analyze Group
+                            Analyze
                           </button>
                           {competitorDraftStarted ? (
                             <button
@@ -11777,56 +11788,64 @@ function AuthenticatedApp({
                             </button>
                           ) : viewMode === "competitors" ? (
                             <div className="workspace-search-result-actions flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-                              <button
-                                onClick={() => void assignCompetitorDraftOwnApp(app)}
-                                disabled={isDraftOwnApp}
-                                className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
-                                style={
-                                  isDraftOwnApp
-                                    ? {
-                                        background: "rgba(16,185,129,0.1)",
-                                        border: "1px solid rgba(16,185,129,0.3)",
-                                        color: "#34d399",
-                                      }
-                                    : {
-                                        background: "rgba(34, 211, 238,0.08)",
-                                        border: "1px solid rgba(34, 211, 238,0.2)",
-                                        color: "#22d3ee",
-                                      }
-                                }
-                              >
-                                {isDraftOwnApp
-                                  ? "My App"
-                                  : "Set My App"}
-                              </button>
-                              <button
-                                onClick={() => void addCompetitorDraftApp(app)}
-                                disabled={
-                                  Boolean(
-                                    isDraftOwnApp ||
-                                      isDraftCompetitorApp ||
-                                      competitorDraftApps.length >= 1,
-                                  )
-                                }
-                                className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
-                                style={
-                                  isDraftCompetitorApp
-                                    ? {
-                                        background: "rgba(16,185,129,0.1)",
-                                        border: "1px solid rgba(16,185,129,0.3)",
-                                        color: "#34d399",
-                                      }
-                                    : {
-                                        background: "rgba(51,65,85,0.45)",
-                                        border: "1px solid rgba(100,116,139,0.28)",
-                                        color: "#cbd5e1",
-                                      }
-                                }
-                              >
-                                {isDraftCompetitorApp
-                                  ? "Added Rival"
-                                  : "+ Rival"}
-                              </button>
+                              {!competitorDraftOwnApp ? (
+                                <button
+                                  onClick={() => void assignCompetitorDraftOwnApp(app)}
+                                  disabled={isDraftOwnApp}
+                                  className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
+                                  style={
+                                    isDraftOwnApp
+                                      ? {
+                                          background: "rgba(16,185,129,0.1)",
+                                          border: "1px solid rgba(16,185,129,0.3)",
+                                          color: "#34d399",
+                                        }
+                                      : {
+                                          background: "rgba(34, 211, 238,0.08)",
+                                          border: "1px solid rgba(34, 211, 238,0.2)",
+                                          color: "#22d3ee",
+                                        }
+                                  }
+                                >
+                                  {isDraftOwnApp ? "Selected" : "Select App"}
+                                </button>
+                              ) : isDraftOwnApp ? (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
+                                  style={{
+                                    background: "rgba(16,185,129,0.1)",
+                                    border: "1px solid rgba(16,185,129,0.3)",
+                                    color: "#34d399",
+                                  }}
+                                >
+                                  Selected App
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => void addCompetitorDraftApp(app)}
+                                  disabled={
+                                    isDraftCompetitorApp || competitorDraftApps.length >= 1
+                                  }
+                                  className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
+                                  style={
+                                    isDraftCompetitorApp
+                                      ? {
+                                          background: "rgba(16,185,129,0.1)",
+                                          border: "1px solid rgba(16,185,129,0.3)",
+                                          color: "#34d399",
+                                        }
+                                      : {
+                                          background: "rgba(34, 211, 238,0.08)",
+                                          border: "1px solid rgba(34, 211, 238,0.2)",
+                                          color: "#22d3ee",
+                                        }
+                                  }
+                                >
+                                  {isDraftCompetitorApp ? "Selected" : "Add Competitor"}
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <button
@@ -12593,10 +12612,9 @@ function AuthenticatedApp({
           {visibleWorkspaceMode !== "bookmarks" &&
             visibleWorkspaceMode !== "tracked" &&
             visibleWorkspaceMode !== "reports" &&
+            visibleWorkspaceMode !== "competitors" &&
             !(visibleWorkspaceMode === "single" && selectedApp) &&
             !(visibleWorkspaceMode === "compare" && comparedApps.length > 0) &&
-            !(visibleWorkspaceMode === "competitors" && competitorDraftHasAnalysis) &&
-            !(visibleWorkspaceMode === "competitors" && competitorWorkspaceTab === "saved") &&
             renderSearchSection(false)
           }          {/* Competitors Dashboard */}{" "}
           {viewMode === "competitors" && (
@@ -12609,7 +12627,21 @@ function AuthenticatedApp({
                 <button
                   type="button"
                   role="tab"
+                  id="competitor-tab-discover"
+                  aria-controls="competitor-panel-discover"
                   aria-selected={competitorWorkspaceTab === "build"}
+                  tabIndex={competitorWorkspaceTab === "build" ? 0 : -1}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "End") {
+                      event.preventDefault();
+                      setCompetitorWorkspaceTab("saved");
+                      document.getElementById("competitor-tab-saved")?.focus();
+                    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "Home") {
+                      event.preventDefault();
+                      setCompetitorWorkspaceTab("build");
+                      event.currentTarget.focus();
+                    }
+                  }}
                   onClick={() => setCompetitorWorkspaceTab("build")}
                   className={cn(
                     "workspace-view-tab",
@@ -12617,12 +12649,25 @@ function AuthenticatedApp({
                   )}
                 >
                   <Layers className="h-4 w-4" />
-                  <span>Build Group</span>
+                  <span>Discover Competitors</span>
                 </button>
                 <button
                   type="button"
                   role="tab"
+                  id="competitor-tab-saved"
+                  aria-controls="competitor-panel-saved"
                   aria-selected={competitorWorkspaceTab === "saved"}
+                  tabIndex={competitorWorkspaceTab === "saved" ? 0 : -1}
+                  onKeyDown={(event) => {
+                    if (event.key === "ArrowLeft" || event.key === "ArrowUp" || event.key === "Home") {
+                      event.preventDefault();
+                      setCompetitorWorkspaceTab("build");
+                      document.getElementById("competitor-tab-discover")?.focus();
+                    } else if (event.key === "ArrowRight" || event.key === "ArrowDown" || event.key === "End") {
+                      event.preventDefault();
+                      setCompetitorWorkspaceTab("saved");
+                    }
+                  }}
                   onClick={() => setCompetitorWorkspaceTab("saved")}
                   className={cn(
                     "workspace-view-tab",
@@ -12636,10 +12681,25 @@ function AuthenticatedApp({
                   </span>
                 </button>
               </div>
-              {/* Compact Search Section for Competitors */}
+              {competitorWorkspaceTab === "build" && !competitorDraftHasAnalysis ? (
+                <div
+                  id="competitor-panel-discover"
+                  role="tabpanel"
+                  aria-labelledby="competitor-tab-discover"
+                  tabIndex={0}
+                >
+                  {renderSearchSection(false)}
+                </div>
+              ) : null}
               {competitorWorkspaceTab === "build" && competitorDraftHasAnalysis && renderSearchSection(true)}
               {competitorWorkspaceTab === "build" && competitorDraftHasAnalysis ? (
-                <div className={`card ${isMobileViewport ? "p-2.5" : "p-5 md:p-6"}`}>
+                <div
+                  id="competitor-panel-discover"
+                  role="tabpanel"
+                  aria-labelledby="competitor-tab-discover"
+                  tabIndex={0}
+                  className={`card ${isMobileViewport ? "p-2.5" : "p-5 md:p-6"}`}
+                >
                   <div className={`flex flex-col ${isMobileViewport ? "gap-3" : "gap-5"}`}>
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
@@ -12653,7 +12713,7 @@ function AuthenticatedApp({
                           >
                             <Layers className="w-4 h-4 text-cyan-100" />
                           </span>
-                          Group Draft
+                          Competitor Analysis
                         </h3>
                       </div>
                       <div className={`flex flex-wrap ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
@@ -12686,25 +12746,14 @@ function AuthenticatedApp({
                           ) : (
                             <RefreshCw className="w-4 h-4" />
                           )}
-                          Analyze Group
-                        </button>
-                        <button
-                          type="button"
-                          onClick={saveCompetitorDraftGroup}
-                          disabled={!competitorDraftCanSave}
-                          className={`inline-flex items-center gap-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 font-semibold text-cyan-200 transition-colors hover:bg-cyan-500/20 disabled:opacity-40 ${isMobileViewport ? "px-3 py-1.5 text-[11px]" : "px-4 py-2 text-sm"}`}
-                        >
-                          <Bookmark className="h-4 w-4" />
-                          {matchingCompetitorDraftGroup
-                            ? "Update Group"
-                            : "Save Group"}
+                          Analyze
                         </button>
                         <button
                           type="button"
                           onClick={resetCompetitorDraft}
                           className={isMobileViewport ? "btn-ghost !px-3 !py-1.5 !text-[11px]" : "btn-ghost"}
                         >
-                          Reset
+                          Start over
                         </button>
                       </div>
                     </div>
@@ -12729,7 +12778,7 @@ function AuthenticatedApp({
                         )}>
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
-                            <span className="md:hidden mr-1">Step 1:</span>Your App
+                            <span className="md:hidden mr-1">Step 1:</span>Your app
                           </p>
                           {!competitorDraftOwnApp && (
                             <span className="md:hidden text-[10px] font-semibold text-cyan-400 animate-pulse">Action required</span>
@@ -12756,6 +12805,8 @@ function AuthenticatedApp({
                                 clearCompetitorDraftAnalysis();
                                 setCompetitorDraftOwnApp(null);
                               }}
+                              aria-label="Change selected app"
+                              title="Change app"
                               className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                             >
                               <X className="h-3.5 w-3.5" />
@@ -12763,7 +12814,7 @@ function AuthenticatedApp({
                           </div>
                         ) : (
                           <p className={`${isMobileViewport ? "mt-2 text-[12px]" : "mt-3 text-sm"} text-app-text-muted`}>
-                            Search above and use "Set My App" on one result.
+                            Search above and select your app first.
                           </p>
                         )}
                       </div>
@@ -12775,7 +12826,7 @@ function AuthenticatedApp({
                         )}>
                           <div className={`flex items-center justify-between gap-3 ${isMobileViewport ? "mb-1.5" : "mb-2"}`}>
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
-                              <span className="md:hidden mr-1">Step 2:</span>Rival App
+                              <span className="md:hidden mr-1">Step 2:</span>Rival
                             </p>
                             <span className="text-xs text-app-text-muted">
                               {competitorDraftApps.length}/1
@@ -12808,6 +12859,8 @@ function AuthenticatedApp({
                                       getCompareAppKey(app, storeType),
                                     )
                                   }
+                                  aria-label="Change rival"
+                                  title="Change rival"
                                   className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
                                 >
                                   <X className="h-3.5 w-3.5" />
@@ -12889,17 +12942,17 @@ function AuthenticatedApp({
                             <div className={`flex flex-col ${isMobileViewport ? "gap-2.5" : "gap-3"} xl:flex-row xl:items-start xl:justify-between`}>
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
-                                  Track Keywords For This Group
+                                  Select Keywords to Track
                                 </p>
                                 <p className={`${isMobileViewport ? "mt-1 text-[11px] line-clamp-2" : "mt-2 text-sm"} text-app-text-muted`}>
                                   Add from keywords both apps rank for, or search
                                   any keyword and check both apps before tracking it.
                                 </p>
                                 <p className={`${isMobileViewport ? "mt-1" : "mt-2"} text-xs text-app-text-muted`}>
-                                  {competitorDraftSaveHint}
+                                  {competitorDraftTrackingHint}
                                 </p>
                                 <p className={`${isMobileViewport ? "mt-0.5 text-[10px]" : "mt-1 text-[11px]"} text-cyan-200/80`}>
-                                  Country picks stay in draft until you save or update this group.
+                                  Tracking creates or updates the matching competitor group automatically.
                                 </p>
                               </div>
                               <div className={`flex w-full max-w-xl flex-col ${isMobileViewport ? "gap-1.5" : "gap-2"} sm:flex-row`}>
@@ -12972,6 +13025,10 @@ function AuthenticatedApp({
                             <div className={`${isMobileViewport ? "mt-2.5 space-y-1.5" : "mt-5 space-y-3"}`}>
                               {competitorDraftKeywordCandidates.length > 0 ? (
                                 competitorDraftKeywordCandidates.map((candidate) => {
+                                  const trackedCountries =
+                                    competitorDraftTrackedCountryMap.get(
+                                      candidate.keyword.trim().toLowerCase(),
+                                    ) || [];
                                   const activeSelection =
                                     competitorDraftSelectedKeywords.find(
                                       (entry) =>
@@ -12994,6 +13051,21 @@ function AuthenticatedApp({
                                                 Searched
                                               </span>
                                             )}
+                                            {candidate.source === "shared" && (
+                                              <span className="rounded-full border border-sky-300 bg-sky-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-600 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-200">
+                                                Shared Keyword
+                                              </span>
+                                            )}
+                                            {candidate.source === "own_win" && (
+                                              <span className="rounded-full border border-cyan-300 bg-cyan-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-600 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-200">
+                                                Your Win
+                                              </span>
+                                            )}
+                                            {candidate.source === "competitor_win" && (
+                                              <span className="rounded-full border border-violet-300 bg-violet-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-violet-600 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200">
+                                                Competitor Win
+                                              </span>
+                                            )}
                                             {candidate.source === "gap" && (
                                               <span className="rounded-full border border-fuchsia-300 bg-fuchsia-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-fuchsia-600 dark:border-fuchsia-500/20 dark:bg-fuchsia-500/10 dark:text-fuchsia-200">
                                                 Opportunity
@@ -13005,6 +13077,11 @@ function AuthenticatedApp({
                                                 {activeSelection.selectedCountries.length === 1
                                                   ? "country"
                                                   : "countries"}
+                                              </span>
+                                            )}
+                                            {!activeSelection && trackedCountries.length > 0 && (
+                                              <span className="rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-200">
+                                                Already tracking
                                               </span>
                                             )}
                                           </div>
@@ -13022,8 +13099,10 @@ function AuthenticatedApp({
                                           className={`rounded-lg border font-semibold transition-colors ${isMobileViewport ? "px-2 py-1 text-[9px]" : "px-3 py-2 text-[11px]"} ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-app-border/70 bg-app-surface-muted/80 text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
                                         >
                                           {activeSelection
-                                            ? "Edit Countries"
-                                            : "Choose Countries"}
+                                                ? "Edit Countries"
+                                            : trackedCountries.length > 0
+                                              ? "Track in More Countries"
+                                              : "Track Keyword"}
                                         </button>
                                       </div>
                                       <div className={`grid gap-1.5 md:grid-cols-2 ${isMobileViewport ? "mt-1.5" : "mt-3"}`}>
@@ -13092,10 +13171,10 @@ function AuthenticatedApp({
                       ) : (
                         <div className="rounded-2xl border border-dashed border-app-border/60 bg-app-surface/35 px-4 py-8 text-center">
                           <p className="text-sm font-medium text-app-text-muted">
-                            Run analysis to load keyword battles for this draft.
+                            Run analysis to load keyword battles for this comparison.
                           </p>
                           <p className="mt-1 text-sm text-app-text-muted">
-                            Reports covers the broader movement history after the group is saved.
+                            Detailed movement history appears after you start tracking.
                           </p>
                         </div>
                       )}
@@ -13105,14 +13184,21 @@ function AuthenticatedApp({
                 </div>
               ) : null}
 
-              {competitorWorkspaceTab === "saved" && (competitorDashboardCards.length === 0 ? (
-                <WorkspaceEmptyBlock
-                  icon={Globe}
-                  title="No tracked competitor groups yet"
-                  description="Search for your app and one rival above, analyze the pair, then save it here."
-                />
-              ) : (
-                <div className={isMobileViewport ? "space-y-2.5" : "space-y-3"}>
+              {competitorWorkspaceTab === "saved" && (
+                <div
+                  id="competitor-panel-saved"
+                  role="tabpanel"
+                  aria-labelledby="competitor-tab-saved"
+                  tabIndex={0}
+                  className={isMobileViewport ? "space-y-2.5" : "space-y-3"}
+                >
+                  {competitorDashboardCards.length === 0 ? (
+                    <WorkspaceEmptyBlock
+                      icon={Globe}
+                      title="No tracked competitor groups yet"
+                      description="Discover your app and one rival, analyze the pair, then track a keyword to create a group here."
+                    />
+                  ) : (
                 <div className={`grid min-w-0 ${isMobileViewport ? "gap-3" : "gap-5"}`}>
                   {competitorDashboardCards.map((card) => {
                     const competitorLinePalette = [
@@ -13325,7 +13411,7 @@ function AuthenticatedApp({
                                 <ChevronDown
                                   className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                                 />
-                                {isExpanded ? "Collapse" : "Expand"}
+                                {isExpanded ? "Close Group" : "Open Group"}
                               </button>
                               <details className="workspace-more-menu">
                                 <summary
@@ -13336,6 +13422,38 @@ function AuthenticatedApp({
                                   <span>More</span>
                                 </summary>
                                 <div className="workspace-more-menu-popover">
+                                  <button
+                                    type="button"
+                                    onClick={() => void refreshCompetitorGroup(card.group)}
+                                    className="workspace-more-menu-item"
+                                  >
+                                    <RefreshCw className="h-4 w-4" />
+                                    Reanalyze
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setExpandedCompetitorGroupIds((prev) =>
+                                        prev.includes(card.group.groupId)
+                                          ? prev
+                                          : [...prev, card.group.groupId],
+                                      );
+                                      requestAnimationFrame(() => {
+                                        document
+                                          .getElementById(
+                                            `competitor-tracked-keywords-${card.group.groupId}`,
+                                          )
+                                          ?.scrollIntoView({
+                                            behavior: "smooth",
+                                            block: "start",
+                                          });
+                                      });
+                                    }}
+                                    className="workspace-more-menu-item"
+                                  >
+                                    <BookOpen className="h-4 w-4" />
+                                    Edit Tracked Keywords
+                                  </button>
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -13743,7 +13861,10 @@ function AuthenticatedApp({
                             )}
                           </div>
 
-                          <div className="competitor-group-section rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]">
+                          <div
+                            id={`competitor-tracked-keywords-${card.group.groupId}`}
+                            className="competitor-group-section rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                          >
                             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -13762,7 +13883,7 @@ function AuthenticatedApp({
                               <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                   <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
-                                    Search A Manual Keyword
+                                    Search a keyword
                                   </p>
                                   <p className="mt-1 text-xs text-app-text-muted">
                                     Check any keyword across both apps, then add countries to start tracking it in this group.
@@ -14339,8 +14460,8 @@ function AuthenticatedApp({
                               </div>
                             ) : (
                               <p className="mt-4 text-sm text-app-text-muted">
-                                Analyze a group and save at least one keyword to
-                                start persistent competitor monitoring here.
+                                Analyze the comparison, then track a keyword to
+                                start competitor monitoring here.
                               </p>
                             )}
                           </div>
@@ -14352,8 +14473,9 @@ function AuthenticatedApp({
                     );
                   })}
                 </div>
+                  )}
                 </div>
-              ))}
+              )}
             </div>
           )}{" "}
           {viewMode === "reports" && (
@@ -18258,8 +18380,8 @@ function AuthenticatedApp({
                 <span className="font-medium text-cyan-300">
                   "{trackCountryPickerState?.keyword || ""}"
                 </span>{" "}
-                in this competitor draft. Tracking starts after you save or
-                update the group.
+                . Confirm to start tracking; the matching competitor group is
+                created or updated automatically.
               </>
             ) : trackCountryPickerState?.selectionKind ===
                 "competitor_tracked_edit" ? (
@@ -18282,7 +18404,7 @@ function AuthenticatedApp({
           }
           selectedLabel={
             trackCountryPickerState?.selectionKind === "competitor_draft"
-              ? "In draft"
+              ? "Selected"
               : trackCountryPickerState?.selectionKind ===
                   "competitor_tracked_edit"
                 ? "Tracking"
@@ -18292,12 +18414,14 @@ function AuthenticatedApp({
           }
           disabledLabel={
             trackCountryPickerState?.selectionKind === "competitor_draft"
-              ? "In group"
+              ? "Already tracking"
               : "Tracked"
           }
           submitLabel={
             trackCountryPickerState?.selectionKind === "competitor_draft"
-              ? "Add To Draft"
+              ? (trackCountryPickerState?.selectedCountries.length || 0) > 1
+                ? `Track in ${trackCountryPickerState?.selectedCountries.length} Countries`
+                : "Track Keyword"
               : trackCountryPickerState?.selectionKind ===
                   "competitor_tracked_edit"
                 ? "Save Countries"

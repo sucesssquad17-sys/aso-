@@ -306,7 +306,7 @@ export interface CompetitorDraftKeywordCandidateApp {
 
 export interface CompetitorDraftKeywordCandidate {
   keyword: string;
-  source: "shared" | "search" | "gap";
+  source: "shared" | "own_win" | "competitor_win" | "search" | "gap";
   detail: string;
   apps: CompetitorDraftKeywordCandidateApp[];
 }
