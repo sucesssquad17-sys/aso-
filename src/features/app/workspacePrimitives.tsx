@@ -195,7 +195,7 @@ export function MobileBottomNav({
   return (
     <nav
       aria-label="Workspace navigation"
-      className="workspace-surface workspace-nav-surface fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-app-border dark:bg-app-surface/95 md:hidden"
+      className="workspace-surface workspace-nav-surface workspace-mobile-nav fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t pb-[env(safe-area-inset-bottom)] pt-2 md:hidden"
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
@@ -208,9 +208,7 @@ export function MobileBottomNav({
             aria-current={isActive ? "page" : undefined}
             className={cn(
               "workspace-button relative flex min-h-[48px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 transition-colors active:scale-95",
-              isActive
-                ? "text-cyan-600 dark:text-cyan-400"
-                : "text-app-text-muted hover:text-slate-900 dark:text-app-text-muted dark:hover:text-app-text",
+              isActive ? "workspace-mobile-nav-active" : "workspace-mobile-nav-inactive",
             )}
           >
             <Icon className="h-5 w-5" />
@@ -218,7 +216,7 @@ export function MobileBottomNav({
               {tab.shortLabel || tab.label}
             </span>
             {typeof tab.badge === "number" && tab.badge > 0 && (
-              <span className="workspace-badge absolute right-2 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-cyan-500 px-1 text-[9px] font-bold text-white shadow-sm">
+              <span className="workspace-badge workspace-mobile-nav-badge absolute right-2 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold">
                 {tab.badge > 99 ? "99+" : tab.badge}
               </span>
             )}
@@ -254,7 +252,7 @@ export function MobileDataCard({
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="truncate text-sm font-semibold text-slate-900 dark:text-app-text">
+            <span className="truncate text-sm font-semibold text-app-text">
               {title}
             </span>
             {badges?.map((badge, i) => (
@@ -272,13 +270,13 @@ export function MobileDataCard({
       </div>
 
       {metrics && metrics.length > 0 && (
-        <div className="workspace-muted grid grid-cols-2 gap-1.5 rounded-lg bg-slate-50 p-2 dark:bg-app-surface/50 sm:gap-3 sm:p-3">
+        <div className="workspace-muted grid grid-cols-2 gap-1.5 rounded-lg p-2 sm:gap-3 sm:p-3">
           {metrics.map((metric, i) => (
             <div key={i} className="flex flex-col gap-0.5">
               <span className="text-[10px] font-medium uppercase tracking-wider text-app-text-muted sm:text-[10px]">
                 {metric.label}
               </span>
-              <span className="text-sm font-semibold text-slate-900 dark:text-app-text sm:text-sm">
+              <span className="text-sm font-semibold text-app-text sm:text-sm">
                 {metric.value}
               </span>
             </div>

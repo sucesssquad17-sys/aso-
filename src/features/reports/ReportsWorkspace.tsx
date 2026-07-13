@@ -55,7 +55,7 @@ function PieDonutLabel({
       <tspan
         x={candidateViewBox.cx}
         y={candidateViewBox.cy}
-        fill="white"
+        fill="var(--color-chart-tooltip-text)"
         fontSize={24}
         fontWeight={700}
       >
@@ -227,7 +227,13 @@ const REPORT_MODE_OPTIONS: Array<{ key: ReportMode; label: string }> = [
   { key: "competitors", label: "Competitor Group Reports" },
 ];
 
-const REPORT_LINE_COLORS = ["#67e8f9", "#34d399", "#f59e0b", "#a78bfa", "#fb7185"];
+const REPORT_LINE_COLORS = [
+  "var(--color-brand-hover)",
+  "var(--color-success)",
+  "var(--color-warning)",
+  "var(--color-comparison)",
+  "var(--color-danger)",
+];
 
 function getPeriodStart(period: ReportPeriodKey, now = new Date()) {
   if (period === "all") return null;
@@ -372,7 +378,7 @@ function ChartTooltip({
             >
               <span
                 className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: entry.color || "#94a3b8" }}
+                style={{ backgroundColor: entry.color || "var(--color-text-tertiary)" }}
               />
               {entry.name}
             </span>
@@ -556,7 +562,7 @@ function MovementRowsList({
                 <div className="h-20 min-w-0">
                   <RankSparkline
                     data={row.history}
-                    stroke={row.delta >= 0 ? "#34d399" : "#fb7185"}
+                    stroke={row.delta >= 0 ? "var(--color-success)" : "var(--color-danger)"}
                     passive
                   />
                 </div>
@@ -1264,17 +1270,17 @@ export default function ReportsWorkspace({
         {
           label: "#1-3",
           value: trackedOverview.top3Count,
-          color: "#7c83ff",
+          color: "var(--color-comparison)",
         },
         {
           label: "#4-10",
           value: trackedOverview.range4To10Count,
-          color: "#29d3ff",
+          color: "var(--color-brand-hover)",
         },
         {
           label: "#11-50",
           value: trackedOverview.range11To50Count,
-          color: "#34b6ff",
+          color: "var(--color-brand)",
         },
       ],
     [
@@ -2087,16 +2093,16 @@ export default function ReportsWorkspace({
                 <div className="workspace-mobile-chart h-80 w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <RechartsLineChart data={myTrendData}>
-                      <CartesianGrid stroke="var(--workspace-border)" vertical={false} />
+                      <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
                       <XAxis
                         dataKey="timestamp"
-                        tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
+                        tick={{ fill: "var(--color-chart-axis)", fontSize: 12 }}
                         axisLine={false}
                         tickLine={false}
                       />
                       <YAxis
                         domain={myTrendDomain}
-                        tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
+                        tick={{ fill: "var(--color-chart-axis)", fontSize: 12 }}
                         axisLine={false}
                         tickLine={false}
                       />
@@ -2105,16 +2111,16 @@ export default function ReportsWorkspace({
                         type="monotone"
                         dataKey="averageRank"
                         name="Average rank"
-                        stroke="#22d3ee"
+                        stroke="var(--color-brand)"
                         strokeWidth={2.5}
                         dot={false}
-                        activeDot={{ r: 4, fill: "#22d3ee" }}
+                        activeDot={{ r: 4, fill: "var(--color-brand)" }}
                       />
                     </RechartsLineChart>
                   </ResponsiveContainer>
                 </div>
                 <ReportLegendRow
-                  items={[{ label: "Average rank", color: "#22d3ee" }]}
+                  items={[{ label: "Average rank", color: "var(--color-brand)" }]}
                 />
               </>
             )}
@@ -2232,7 +2238,7 @@ export default function ReportsWorkspace({
                             cy="50%"
                             innerRadius={48}
                             outerRadius={72}
-                            stroke="rgba(15,23,42,0.85)"
+                            stroke="var(--color-chart-tooltip-bg)"
                             strokeWidth={4}
                             paddingAngle={2}
                             dataKey="value"
@@ -2476,16 +2482,16 @@ export default function ReportsWorkspace({
                     <div className="workspace-mobile-chart h-80 w-full min-w-0">
                       <ResponsiveContainer width="100%" height="100%">
                         <RechartsLineChart data={competitorTrendData}>
-                          <CartesianGrid stroke="var(--workspace-border)" vertical={false} />
+                          <CartesianGrid stroke="var(--color-chart-grid)" vertical={false} />
                           <XAxis
                             dataKey="timestamp"
-                            tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
+                            tick={{ fill: "var(--color-chart-axis)", fontSize: 12 }}
                             axisLine={false}
                             tickLine={false}
                           />
                           <YAxis
                             domain={competitorTrendDomain}
-                            tick={{ fill: "var(--workspace-text-muted)", fontSize: 12 }}
+                            tick={{ fill: "var(--color-chart-axis)", fontSize: 12 }}
                             axisLine={false}
                             tickLine={false}
                           />

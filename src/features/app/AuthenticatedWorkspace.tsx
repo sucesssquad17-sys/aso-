@@ -10985,49 +10985,27 @@ function AuthenticatedApp({
       </div>
     );
   };
-  const rankingPanelStyle = isLightTheme
-    ? {
-        background:
-          "linear-gradient(180deg, rgba(255,255,255,0.88), rgba(240,247,253,0.8))",
-        borderColor: "rgba(150,180,210,0.38)",
-        boxShadow:
-          "0 18px 36px rgba(120,146,178,0.12), inset 0 1px 0 rgba(255,255,255,0.45)",
-      }
-    : {
-        background: "rgba(10,15,35,0.7)",
-        borderColor: "rgba(51,65,85,0.5)",
-      };
-  const chartSurfaceStyle = isLightTheme
-    ? {
-        background:
-          "linear-gradient(180deg, rgba(248,252,255,0.94), rgba(233,244,251,0.9))",
-        border: "1px solid rgba(150,180,210,0.34)",
-        boxShadow:
-          "inset 0 1px 0 rgba(255,255,255,0.45), 0 12px 28px rgba(120,146,178,0.1)",
-      }
-    : {
-        background: "rgba(5,10,25,0.5)",
-        border: "1px solid rgba(30,41,59,0.8)",
-      };
-  const chartTooltipStyle = isLightTheme
-    ? {
-        backgroundColor: "rgba(255,255,255,0.96)",
-        borderRadius: "12px",
-        border: "1px solid rgba(150,180,210,0.48)",
-        color: "#10233a",
-        boxShadow: "0 18px 36px rgba(120,146,178,0.18)",
-      }
-    : {
-        backgroundColor: "#0f172a",
-        borderRadius: "12px",
-        border: "1px solid #1e293b",
-        color: "#f8fafc",
-        boxShadow: "0 12px 28px rgba(2,6,23,0.45)",
-      };
-  const chartGridStroke = isLightTheme ? "#c7d7e6" : "#1e293b";
-  const chartAxisTickColor = isLightTheme ? "#61748b" : "#94a3b8";
-  const chartAxisLabelColor = isLightTheme ? "#51657e" : "#64748b";
-  const chartLegendTextColor = isLightTheme ? "#39506a" : "#cbd5e1";
+  const rankingPanelStyle = {
+    background: "var(--color-surface)",
+    borderColor: "var(--color-border)",
+    boxShadow: "var(--shadow-card)",
+  };
+  const chartSurfaceStyle = {
+    background: "var(--color-surface-muted)",
+    border: "1px solid var(--color-border)",
+    boxShadow: "var(--shadow-card)",
+  };
+  const chartTooltipStyle = {
+    backgroundColor: "var(--color-chart-tooltip-bg)",
+    borderRadius: "12px",
+    border: "1px solid var(--color-chart-tooltip-border)",
+    color: "var(--color-chart-tooltip-text)",
+    boxShadow: "var(--shadow-card)",
+  };
+  const chartGridStroke = "var(--color-chart-grid)";
+  const chartAxisTickColor = "var(--color-chart-axis)";
+  const chartAxisLabelColor = "var(--color-chart-axis)";
+  const chartLegendTextColor = "var(--color-text-secondary)";
   if (!isDemoMode && !hasLoadedBillingStatus) {
     return (
       <ErrorBoundary>
@@ -13138,9 +13116,9 @@ function AuthenticatedApp({
                 <div className={`grid min-w-0 ${isMobileViewport ? "gap-3" : "gap-5"}`}>
                   {competitorDashboardCards.map((card) => {
                     const competitorLinePalette = [
-                      "#7dd3fc",
-                      "#c4b5fd",
-                      "#6ee7b7",
+                      "var(--color-brand-hover)",
+                      "var(--color-comparison)",
+                      "var(--color-success)",
                     ];
                     const isExpanded = expandedCompetitorGroupIds.includes(
                       card.group.groupId,
@@ -14244,14 +14222,14 @@ function AuthenticatedApp({
                                                   <CartesianGrid
                                                     strokeDasharray="3 3"
                                                     vertical={false}
-                                                    stroke="rgba(148,163,184,0.08)"
+                                                    stroke={chartGridStroke}
                                                   />
                                                   <XAxis
                                                     dataKey="timestamp"
                                                     fontSize={10}
                                                     tickLine={false}
                                                     axisLine={false}
-                                                    tick={{ fill: "#64748b" }}
+                                                    tick={{ fill: chartAxisLabelColor }}
                                                   />
                                                   <YAxis
                                                     domain={[
@@ -14261,7 +14239,7 @@ function AuthenticatedApp({
                                                     fontSize={10}
                                                     tickLine={false}
                                                     axisLine={false}
-                                                    tick={{ fill: "#64748b" }}
+                                                    tick={{ fill: chartAxisLabelColor }}
                                                     width={30}
                                                     tickFormatter={(value) =>
                                                       `#${value}`
@@ -14276,11 +14254,8 @@ function AuthenticatedApp({
                                                       _value
                                                     }
                                                     contentStyle={{
-                                                      backgroundColor: "#0f172a",
+                                                      ...chartTooltipStyle,
                                                       borderRadius: "8px",
-                                                      border:
-                                                        "1px solid rgba(148,163,184,0.15)",
-                                                      color: "#f8fafc",
                                                       fontSize: "10px",
                                                     }}
                                                     formatter={(
@@ -14339,7 +14314,7 @@ function AuthenticatedApp({
                                                           activeDot={{
                                                             r: 3,
                                                             fill: color,
-                                                            stroke: "#0f172a",
+                                                            stroke: "var(--color-chart-tooltip-bg)",
                                                             strokeWidth: 1.5,
                                                           }}
                                                           connectNulls
@@ -14970,7 +14945,9 @@ function AuthenticatedApp({
                         const summaryImprovement =
                           summaryCountryView?.improvement ?? 0;
                         const summaryLineColor =
-                          summaryImprovement >= 0 ? "#10b981" : "#f43f5e";
+                          summaryImprovement >= 0
+                            ? "var(--color-success)"
+                            : "var(--color-danger)";
                         const summaryBestRank =
                           summaryValidHistory.length > 0
                             ? Math.min(
@@ -15295,8 +15272,8 @@ function AuthenticatedApp({
                                         : null;
                                     const isPositive = improvement >= 0;
                                     const lineColor = isPositive
-                                      ? "#10b981"
-                                      : "#f43f5e";
+                                      ? "var(--color-success)"
+                                      : "var(--color-danger)";
                                     return (
                                       <div
                                         key={`${group.groupId}:${trackedKeyword.country}`}
@@ -15326,7 +15303,7 @@ function AuthenticatedApp({
                                             </p>{" "}
                                             {improvement !== 0 && (
                                               <span
-                                                className={`text-[10px] font-bold flex items-center justify-end gap-0.5 mt-1 ${improvement > 0 ? "text-cyan-400" : "text-red-400"}`}
+                                                className={`text-[10px] font-bold flex items-center justify-end gap-0.5 mt-1 ${improvement > 0 ? "text-[color:var(--color-success)]" : "text-[color:var(--color-danger)]"}`}
                                               >
                                                 {" "}
                                                 {improvement > 0 ? (
@@ -16081,7 +16058,7 @@ function AuthenticatedApp({
                       ) : (
                         <div
                           className="text-lg font-semibold py-6"
-                          style={{ color: "#f87171" }}
+                          style={{ color: "var(--color-danger)" }}
                         >
                           Not in top 100
                         </div>
@@ -16089,9 +16066,7 @@ function AuthenticatedApp({
                       <div
                         className="mt-5 flex items-center justify-center gap-5 pt-4"
                         style={{
-                          borderTop: isLightTheme
-                            ? "1px solid rgba(150,180,210,0.34)"
-                            : "1px solid rgba(30,41,59,0.8)",
+                          borderTop: "1px solid var(--color-border)",
                         }}
                       >
                         {" "}
@@ -16100,7 +16075,7 @@ function AuthenticatedApp({
                           disabled={isCheckingRank}
                           className="text-sm flex items-center gap-1.5 transition-colors font-medium disabled:opacity-40"
                           style={{
-                            color: isLightTheme ? "#0f766e" : "#10b981",
+                            color: "var(--color-success)",
                           }}
                         >
                           {" "}
@@ -16189,14 +16164,14 @@ function AuthenticatedApp({
                       <span
                         className="section-header-icon"
                         style={{
-                          background: "rgba(34, 211, 238,0.1)",
-                          border: "1px solid rgba(34, 211, 238,0.2)",
+                          background: "var(--color-brand-soft)",
+                          border: "1px solid var(--color-brand-border)",
                         }}
                       >
                         {" "}
                         <BarChart3
                           className="w-4 h-4"
-                          style={{ color: "#22d3ee" }}
+                          style={{ color: "var(--color-brand)" }}
                         />{" "}
                       </span>{" "}
                       Keyword Metrics Density{" "}
@@ -16234,9 +16209,7 @@ function AuthenticatedApp({
                           />{" "}
                           <Tooltip
                             cursor={{
-                              fill: isLightTheme
-                                ? "rgba(186,230,253,0.28)"
-                                : "#1e293b",
+                              fill: "var(--color-brand-soft)",
                             }}
                             contentStyle={chartTooltipStyle}
                           />{" "}
@@ -16251,19 +16224,19 @@ function AuthenticatedApp({
                           <Bar
                             dataKey="demand"
                             name="Estimated Volume"
-                            fill="#0ea5e9"
+                            fill="var(--color-brand)"
                             radius={[6, 6, 0, 0]}
                           />{" "}
                           <Bar
                             dataKey="difficulty"
                             name="Estimated Difficulty"
-                            fill="#f59e0b"
+                            fill="var(--color-warning)"
                             radius={[6, 6, 0, 0]}
                           />{" "}
                           <Bar
                             dataKey="relevance"
                             name="Estimated Relevance"
-                            fill="#8b5cf6"
+                            fill="var(--color-comparison)"
                             radius={[6, 6, 0, 0]}
                           />{" "}
                         </BarChart>{" "}
@@ -16288,14 +16261,14 @@ function AuthenticatedApp({
                       <span
                         className="section-header-icon"
                         style={{
-                          background: "rgba(34, 211, 238,0.1)",
-                          border: "1px solid rgba(34, 211, 238,0.2)",
+                          background: "var(--color-brand-soft)",
+                          border: "1px solid var(--color-brand-border)",
                         }}
                       >
                         {" "}
                         <TrendingUp
                           className="w-4 h-4"
-                          style={{ color: "#22d3ee" }}
+                          style={{ color: "var(--color-brand)" }}
                         />{" "}
                       </span>{" "}
                       Estimated Keyword Profile{" "}
@@ -16354,8 +16327,8 @@ function AuthenticatedApp({
                           <Radar
                             name={autoRankings[0]?.keyword || "Keyword"}
                             dataKey="value"
-                            stroke="#22d3ee"
-                            fill="#22d3ee"
+                            stroke="var(--color-brand)"
+                            fill="var(--color-brand)"
                             fillOpacity={0.5}
                           />{" "}
                           <Tooltip
@@ -16381,14 +16354,14 @@ function AuthenticatedApp({
                       <span
                         className="section-header-icon"
                         style={{
-                          background: "rgba(16,185,129,0.1)",
-                          border: "1px solid rgba(16,185,129,0.2)",
+                          background: "var(--color-success-soft)",
+                          border: "1px solid var(--color-success-border)",
                         }}
                       >
                         {" "}
                         <Search
                           className="w-4 h-4"
-                          style={{ color: "#10b981" }}
+                          style={{ color: "var(--color-success)" }}
                         />{" "}
                       </span>{" "}
                       Opportunity Matrix{" "}
@@ -16451,11 +16424,11 @@ function AuthenticatedApp({
                             cursor={{ strokeDasharray: "3 3" }}
                             contentStyle={chartTooltipStyle}
                             labelStyle={{
-                              color: isLightTheme ? "#10233a" : "#f8fafc",
+                              color: "var(--color-chart-tooltip-text)",
                               fontWeight: 700,
                             }}
                             itemStyle={{
-                              color: isLightTheme ? "#39506a" : "#e2e8f0",
+                              color: "var(--color-text-secondary)",
                             }}
                             formatter={(value, name) => [value, name]}
                           />{" "}
@@ -16468,10 +16441,10 @@ function AuthenticatedApp({
                               relevance: r.relevance || 0,
                               fill:
                                 r.rank <= 10
-                                  ? "#10b981"
+                                  ? "var(--color-success)"
                                   : r.rank <= 50
-                                    ? "#f59e0b"
-                                    : "#334155",
+                                    ? "var(--color-warning)"
+                                    : "var(--color-text-tertiary)",
                             }))}
                           >
                             {" "}
@@ -16480,12 +16453,10 @@ function AuthenticatedApp({
                                 key={`cell-${index}`}
                                 fill={
                                   entry.rank <= 10
-                                    ? "#10b981"
+                                    ? "var(--color-success)"
                                     : entry.rank <= 50
-                                      ? "#f59e0b"
-                                      : isLightTheme
-                                        ? "#7b8ea5"
-                                        : "#64748b"
+                                      ? "var(--color-warning)"
+                                      : "var(--color-text-tertiary)"
                                 }
                               />
                             ))}{" "}
@@ -16510,14 +16481,14 @@ function AuthenticatedApp({
                       <span
                         className="section-header-icon"
                         style={{
-                          background: "rgba(34, 211, 238,0.1)",
-                          border: "1px solid rgba(34, 211, 238,0.2)",
+                          background: "var(--color-brand-soft)",
+                          border: "1px solid var(--color-brand-border)",
                         }}
                       >
                         {" "}
                         <Layers
                           className="w-4 h-4"
-                          style={{ color: "#22d3ee" }}
+                          style={{ color: "var(--color-brand)" }}
                         />{" "}
                       </span>{" "}
                       Rank Distribution{" "}
@@ -16563,20 +16534,20 @@ function AuthenticatedApp({
                                 name: "Top 10",
                                 value: autoRankings.filter((r) => r.rank <= 10)
                                   .length,
-                                color: "#10b981",
+                                color: "var(--color-success)",
                               },
                               {
                                 name: "Top 11-30",
                                 value: autoRankings.filter(
                                   (r) => r.rank > 10 && r.rank <= 30,
                                 ).length,
-                                color: "#f59e0b",
+                                color: "var(--color-warning)",
                               },
                               {
                                 name: "Top 31-100",
                                 value: autoRankings.filter((r) => r.rank > 30)
                                   .length,
-                                color: "#ef4444",
+                                color: "var(--color-danger)",
                               },
                             ]
                               .filter((d) => d.value > 0)
@@ -17181,7 +17152,7 @@ function AuthenticatedApp({
                           {" "}
                           <BarChart3
                             className="w-4 h-4"
-                            style={{ color: "#22d3ee" }}
+                            style={{ color: "var(--color-brand)" }}
                           />{" "}
                         </span>{" "}
                         Search Footprint Snapshot{" "}
@@ -17274,19 +17245,19 @@ function AuthenticatedApp({
                             <Bar
                               dataKey="top10"
                               name="Top 10"
-                              fill="#10b981"
+                              fill="var(--color-success)"
                               radius={[6, 6, 0, 0]}
                             />{" "}
                             <Bar
                               dataKey="top30"
                               name="Top 30"
-                              fill="#f59e0b"
+                              fill="var(--color-warning)"
                               radius={[6, 6, 0, 0]}
                             />{" "}
                             <Bar
                               dataKey="top100"
                               name="Top 100"
-                              fill="#6366f1"
+                              fill="var(--color-comparison)"
                               radius={[6, 6, 0, 0]}
                             />{" "}
                           </BarChart>{" "}
@@ -17388,12 +17359,12 @@ function AuthenticatedApp({
                         <span
                           className="section-header-icon"
                           style={{
-                            background: "rgba(16,185,129,0.1)",
-                            border: "1px solid rgba(16,185,129,0.2)",
+                            background: "var(--color-success-soft)",
+                            border: "1px solid var(--color-success-border)",
                           }}
                         >
                           {" "}
-                          <Globe className="w-4 h-4 text-cyan-400" />{" "}
+                          <Globe className="w-4 h-4 text-[color:var(--color-success)]" />{" "}
                         </span>{" "}
                         Highest-Value Gaps{" "}
                       </h3>{" "}
@@ -17456,14 +17427,14 @@ function AuthenticatedApp({
                         <span
                           className="section-header-icon"
                           style={{
-                            background: "rgba(34, 211, 238,0.1)",
-                            border: "1px solid rgba(34, 211, 238,0.2)",
+                            background: "var(--color-brand-soft)",
+                            border: "1px solid var(--color-brand-border)",
                           }}
                         >
                           {" "}
                           <Layers
                             className="w-4 h-4"
-                            style={{ color: "#22d3ee" }}
+                            style={{ color: "var(--color-brand)" }}
                           />{" "}
                         </span>{" "}
                         Contested Keywords{" "}
@@ -17541,7 +17512,7 @@ function AuthenticatedApp({
                           {" "}
                           <Search
                             className="w-4 h-4"
-                            style={{ color: "#10b981" }}
+                            style={{ color: "var(--color-success)" }}
                           />{" "}
                         </span>{" "}
                         Gap Opportunities{" "}

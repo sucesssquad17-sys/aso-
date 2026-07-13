@@ -134,27 +134,27 @@ function UsageBar({
   const isAt = pct >= 100;
 
   const textColor = isAt
-    ? "text-red-600 dark:text-red-400"
+    ? "workspace-usage-danger"
     : isNear
-      ? "text-amber-600 dark:text-amber-400"
-      : "text-blue-600 dark:text-blue-400";
+      ? "workspace-usage-warning"
+      : "workspace-usage-brand";
       
   const barColor = isAt
-    ? "bg-red-500"
+    ? "workspace-usage-bar-danger"
     : isNear
-      ? "bg-amber-400"
-      : "bg-blue-600";
+      ? "workspace-usage-bar-warning"
+      : "workspace-usage-bar-brand";
 
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between gap-3 sm:mb-2">
-        <span className="text-xs font-medium text-slate-600 dark:text-app-text-muted sm:text-[13px]">{label}</span>
+        <span className="text-xs font-medium text-app-text-muted sm:text-[13px]">{label}</span>
         <span className={`text-xs font-bold tabular-nums tracking-wide sm:text-[13px] ${textColor}`}>
           {used} / {total === null ? "∞" : total}
         </span>
       </div>
       {total !== null && (
-        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-app-surface-strong">
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--color-surface-muted)]">
           <div
             className={`h-1.5 rounded-full transition-all duration-700 ${barColor}`}
             style={{ width: `${pct}%` }}
@@ -269,13 +269,13 @@ export function UpgradePage({
       !isDowngrade;
 
     const highlightCta =
-      "inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3.5 sm:py-3 text-sm font-bold text-white shadow-sm transition-all hover:bg-blue-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+      "workspace-billing-cta-primary inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 sm:py-3 text-sm font-bold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
     
     const normalCta =
-      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-200 dark:border-blue-900 bg-transparent px-4 py-3.5 sm:py-3 text-sm font-bold text-blue-600 dark:text-blue-400 transition-all hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-800 dark:hover:bg-blue-950/30 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+      "workspace-billing-cta-secondary inline-flex w-full items-center justify-center gap-2 rounded-xl border bg-transparent px-4 py-3.5 sm:py-3 text-sm font-bold transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
     
     const currentCta =
-      "inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-600 bg-transparent px-4 py-3.5 sm:py-3 text-sm font-bold text-blue-600 dark:text-blue-400 cursor-default";
+      "workspace-billing-cta-current inline-flex w-full items-center justify-center gap-2 rounded-xl border bg-transparent px-4 py-3.5 sm:py-3 text-sm font-bold cursor-default";
 
     if (isPendingPlan && isPendingActivation) {
       return (
@@ -344,11 +344,11 @@ export function UpgradePage({
   };
 
   return (
-    <div className="workspace-upgrade-shell relative min-h-screen w-full bg-[#fafcff] dark:bg-app-surface">
+    <div className="workspace-upgrade-shell relative min-h-screen w-full">
       {/* ── Decorative Background ────────────────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-[8%] top-0 h-[420px] w-[420px] rounded-full bg-gradient-to-br from-blue-100/40 to-transparent opacity-45 blur-2xl dark:from-blue-900/15" />
-        <div className="absolute -right-[4%] top-[5%] h-[500px] w-[500px] rounded-full bg-gradient-to-bl from-blue-50/45 to-transparent opacity-55 blur-2xl dark:from-blue-900/8" />
+        <div className="workspace-upgrade-orb absolute -left-[8%] top-0 h-[420px] w-[420px] rounded-full opacity-45 blur-2xl" />
+        <div className="workspace-upgrade-orb absolute -right-[4%] top-[5%] h-[500px] w-[500px] rounded-full opacity-55 blur-2xl" />
         <div className="absolute left-0 top-0 h-[500px] w-full" style={{ backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
       </div>
 
@@ -364,7 +364,7 @@ export function UpgradePage({
               Back to workspace
             </button>
           ) : (
-            <div className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 shadow-sm dark:border-blue-900/50 dark:bg-blue-950/40 dark:text-blue-300">
+            <div className="workspace-billing-pending-pill inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm">
               <Lock className="h-3.5 w-3.5" />
               {isActivating ? "Trial activation pending" : "Plan selection required"}
             </div>
@@ -378,7 +378,7 @@ export function UpgradePage({
         </div>
         <div className="flex items-center gap-1.5 sm:gap-2">
           {billingStatus?.environment === "test" && (
-            <span className="rounded-md bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-600 shadow-sm border border-amber-200/50 dark:bg-amber-900/20 dark:border-amber-800/50 dark:text-amber-500">
+            <span className="workspace-billing-test-mode rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider shadow-sm">
               Test mode
             </span>
           )}
@@ -411,14 +411,14 @@ export function UpgradePage({
       <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-20 pt-5 sm:px-6 sm:pb-24 sm:pt-8 md:px-10">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
         <div className="mb-6 text-center sm:mb-10">
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/60 bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-[10px]">
+          <div className="workspace-billing-brand-pill inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest shadow-sm sm:gap-2 sm:px-4 sm:py-1.5 sm:text-[10px]">
             <Sparkles className="h-3 w-3" />
             Upgrade your workspace
           </div>
           <h1 className="mt-4 text-[2.1rem] font-black leading-[1.05] tracking-tight text-slate-900 dark:text-app-text sm:mt-6 sm:text-[3.15rem]">
             Pick the depth that fits
             <br />
-            <span className="mt-2 inline-block text-blue-600 dark:text-blue-500">
+            <span className="workspace-billing-brand-text mt-2 inline-block text-[color:var(--color-brand-hover)]">
               your portfolio.
             </span>
           </h1>
@@ -456,7 +456,7 @@ export function UpgradePage({
                   We&apos;re waiting for billing to activate your workspace access.
                 </p>
                 {pendingPlan ? (
-                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-600 dark:bg-app-surface-strong dark:text-app-text-muted">
+                  <div className="workspace-billing-neutral-pill inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold">
                     <CreditCard className="h-3.5 w-3.5" />
                     {pendingPlan.name}
                     {billingStatus?.pendingInterval
@@ -465,13 +465,13 @@ export function UpgradePage({
                   </div>
                 ) : null}
                 {activationTimedOut ? (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+                  <div className="workspace-billing-warning-panel rounded-xl border p-3 text-left text-xs">
                     Activation is taking longer than expected. Retry the status check or choose a plan again.
                     <div className="mt-3">
                       <button
                         type="button"
                         onClick={onRetryBillingStatus}
-                        className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 font-semibold text-amber-700 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-app-surface-muted dark:text-amber-300 dark:hover:bg-amber-950/40"
+                        className="workspace-billing-warning-action inline-flex items-center gap-2 rounded-lg border px-3 py-2 font-semibold transition-colors"
                       >
                         Refresh billing status
                       </button>
@@ -487,10 +487,10 @@ export function UpgradePage({
               <div
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${
                   isPremium
-                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400"
+                    ? "workspace-billing-status-success"
                     : isActivating
-                      ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                    : "bg-[#e0f2fe] text-[#0284c7] dark:bg-blue-900/30 dark:text-blue-400"
+                      ? "workspace-billing-status-warning"
+                    : "workspace-billing-status-brand"
                 }`}
               >
                 <Check className="h-3 w-3" />
@@ -511,8 +511,8 @@ export function UpgradePage({
             <div className="flex-1" />
 
             {(billingError || !billingConnected) && (
-              <div className="mt-4 flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-app-border dark:bg-app-surface-muted/50 sm:mt-6 sm:p-4">
-                <Headphones className="h-5 w-5 shrink-0 text-blue-500" />
+              <div className="mt-4 flex items-center gap-3 rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] p-3 sm:mt-6 sm:p-4">
+                <Headphones className="h-5 w-5 shrink-0 text-[color:var(--color-brand)]" />
                 <p className="text-xs font-medium leading-relaxed text-slate-600 dark:text-app-text-muted">
                   {isLoading
                     ? "Refreshing billing…"
@@ -561,8 +561,8 @@ export function UpgradePage({
                   </p>
                 </div>
                 {selectedCapacityPlan ? (
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-left shadow-sm dark:border-blue-900/50 dark:bg-blue-950/30 sm:px-4 sm:py-3">
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-300">
+                  <div className="workspace-billing-capacity-preview rounded-2xl border px-3 py-2.5 text-left shadow-sm sm:px-4 sm:py-3">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-[color:var(--color-brand-hover)]">
                       Selected plan
                     </p>
                     <p className="mt-1 text-sm font-bold text-slate-900 dark:text-app-text">
@@ -579,7 +579,7 @@ export function UpgradePage({
 
               <div className="mt-4 sm:mt-6">
                 <div className="mb-3 flex items-center gap-2">
-                  <div className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600 dark:border-blue-900/50 dark:bg-blue-950/30 dark:text-blue-300">
+                  <div className="workspace-billing-brand-icon inline-flex h-6 w-6 items-center justify-center rounded-full border">
                     <ArrowRight className="h-3.5 w-3.5" />
                   </div>
                   <p className="text-[11px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
@@ -601,8 +601,8 @@ export function UpgradePage({
                         onClick={() => setSelectedCapacityPlanId(plan.id)}
                           className={`rounded-2xl border px-3 py-2.5 text-left transition-all sm:px-4 sm:py-3 ${
                           isActive
-                            ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-500/15"
-                            : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50/60 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text dark:hover:border-blue-700 dark:hover:bg-app-surface-strong"
+                            ? "workspace-billing-capacity-selected"
+                            : "workspace-billing-capacity-option"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -611,7 +611,7 @@ export function UpgradePage({
                             <p
                               className={`mt-1 text-xs ${
                                 isActive
-                                  ? "text-blue-100"
+                                  ? "text-[color:var(--color-canvas)]/75"
                                   : "text-app-text-muted dark:text-app-text-muted"
                               }`}
                             >
@@ -623,12 +623,12 @@ export function UpgradePage({
                           <div
                             className={`mt-0.5 h-4 w-4 rounded-full border ${
                               isActive
-                                ? "border-white bg-white"
-                                : "border-slate-300 dark:border-app-border"
+                                ? "border-[color:var(--color-canvas)] bg-[color:var(--color-canvas)]"
+                                : "border-[color:var(--color-border)]"
                             }`}
                           >
                             {isActive ? (
-                              <div className="mx-auto mt-[3px] h-2 w-2 rounded-full bg-blue-600" />
+                              <div className="mx-auto mt-[3px] h-2 w-2 rounded-full bg-[color:var(--color-brand)]" />
                             ) : null}
                           </div>
                         </div>
@@ -693,13 +693,13 @@ export function UpgradePage({
         </div>
 
         {/* ── Everything included ───────────────────────────────────────── */}
-        <div className="workspace-panel relative mb-8 overflow-hidden !border-slate-200/60 bg-slate-50/50 dark:bg-app-surface-muted/50 sm:mb-12">
+        <div className="workspace-panel relative mb-8 overflow-hidden border-[color:var(--color-border)] bg-[color:var(--color-surface-muted)] sm:mb-12">
           {/* Subtle gradient background inside */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#f0f7ff] to-transparent dark:from-blue-950/20" />
+          <div className="workspace-billing-section-glow pointer-events-none absolute inset-0" />
           
           <div className="relative z-10">
             <div className="mb-6 flex flex-col items-center text-center sm:mb-10">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-200/60 bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400 sm:px-4 sm:py-1.5 sm:text-[10px]">
+              <div className="workspace-billing-brand-pill inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest shadow-sm sm:px-4 sm:py-1.5 sm:text-[10px]">
                 Every plan includes
               </div>
               <h2 className="mt-3 text-[1.6rem] font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-5 md:text-[2rem]">
@@ -715,7 +715,7 @@ export function UpgradePage({
                 const Icon = FEATURE_ICONS[cap.label] || CheckCircle2;
                 return (
                   <div key={cap.label} className="flex items-start gap-3 sm:gap-4">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200/60 bg-white text-blue-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-blue-400 sm:h-10 sm:w-10 sm:rounded-[14px]">
+                    <div className="workspace-billing-feature-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-sm sm:h-10 sm:w-10 sm:rounded-[14px]">
                       <Icon className="h-4 w-4" />
                     </div>
                     <div>
@@ -731,7 +731,7 @@ export function UpgradePage({
 
         {/* ── Pricing Cards ────────────────────────────────────────────────── */}
         <div className="mb-6 flex justify-center sm:mb-8">
-          <div className="inline-flex items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm dark:border-app-border dark:bg-app-surface-muted">
+          <div className="workspace-billing-interval-switcher inline-flex items-center rounded-full border p-1 shadow-sm">
             {allIntervals.map((interval) => {
               const isActive = selectedInterval === interval;
               return (
@@ -741,8 +741,8 @@ export function UpgradePage({
                   onClick={() => setSelectedInterval(interval)}
                   className={`rounded-full px-4 py-2 text-xs font-semibold transition-colors sm:px-5 sm:py-2.5 sm:text-sm ${
                     isActive
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-600 hover:text-slate-900 dark:text-app-text-muted dark:hover:text-white"
+                      ? "workspace-billing-interval-active"
+                      : "text-app-text-muted hover:text-app-text"
                   }`}
                 >
                   {formatIntervalLabel(interval)}
@@ -765,14 +765,14 @@ export function UpgradePage({
                 key={plan.id}
                 className={`workspace-panel relative h-full transition-all ${
                   isHighlight
-                    ? "border-2 border-blue-600 px-4 pb-4 pt-8 shadow-xl shadow-blue-500/10 z-10 sm:px-6 sm:pb-6 sm:pt-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
-                    : "!border !border-slate-200 dark:!border-app-border hover:shadow-md"
+                    ? "workspace-billing-plan-highlight border-2 px-4 pb-4 pt-8 z-10 sm:px-6 sm:pb-6 sm:pt-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
+                    : "workspace-billing-plan-normal !border hover:shadow-md"
                 }`}
               >
                 {/* Popular banner */}
                 {isHighlight && (
-                    <div className="absolute inset-x-0 top-0 flex h-[22px] items-center justify-center rounded-t-[18px] bg-blue-600 sm:h-[26px]">
-                    <span className="text-[9px] font-bold uppercase tracking-widest text-app-text">Popular</span>
+                    <div className="workspace-billing-plan-banner absolute inset-x-0 top-0 flex h-[22px] items-center justify-center rounded-t-[18px] sm:h-[26px]">
+                    <span className="text-[9px] font-bold uppercase tracking-widest">Popular</span>
                   </div>
                 )}
 
@@ -781,13 +781,13 @@ export function UpgradePage({
                   <div
                     className={`flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl border ${
                       isHighlight
-                        ? "border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-400"
-                        : "border-slate-100 bg-slate-50 text-blue-600 dark:border-app-border/80 dark:bg-app-surface-strong/50 dark:text-blue-400"
+                        ? "workspace-billing-plan-icon-highlight"
+                        : "workspace-billing-plan-icon"
                     }`}
                   >
                     <PlanIcon className="h-4 w-4" />
                   </div>
-                  <div className={`text-base font-bold ${isHighlight ? "text-slate-900 dark:text-white" : "text-slate-900 dark:text-white"}`}>
+                  <div className="text-base font-bold text-app-text">
                     {plan.name}
                   </div>
                 </div>
@@ -814,17 +814,17 @@ export function UpgradePage({
                 </p>
 
                 {/* Divider */}
-                <div className="my-4 h-px w-full bg-slate-100 dark:bg-app-surface-strong sm:my-5" />
+                <div className="my-4 h-px w-full bg-[color:var(--color-border)] sm:my-5" />
 
                 {/* Features */}
                 <div className="flex-1 space-y-2.5 sm:space-y-3.5">
                   {featureLines.map((line) => (
                     <div
                       key={line}
-                      className="flex items-start gap-2.5 text-[11px] font-medium text-slate-700 dark:text-app-text-muted sm:gap-3 sm:text-[12px]"
+                      className="flex items-start gap-2.5 text-[11px] font-medium text-app-text-muted sm:gap-3 sm:text-[12px]"
                     >
                       <Check
-                        className="mt-0.5 h-[14px] w-[14px] shrink-0 text-blue-600 dark:text-blue-400"
+                        className="mt-0.5 h-[14px] w-[14px] shrink-0 text-[color:var(--color-brand-hover)]"
                         strokeWidth={2.5}
                       />
                       <span className="leading-snug">{line}</span>
