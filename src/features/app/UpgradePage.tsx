@@ -216,6 +216,7 @@ export function UpgradePage({
   const isPendingActivation =
     isActivating && Boolean(pendingPlan) && isPollingActivation && !activationTimedOut;
   const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
+  const prioritizePlanAction = isSelectionRequired || isActivating;
   const signedInAccount = currentUserEmail || currentUserLabel;
   const capacityPreviewPlans = PUBLIC_BILLING_PLANS;
   const [selectedCapacityPlanId, setSelectedCapacityPlanId] =
@@ -343,11 +344,11 @@ export function UpgradePage({
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[#fafcff] dark:bg-app-surface">
+    <div className="workspace-upgrade-shell relative min-h-screen w-full bg-[#fafcff] dark:bg-app-surface">
       {/* ── Decorative Background ────────────────────────────────────────── */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-[10%] top-0 h-[600px] w-[600px] rounded-full bg-gradient-to-br from-blue-100/50 to-transparent opacity-60 blur-3xl dark:from-blue-900/20" />
-        <div className="absolute -right-[5%] top-[5%] h-[700px] w-[700px] rounded-full bg-gradient-to-bl from-blue-50/60 to-transparent opacity-80 blur-3xl dark:from-blue-900/10" />
+        <div className="absolute -left-[8%] top-0 h-[420px] w-[420px] rounded-full bg-gradient-to-br from-blue-100/40 to-transparent opacity-45 blur-2xl dark:from-blue-900/15" />
+        <div className="absolute -right-[4%] top-[5%] h-[500px] w-[500px] rounded-full bg-gradient-to-bl from-blue-50/45 to-transparent opacity-55 blur-2xl dark:from-blue-900/8" />
         <div className="absolute left-0 top-0 h-[500px] w-full" style={{ backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
       </div>
 
@@ -407,21 +408,21 @@ export function UpgradePage({
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-20 pt-8 sm:px-6 sm:pb-24 sm:pt-16 md:px-10">
+      <div className="relative z-10 mx-auto max-w-[1280px] px-4 pb-20 pt-5 sm:px-6 sm:pb-24 sm:pt-8 md:px-10">
         {/* ── Hero ──────────────────────────────────────────────────────── */}
-        <div className="mb-8 text-center sm:mb-14">
+        <div className="mb-6 text-center sm:mb-10">
           <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200/60 bg-white px-3 py-1 text-[9px] font-bold uppercase tracking-widest text-blue-600 shadow-sm dark:border-blue-900/60 dark:bg-app-surface-muted dark:text-blue-400 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-[10px]">
             <Sparkles className="h-3 w-3" />
             Upgrade your workspace
           </div>
-          <h1 className="mt-4 text-[2.1rem] font-black leading-[1.05] tracking-tight text-slate-900 dark:text-app-text sm:mt-8 sm:text-[3.5rem]">
+          <h1 className="mt-4 text-[2.1rem] font-black leading-[1.05] tracking-tight text-slate-900 dark:text-app-text sm:mt-6 sm:text-[3.15rem]">
             Pick the depth that fits
             <br />
             <span className="mt-2 inline-block text-blue-600 dark:text-blue-500">
               your portfolio.
             </span>
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-8 sm:text-base">
+          <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-5 sm:text-base">
             Every plan includes all features. Only tracked apps, competitor groups, and keyword capacity scale per tier.
           </p>
         </div>
@@ -430,7 +431,7 @@ export function UpgradePage({
 
         <div className="mb-8 flex flex-col gap-4 sm:mb-12 sm:grid sm:grid-cols-2 sm:gap-6 lg:grid-cols-3">
           {/* Plan card */}
-          <div className="workspace-panel order-2 sm:order-1">
+          <div className={`workspace-panel ${prioritizePlanAction ? "order-1" : "order-2"} sm:order-1`}>
             <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
               Your membership
             </p>
@@ -523,7 +524,7 @@ export function UpgradePage({
 
           {/* Usage bars */}
           {accessState === "active" && billingStatus?.usage && billingStatus?.planLimits ? (
-            <div className="workspace-panel order-1 sm:order-2 sm:col-span-1 lg:col-span-2">
+            <div className={`workspace-panel ${prioritizePlanAction ? "order-2" : "order-1"} sm:order-2 sm:col-span-1 lg:col-span-2`}>
               <p className="mb-4 text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted sm:mb-6">
                 Capacity usage
               </p>

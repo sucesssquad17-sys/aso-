@@ -3593,6 +3593,7 @@ function AuthenticatedApp({
     failedLookups?: number;
   }>({});
   const [discoveryMode, setDiscoveryMode] = useState<DiscoveryMode>("fast");
+  const [isAdvancedInsightsOpen, setIsAdvancedInsightsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<WorkspaceViewMode | "charts">(
     "single",
   );
@@ -3881,6 +3882,7 @@ function AuthenticatedApp({
   );
   const singleExportRef = React.useRef<HTMLDivElement>(null);
   const compareExportRef = React.useRef<HTMLDivElement>(null);
+  const compareSearchRef = React.useRef<HTMLDivElement>(null);
   const trackedExportRef = React.useRef<HTMLDivElement>(null);
   const competitorsExportRef = React.useRef<HTMLDivElement>(null);
   const reportsExportRef = React.useRef<HTMLDivElement>(null);
@@ -11215,6 +11217,81 @@ function AuthenticatedApp({
 
   const renderSearchSection = (isCompact = false) => (
     <WorkspacePanel className={`workspace-search-panel workspace-toolbar-panel ${isCompact ? (isMobileViewport ? "mb-4 p-2.5" : "mb-6 p-3") : isMobileViewport ? "mb-5" : "mb-8"}`} tone={isCompact ? "muted" : "strong"}>
+      {isCompact && visibleWorkspaceMode === "single" && selectedApp ? (
+        <div className="workspace-selected-app-controls flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <img
+              src={selectedApp.icon}
+              alt=""
+              className="h-9 w-9 shrink-0 rounded-xl border border-app-border/60 object-cover"
+            />
+            <div className="min-w-0">
+              <p className="workspace-chip-label">Selected app</p>
+              <p className="truncate text-sm font-semibold text-app-text">
+                {selectedApp.title}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <div className="workspace-store-toggle shrink-0">
+              <button
+                type="button"
+                onClick={() => handleStoreTypeChange("android")}
+                aria-label="Use Google Play"
+                className={cn(
+                  "workspace-store-button",
+                  storeType === "android" && "workspace-store-button-active",
+                )}
+              >
+                <Play
+                  className="h-3.5 w-3.5"
+                  fill={storeType === "android" ? "currentColor" : "none"}
+                />
+                Play
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStoreTypeChange("ios")}
+                aria-label="Use App Store"
+                className={cn(
+                  "workspace-store-button",
+                  storeType === "ios" && "workspace-store-button-active",
+                )}
+              >
+                <Apple className="h-3.5 w-3.5" />
+                iOS
+              </button>
+            </div>
+            <div className="workspace-topbar-country workspace-utility-chip shrink-0">
+              <Globe className="hidden h-3.5 w-3.5 text-app-text-muted sm:block" />
+              <CountrySearchSelect
+                value={country}
+                onChange={handleCountryChange}
+                options={COUNTRIES}
+                ariaLabel="Change analysis country"
+                className="w-[112px] min-w-0 sm:w-[150px] sm:min-w-[150px]"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedApp(null);
+                setRanking(null);
+                setAutoRankings([]);
+                setKeywordSuggestions([]);
+                setSearchResults([]);
+                setSearchTerm("");
+                setHasSearched(false);
+              }}
+              className="workspace-btn-secondary min-h-11 rounded-xl px-3 py-2 text-xs font-semibold"
+            >
+              Change app
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {!(isCompact && visibleWorkspaceMode === "single" && selectedApp) && (
+        <>
               {!isCompact && (
 <div className="workspace-search-composer-header mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
@@ -11793,7 +11870,9 @@ function AuthenticatedApp({
                     )}{" "}
                   </div>{" "}
                 </div>
-              )}{" "}
+               )}{" "}
+        </>
+      )}
     </WorkspacePanel>
   );
   return (
@@ -16073,7 +16152,34 @@ function AuthenticatedApp({
               </div>{" "}
               {/* Advanced Keyword Analysis Charts Section */}{" "}
               {autoRankings.length > 0 && (
-                <div className="grid md:grid-cols-2 gap-5">
+                <div className="workspace-advanced-insights space-y-3">
+                  <div className="workspace-advanced-insights-header flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="workspace-chip-label">Advanced insights</p>
+                      <h3 className="mt-1 text-base font-semibold text-app-text">
+                        Discovery charts
+                      </h3>
+                      <p className="mt-1 text-xs text-app-text-muted">
+                        Explore keyword quality and rank distribution when you need more detail.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-expanded={isAdvancedInsightsOpen}
+                      onClick={() => setIsAdvancedInsightsOpen((open) => !open)}
+                      className="workspace-btn-secondary min-h-11 shrink-0 rounded-xl px-3 py-2 text-xs font-semibold"
+                    >
+                      {isAdvancedInsightsOpen ? "Hide charts" : "Show charts"}
+                      <ChevronDown
+                        className={cn(
+                          "h-4 w-4 transition-transform",
+                          isAdvancedInsightsOpen && "rotate-180",
+                        )}
+                      />
+                    </button>
+                  </div>
+                  {isAdvancedInsightsOpen ? (
+                    <div className="grid gap-5 md:grid-cols-2">
                   {" "}
                   {/* Keyword Density Chart */}{" "}
                   <div className="card p-6">
@@ -16504,6 +16610,8 @@ function AuthenticatedApp({
                       position ranges.
                     </p>{" "}
                   </div>{" "}
+                    </div>
+                  ) : null}
                 </div>
               )}{" "}
             </div>
@@ -16671,23 +16779,39 @@ function AuthenticatedApp({
                 description="Use the search composer to add apps into the compare set. Coverage, battle, and opportunity modules will populate after that."
               />
             ) : (
-              <div className="workspace-compare-view space-y-6" ref={compareExportRef}>
-              {renderSearchSection(true)}
-              <WorkspacePanel tone="muted" className="workspace-compare-overview">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-                  <div>
-                    <div className="workspace-chip-label">Compare Overview</div>
-                    <h3 className="mt-1 text-lg font-semibold text-app-text">
-                      Coverage at a glance
-                    </h3>
-                    <p className="mt-2 max-w-xl text-sm text-app-text-muted">
-                      See which app has the strongest keyword footprint and where the clearest gaps are.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <WorkspaceMetricCard
-                      label="Coverage Leader"
-                      value={compareCoverageLeader?.app.title || "-"}
+               <div className="workspace-compare-view space-y-6" ref={compareExportRef}>
+               <div ref={compareSearchRef}>{renderSearchSection(true)}</div>
+               <WorkspacePanel tone="muted" className="workspace-compare-overview workspace-compare-header">
+                 <div className="flex flex-col gap-3">
+                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                     <div className="min-w-0">
+                       <div className="workspace-chip-label">Compare workspace</div>
+                       <h3 className="mt-1 text-lg font-semibold text-app-text">
+                         Compare Apps
+                       </h3>
+                       <p className="mt-1 text-sm text-app-text-muted">
+                         {comparedApps.length} apps · {compareAnalyzedCount}/{comparedApps.length} analyzed ·{" "}
+                         {COUNTRIES.find((c) => c.code === country)?.name || country}
+                       </p>
+                     </div>
+                     <button
+                       type="button"
+                       onClick={() =>
+                         compareSearchRef.current?.scrollIntoView({
+                           behavior: "smooth",
+                           block: "start",
+                         })
+                       }
+                       className="workspace-btn-secondary min-h-11 shrink-0 rounded-xl px-3 py-2 text-xs font-semibold"
+                     >
+                       <Layers className="h-4 w-4" />
+                       Change apps
+                     </button>
+                   </div>
+                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                     <WorkspaceMetricCard
+                       label="Coverage Leader"
+                       value={compareCoverageLeader?.app.title || "-"}
                       hint={
                         compareCoverageLeader
                           ? `${compareCoverageLeader.top100} ranked keywords`
@@ -16699,41 +16823,14 @@ function AuthenticatedApp({
                       label="Gap Opportunities"
                       value={compareGapRows.length}
                       hint="Whitespace and uneven coverage"
-                      accent="cyan"
-                    />
-                  </div>
-                </div>
-              </WorkspacePanel>
-              <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                {" "}
-                <div>
-                  {" "}
-                  <h2
-                    className="font-display font-bold text-app-text flex items-center gap-3"
-                    style={{ fontSize: "1.375rem", letterSpacing: "-0.02em" }}
-                  >
-                    {" "}
-                    <span
-                      className="section-header-icon"
-                      style={{
-                        background: "rgba(34, 211, 238,0.1)",
-                        border: "1px solid rgba(34, 211, 238,0.2)",
-                      }}
-                    >
-                      {" "}
-                      <Layers
-                        className="w-4 h-4"
-                        style={{ color: "#22d3ee" }}
-                      />{" "}
-                    </span>{" "}
-                    Compare Apps{" "}
-                  </h2>{" "}
-                  <p className="mt-2 max-w-2xl text-sm text-app-text-muted">
-                    {" "}
-                    Compare keyword coverage, contested terms, and whitespace opportunities across the selected set.
-                  </p>{" "}
-                </div>{" "}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                       accent="cyan"
+                     />
+                   </div>
+                 </div>
+               </WorkspacePanel>
+               <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-end">
+                 {" "}
+                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   {" "}
                   <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
                     {" "}

@@ -4136,6 +4136,47 @@ html[data-theme="light"] .workspace-panel-strong {
   background: linear-gradient(180deg, var(--workspace-surface), var(--workspace-surface-strong));
 }
 
+.workspace-selected-app-controls,
+.workspace-advanced-insights-header {
+  border: 1px solid var(--workspace-border);
+  border-radius: 0.9rem;
+  background: var(--workspace-surface-muted);
+}
+
+.workspace-selected-app-controls {
+  padding: 0.55rem 0.65rem;
+}
+
+.workspace-advanced-insights-header {
+  padding: 0.8rem 0.9rem;
+}
+
+.workspace-compare-header {
+  border-color: rgba(34, 211, 238, 0.22);
+}
+
+.workspace-upgrade-shell {
+  isolation: isolate;
+}
+
+@media (max-width: 639px) {
+  .workspace-selected-app-controls {
+    padding: 0.6rem;
+  }
+
+  .workspace-selected-app-controls > div:last-child {
+    width: 100%;
+  }
+
+  .workspace-selected-app-controls .workspace-btn-secondary {
+    flex: 1 1 auto;
+  }
+
+  .workspace-advanced-insights-header {
+    padding: 0.75rem;
+  }
+}
+
 .workspace-discovery-status-row {
   display: flex;
   align-items: center;
