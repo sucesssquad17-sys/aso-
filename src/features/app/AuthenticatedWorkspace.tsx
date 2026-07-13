@@ -12215,17 +12215,6 @@ function AuthenticatedApp({
         </header>
         <div className="workspace-layout">
           <aside className="workspace-sidebar">
-            <WorkspacePanel className="workspace-sidebar-panel workspace-sidebar-brand">
-              <div className="space-y-3">
-                <div className="workspace-page-eyebrow">Workspace</div>
-                <div className="text-lg font-semibold text-app-text">
-                  {activeWorkspacePage.title}
-                </div>
-                <p className="workspace-sidebar-description text-sm text-app-text-muted">
-                  {activeWorkspacePage.description}
-                </p>
-              </div>
-            </WorkspacePanel>
             <div className="workspace-rail">
               {workspacePageConfigs.map((item) => (
                 <WorkspaceNavButton
@@ -12284,21 +12273,6 @@ function AuthenticatedApp({
                 </button>
               </div>
             )}
-            <div className="workspace-mobile-nav">
-              {mobileWorkspacePageConfigs.map((item) => (
-                <WorkspaceNavButton
-                  key={`mobile-${item.id}`}
-                  active={
-                    item.id === "tracked"
-                      ? isMobileTrackWorkspace
-                      : visibleWorkspaceMode === item.id
-                  }
-                  item={item}
-                  onClick={() => setViewMode(item.id)}
-                  compact
-                />
-              ))}
-            </div>
             {isDemoMode && (
               <WorkspacePanel className="mb-6" tone="muted">
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

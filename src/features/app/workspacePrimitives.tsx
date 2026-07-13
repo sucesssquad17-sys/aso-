@@ -128,12 +128,10 @@ export function WorkspaceNavButton({
   active,
   item,
   onClick,
-  compact = false,
 }: {
   active: boolean;
   item: WorkspacePageConfig;
   onClick: () => void;
-  compact?: boolean;
 }) {
   const Icon = item.icon;
 
@@ -144,7 +142,6 @@ export function WorkspaceNavButton({
       className={cn(
         "workspace-button workspace-nav-button",
         active && "workspace-nav-button-active",
-        compact && "workspace-nav-button-compact",
       )}
     >
       <span className="workspace-nav-icon">
@@ -152,11 +149,9 @@ export function WorkspaceNavButton({
       </span>
       <span className="workspace-nav-copy">
         <span className="workspace-nav-label">
-          {compact && item.shortLabel ? item.shortLabel : item.label}
+          {item.label}
         </span>
-        {!compact ? (
-          <span className="workspace-nav-eyebrow">{item.eyebrow}</span>
-        ) : null}
+        <span className="workspace-nav-eyebrow">{item.eyebrow}</span>
       </span>
       {typeof item.badge === "number" ? (
         <span className="workspace-nav-badge">{item.badge}</span>
@@ -198,7 +193,10 @@ export function MobileBottomNav({
   onTabChange: (id: WorkspaceViewMode) => void;
 }) {
   return (
-    <nav className="workspace-surface workspace-nav-surface fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-app-border dark:bg-app-surface/95 md:hidden">
+    <nav
+      aria-label="Workspace navigation"
+      className="workspace-surface workspace-nav-surface fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-md dark:border-app-border dark:bg-app-surface/95 md:hidden"
+    >
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeId === tab.id;
@@ -207,6 +205,7 @@ export function MobileBottomNav({
             key={tab.id}
             type="button"
             onClick={() => onTabChange(tab.id)}
+            aria-current={isActive ? "page" : undefined}
             className={cn(
               "workspace-button relative flex min-h-[48px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 transition-colors active:scale-95",
               isActive
