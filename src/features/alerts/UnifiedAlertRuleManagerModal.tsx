@@ -383,8 +383,8 @@ export function UnifiedAlertRuleManagerModal({
       : "Watch daily metadata changes across the competitor apps in this group.";
 
   return (
-    <div className="unified-alert-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
-      <div className="unified-alert-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
+    <div className="workspace-mobile-overlay unified-alert-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
+      <div className="workspace-mobile-dialog unified-alert-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
         <div className="unified-alert-modal-header flex items-center justify-between border-b border-app-border/50 px-6 py-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">

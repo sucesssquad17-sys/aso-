@@ -185,27 +185,68 @@ export function WorkspaceEmptyBlock({
 
 export function MobileBottomNav({
   tabs,
+  extraAction,
   activeId,
   onTabChange,
 }: {
   tabs: WorkspacePageConfig[];
+  extraAction?: {
+    id: string;
+    label: string;
+    shortLabel?: string;
+    icon: LucideIcon;
+    badge?: number;
+    active?: boolean;
+    onClick: () => void;
+  };
   activeId: WorkspaceViewMode;
   onTabChange: (id: WorkspaceViewMode) => void;
 }) {
+  const navItems = extraAction
+    ? [
+        ...tabs.map((tab) => ({
+          key: tab.id,
+          label: tab.shortLabel || tab.label,
+          icon: tab.icon,
+          badge: tab.badge,
+          active: activeId === tab.id,
+          onClick: () => onTabChange(tab.id),
+          current: activeId === tab.id ? "page" : undefined,
+        })),
+        {
+          key: extraAction.id,
+          label: extraAction.shortLabel || extraAction.label,
+          icon: extraAction.icon,
+          badge: extraAction.badge,
+          active: Boolean(extraAction.active),
+          onClick: extraAction.onClick,
+          current: undefined,
+        },
+      ]
+    : tabs.map((tab) => ({
+        key: tab.id,
+        label: tab.shortLabel || tab.label,
+        icon: tab.icon,
+        badge: tab.badge,
+        active: activeId === tab.id,
+        onClick: () => onTabChange(tab.id),
+        current: activeId === tab.id ? "page" : undefined,
+      }));
+
   return (
     <nav
       aria-label="Workspace navigation"
-      className="workspace-surface workspace-nav-surface workspace-mobile-nav fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t pb-[env(safe-area-inset-bottom)] pt-2 md:hidden"
+      className="workspace-surface workspace-nav-surface workspace-mobile-nav fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t pb-[env(safe-area-inset-bottom)] pt-2"
     >
-      {tabs.map((tab) => {
-        const Icon = tab.icon;
-        const isActive = activeId === tab.id;
+      {navItems.map((item) => {
+        const Icon = item.icon;
+        const isActive = item.active;
         return (
           <button
-            key={tab.id}
+            key={item.key}
             type="button"
-            onClick={() => onTabChange(tab.id)}
-            aria-current={isActive ? "page" : undefined}
+            onClick={item.onClick}
+            aria-current={item.current}
             className={cn(
               "workspace-button relative flex min-h-[48px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 transition-colors active:scale-95",
               isActive ? "workspace-mobile-nav-active" : "workspace-mobile-nav-inactive",
@@ -213,11 +254,11 @@ export function MobileBottomNav({
           >
             <Icon className="h-5 w-5" />
             <span className="text-[11px] font-medium leading-none">
-              {tab.shortLabel || tab.label}
+              {item.label}
             </span>
-            {typeof tab.badge === "number" && tab.badge > 0 && (
+            {typeof item.badge === "number" && item.badge > 0 && (
               <span className="workspace-badge workspace-mobile-nav-badge absolute right-2 top-0 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold">
-                {tab.badge > 99 ? "99+" : tab.badge}
+                {item.badge > 99 ? "99+" : item.badge}
               </span>
             )}
           </button>

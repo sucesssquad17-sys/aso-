@@ -2586,8 +2586,8 @@ export default function ReportsWorkspace({
         </>
       )}
       {isWeeklyReportSettingsOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
-          <div className="app-modal w-full max-w-md rounded-3xl p-5 shadow-2xl sm:p-6">
+        <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
+          <div className="workspace-mobile-dialog app-modal w-full max-w-md rounded-3xl p-5 shadow-2xl sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="workspace-chip-label">Weekly Email</div>

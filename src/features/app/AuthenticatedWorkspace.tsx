@@ -262,6 +262,134 @@ function parseReportsDeepLinkFromLocation(): ReportsDeepLinkState | null {
   };
 }
 
+type LoadingStage = {
+  key: string;
+  label: string;
+  description: string;
+};
+
+const FAST_DISCOVERY_STAGES: LoadingStage[] = [
+  {
+    key: "metadata",
+    label: "Reading app metadata",
+    description: "Collecting title, category, and store context for this scan.",
+  },
+  {
+    key: "ideas",
+    label: "Generating keyword ideas",
+    description: "Building the candidate set from app metadata and market signals.",
+  },
+  {
+    key: "verify",
+    label: "Validating store rankings",
+    description: "Checking current store positions for the strongest candidates.",
+  },
+  {
+    key: "metrics",
+    label: "Calculating estimated metrics",
+    description: "Finishing the verified result set and score summaries.",
+  },
+];
+
+const DEEP_DISCOVERY_STAGES: LoadingStage[] = [
+  {
+    key: "metadata",
+    label: "Reading app metadata",
+    description: "Collecting the full app context before the deeper scan begins.",
+  },
+  {
+    key: "competitors",
+    label: "Analysing competitors",
+    description: "Looking for adjacent terms and coverage gaps around this app.",
+  },
+  {
+    key: "ideas",
+    label: "Generating keyword ideas",
+    description: "Expanding the discovery set for deeper validation.",
+  },
+  {
+    key: "verify",
+    label: "Validating store rankings",
+    description: "Checking a wider slice of store results for live rankings.",
+  },
+  {
+    key: "metrics",
+    label: "Calculating estimated metrics",
+    description: "Finishing the deeper result set and scan summary.",
+  },
+];
+
+function getScanStages(
+  mode: DiscoveryMode,
+  scope: "single" | "compare",
+): LoadingStage[] {
+  if (scope === "compare") {
+    return (mode === "deep" ? DEEP_DISCOVERY_STAGES : FAST_DISCOVERY_STAGES).map(
+      (stage) => ({
+        ...stage,
+        description:
+          stage.key === "verify"
+            ? "Checking live rankings across the selected app set."
+            : stage.description,
+      }),
+    );
+  }
+  return mode === "deep" ? DEEP_DISCOVERY_STAGES : FAST_DISCOVERY_STAGES;
+}
+
+function ScanProgressPanel({
+  title,
+  stages,
+  activeIndex,
+}: {
+  title: string;
+  stages: LoadingStage[];
+  activeIndex: number;
+}) {
+  return (
+    <div className="workspace-scan-progress" role="status" aria-live="polite">
+      <div className="workspace-scan-progress-header">
+        <div>
+          <p className="workspace-scan-progress-eyebrow">{title}</p>
+          <h4 className="workspace-scan-progress-title">
+            {stages[Math.min(activeIndex, stages.length - 1)]?.label || title}
+          </h4>
+          <p className="workspace-scan-progress-copy">
+            {stages[Math.min(activeIndex, stages.length - 1)]?.description}
+          </p>
+        </div>
+        <span className="workspace-status-chip">
+          {Math.min(activeIndex + 1, stages.length)}/{stages.length} stages
+        </span>
+      </div>
+      <div className="workspace-scan-progress-list">
+        {stages.map((stage, index) => {
+          const state =
+            index < activeIndex
+              ? "done"
+              : index === activeIndex
+                ? "active"
+                : "pending";
+          return (
+            <div
+              key={stage.key}
+              className={cn("workspace-scan-progress-step", `is-${state}`)}
+            >
+              <span className="workspace-scan-progress-dot" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="workspace-scan-progress-step-title">{stage.label}</p>
+                <p className="workspace-scan-progress-step-copy">
+                  {stage.description}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function getLegacyTrackingGroupId({
   appId,
   keyword,
@@ -3371,9 +3499,9 @@ function CountryMultiSelectModal({
   );
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
+    <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
       {" "}
-      <div className="w-full max-w-2xl rounded-3xl border border-app-border/70 bg-app-surface/95 p-6 shadow-2xl">
+      <div className="workspace-mobile-dialog w-full max-w-2xl rounded-3xl border border-app-border/70 bg-app-surface/95 p-6 shadow-2xl">
         {" "}
         <div className="flex items-start justify-between gap-4">
           {" "}
@@ -3586,6 +3714,7 @@ function AuthenticatedApp({
     }[]
   >([]);
   const [isDiscoveringKeywords, setIsDiscoveringKeywords] = useState(false);
+  const [discoveryLoadingStageIndex, setDiscoveryLoadingStageIndex] = useState(0);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
   const [discoveryRunMeta, setDiscoveryRunMeta] = useState<{
     checkedKeywords?: number;
@@ -3602,10 +3731,14 @@ function AuthenticatedApp({
   );
   const [initialReportsDeepLinkState, setInitialReportsDeepLinkState] =
     useState<ReportsDeepLinkState | null>(reportDeepLinkStateRef.current);
-  const [isMobileViewport, setIsMobileViewport] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.matchMedia("(max-width: 1100px)").matches;
+  const [viewportWidth, setViewportWidth] = useState(() => {
+    if (typeof window === "undefined") return 1440;
+    return window.innerWidth;
   });
+  const isPhoneViewport = viewportWidth < 640;
+  const isCompactWorkspace = viewportWidth >= 768 && viewportWidth < 1100;
+  const isCompactViewport = viewportWidth < 1100;
+  const isMobileViewport = isCompactViewport;
   const [comparedApps, setComparedApps] = useState<AppDetails[]>([]);
   const [compareKeyword, setCompareKeyword] = useState("");
   const [compareRankings, setCompareRankings] = useState<
@@ -3618,6 +3751,7 @@ function AuthenticatedApp({
     Record<string, DiscoveryPayload>
   >({});
   const [isAnalyzingCompare, setIsAnalyzingCompare] = useState(false);
+  const [compareLoadingStageIndex, setCompareLoadingStageIndex] = useState(0);
   const [compareAnalysisError, setCompareAnalysisError] = useState<
     string | null
   >(null);
@@ -3685,6 +3819,7 @@ function AuthenticatedApp({
     useState("");
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isPhoneMoreMenuOpen, setIsPhoneMoreMenuOpen] = useState(false);
   const [allRankHistory, setAllRankHistory] = useState<RankHistoryEntry[]>([]);
   const [trackSortBy, setTrackSortBy] = useState<
     "date_added" | "last_checked" | "app" | "rank_change"
@@ -3869,6 +4004,11 @@ function AuthenticatedApp({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isAccountMenuOpen]);
+  useEffect(() => {
+    if (!isPhoneViewport && isPhoneMoreMenuOpen) {
+      setIsPhoneMoreMenuOpen(false);
+    }
+  }, [isPhoneMoreMenuOpen, isPhoneViewport]);
   useEffect(() => {
     if (!isDemoMode) return;
     const demoState = buildDemoWorkspaceState();
@@ -5124,6 +5264,40 @@ function AuthenticatedApp({
     window.history.replaceState({}, document.title, url.toString());
   }, [initialReportsDeepLinkState, isDemoMode, userStateHydrated]);
   useEffect(() => {
+    if (!isDiscoveringKeywords) {
+      setDiscoveryLoadingStageIndex(0);
+      return;
+    }
+    setDiscoveryLoadingStageIndex(0);
+    const steps = getScanStages(discoveryMode, "single");
+    if (steps.length <= 1) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      setDiscoveryLoadingStageIndex((current) =>
+        current >= steps.length - 1 ? current : current + 1,
+      );
+    }, discoveryMode === "deep" ? 1900 : 1500);
+    return () => window.clearInterval(intervalId);
+  }, [discoveryMode, isDiscoveringKeywords]);
+  useEffect(() => {
+    if (!isAnalyzingCompare) {
+      setCompareLoadingStageIndex(0);
+      return;
+    }
+    setCompareLoadingStageIndex(0);
+    const steps = getScanStages(compareDiscoveryMode, "compare");
+    if (steps.length <= 1) {
+      return;
+    }
+    const intervalId = window.setInterval(() => {
+      setCompareLoadingStageIndex((current) =>
+        current >= steps.length - 1 ? current : current + 1,
+      );
+    }, compareDiscoveryMode === "deep" ? 2000 : 1600);
+    return () => window.clearInterval(intervalId);
+  }, [compareDiscoveryMode, isAnalyzingCompare]);
+  useEffect(() => {
     if (viewMode === "reports" && initialReportsDeepLinkState) {
       setInitialReportsDeepLinkState(null);
     }
@@ -5436,6 +5610,14 @@ function AuthenticatedApp({
     !isDemoMode && hasLoadedBillingStatus && !billingStatus && Boolean(billingError);
   const hasActiveBillingAccess =
     isDemoMode || billingAccessState === "active";
+  const discoveryLoadingStages = React.useMemo(
+    () => getScanStages(discoveryMode, "single"),
+    [discoveryMode],
+  );
+  const compareLoadingStages = React.useMemo(
+    () => getScanStages(compareDiscoveryMode, "compare"),
+    [compareDiscoveryMode],
+  );
   const effectivePlanLimits = React.useMemo(
     () =>
       hasActiveBillingAccess && billingStatus?.planLimits
@@ -10248,14 +10430,12 @@ function AuthenticatedApp({
       const input = document.getElementById("app-search");
       if (!(input instanceof HTMLInputElement)) return;
       input.scrollIntoView({
-        behavior: window.matchMedia("(max-width: 1100px)").matches
-          ? "auto"
-          : "smooth",
+        behavior: isCompactViewport ? "auto" : "smooth",
         block: "center",
       });
       input.focus();
     });
-  }, []);
+  }, [isCompactViewport]);
   const dismissOnboarding = React.useCallback(() => {
     setIsOnboardingDismissed(true);
     if (isPreferenceStorageAllowed()) {
@@ -10544,7 +10724,7 @@ function AuthenticatedApp({
       {
         id: "competitors",
         label: "Competitors",
-        shortLabel: "Rivals",
+        shortLabel: "Competitors",
         icon: Globe,
         eyebrow: "Competitor tracking",
         title: "Competitor Groups",
@@ -10575,20 +10755,16 @@ function AuthenticatedApp({
       trackedAppUsageCount,
     ],
   );
-  const mobileWorkspacePageConfigs = React.useMemo(
-    () => {
-      const pageConfigById = new Map(
-        workspacePageConfigs.map((page) => [page.id, page]),
-      );
-
-      return ["single", "compare", "reports", "bookmarks", "tracked"]
-        .map((pageId) => {
-          const page = pageConfigById.get(pageId as WorkspaceViewMode);
-          if (!page) return null;
-          return page;
-        })
-        .filter((page): page is WorkspacePageConfig => Boolean(page));
-    },
+  const phoneWorkspacePageConfigs = React.useMemo(() => {
+    const pageConfigById = new Map(
+      workspacePageConfigs.map((page) => [page.id, page]),
+    );
+    return ["single", "competitors", "tracked", "reports"]
+      .map((pageId) => pageConfigById.get(pageId as WorkspaceViewMode) || null)
+      .filter((page): page is WorkspacePageConfig => Boolean(page));
+  }, [workspacePageConfigs]);
+  const compactWorkspacePageConfigs = React.useMemo(
+    () => workspacePageConfigs,
     [workspacePageConfigs],
   );
   const visibleWorkspaceMode: WorkspaceViewMode =
@@ -10642,9 +10818,17 @@ function AuthenticatedApp({
   const activeWorkspaceLandingCopy =
     compactWorkspaceLandingCopy[visibleWorkspaceMode];
   const isMobileTrackWorkspace =
-    isMobileViewport &&
+    isPhoneViewport &&
     (visibleWorkspaceMode === "tracked" ||
       visibleWorkspaceMode === "competitors");
+  const isPhoneMoreActionActive =
+    visibleWorkspaceMode === "compare" ||
+    visibleWorkspaceMode === "bookmarks" ||
+    visibleWorkspaceMode === "upgrade" ||
+    isPhoneMoreMenuOpen;
+  useEffect(() => {
+    setIsPhoneMoreMenuOpen(false);
+  }, [visibleWorkspaceMode]);
 
   const scrollPositions = React.useRef<Record<string, number>>({});
   const prevModeRef = React.useRef<WorkspaceViewMode>(visibleWorkspaceMode);
@@ -10673,23 +10857,12 @@ function AuthenticatedApp({
 
   useEffect(() => {
     if (typeof window === "undefined") return undefined;
-    const mediaQuery = window.matchMedia("(max-width: 1100px)");
-    const syncViewport = (matches: boolean) => {
-      setIsMobileViewport(matches);
+    const syncViewport = () => {
+      setViewportWidth(window.innerWidth);
     };
-    const handleChange = (event: MediaQueryListEvent) => {
-      syncViewport(event.matches);
-    };
-
-    syncViewport(mediaQuery.matches);
-
-    if (typeof mediaQuery.addEventListener === "function") {
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
-    }
-
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
+    syncViewport();
+    window.addEventListener("resize", syncViewport, { passive: true });
+    return () => window.removeEventListener("resize", syncViewport);
   }, []);
 
   const getTrackedStatusPills = React.useCallback(
@@ -11143,17 +11316,15 @@ function AuthenticatedApp({
               <button
                 type="button"
                 onClick={() => void loadBillingStatus()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-4 py-2 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/20"
+                className="btn-primary"
               >
-                <RefreshCw className="h-4 w-4" />
-                Retry billing check
+                Retry
               </button>
               <button
                 type="button"
                 onClick={() => void onSignOut()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-app-border bg-app-surface-muted/70 px-4 py-2 text-sm font-semibold text-app-text transition-colors hover:bg-app-surface-strong"
+                className="btn-secondary"
               >
-                <LogOut className="h-4 w-4" />
                 Use different account
               </button>
             </div>
@@ -12054,7 +12225,18 @@ function AuthenticatedApp({
       ) : (
       <div className="workspace-shell min-h-screen text-app-text font-sans relative pb-20 md:pb-0">
         <MobileBottomNav
-          tabs={mobileWorkspacePageConfigs}
+          tabs={phoneWorkspacePageConfigs}
+          extraAction={{
+            id: "more",
+            label: "More",
+            shortLabel: "More",
+            icon: MoreHorizontal,
+            active: isPhoneMoreActionActive,
+            onClick: () => {
+              setIsAccountMenuOpen(false);
+              setIsPhoneMoreMenuOpen((previous) => !previous);
+            },
+          }}
           activeId={viewMode === "charts" ? "single" : viewMode}
           onTabChange={(id) => setViewMode(id)}
         />
@@ -12669,6 +12851,36 @@ function AuthenticatedApp({
             </WorkspacePanel>
           </aside>
           <main className="workspace-main">
+            {isCompactWorkspace ? (
+              <div className="workspace-compact-nav" role="navigation" aria-label="Compact workspace navigation">
+                <div className="workspace-view-tabs workspace-compact-nav-tabs">
+                  {compactWorkspacePageConfigs.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = visibleWorkspaceMode === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setViewMode(item.id)}
+                        aria-current={isActive ? "page" : undefined}
+                        className={cn(
+                          "workspace-view-tab workspace-compact-nav-button",
+                          isActive && "workspace-view-tab-active",
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                        {typeof item.badge === "number" && item.badge > 0 ? (
+                          <span className="workspace-view-tab-count">
+                            {item.badge > 99 ? "99+" : item.badge}
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
             {successMessage && (
               <div className="workspace-success-banner">
                 <div className="flex items-center gap-2.5 text-sm font-medium text-cyan-300">
@@ -12898,42 +13110,6 @@ function AuthenticatedApp({
                     </div>
                   }
                 />
-                {isMobileTrackWorkspace ? (
-                  <div
-                    className="workspace-mobile-track-switcher"
-                    role="tablist"
-                    aria-label="Tracking workspace views"
-                  >
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={visibleWorkspaceMode === "tracked"}
-                      onClick={() => setViewMode("tracked")}
-                      className={cn(
-                        "workspace-mobile-track-button",
-                        visibleWorkspaceMode === "tracked" &&
-                          "workspace-mobile-track-button-active",
-                      )}
-                    >
-                      <BellRing className="h-3.5 w-3.5" />
-                      Tracked Keywords
-                    </button>
-                    <button
-                      type="button"
-                      role="tab"
-                      aria-selected={visibleWorkspaceMode === "competitors"}
-                      onClick={() => setViewMode("competitors")}
-                      className={cn(
-                        "workspace-mobile-track-button",
-                        visibleWorkspaceMode === "competitors" &&
-                          "workspace-mobile-track-button-active",
-                      )}
-                    >
-                      <Globe className="h-3.5 w-3.5" />
-                      Competitor Groups
-                    </button>
-                  </div>
-                ) : null}
                 {workspaceSummaryCards.length > 0 ? (
                   <WorkspaceMetricGrid compact dense={isDenseWorkspaceLandingSummary}>
                     {workspaceSummaryCards.map((card) => (
@@ -16422,6 +16598,13 @@ function AuthenticatedApp({
                         </span>
                       </div>
                     </div>
+                    {isDiscoveringKeywords ? (
+                      <ScanProgressPanel
+                        title={discoveryMode === "deep" ? "Deep scan in progress" : "Quick scan in progress"}
+                        stages={discoveryLoadingStages}
+                        activeIndex={discoveryLoadingStageIndex}
+                      />
+                    ) : null}
                     {discoveryError ? (
                       <div className="workspace-discovery-error mt-3" role="alert">
                         <AlertCircle className="h-4 w-4 shrink-0" />
@@ -17376,6 +17559,17 @@ function AuthenticatedApp({
                   .{" "}
                 </span>{" "}
               </div>{" "}
+              {isAnalyzingCompare ? (
+                <ScanProgressPanel
+                  title={
+                    compareDiscoveryMode === "deep"
+                      ? "Deep compare scan in progress"
+                      : "Quick compare scan in progress"
+                  }
+                  stages={compareLoadingStages}
+                  activeIndex={compareLoadingStageIndex}
+                />
+              ) : null}
               {compareAnalysisError && (
                 <div
                   className="rounded-2xl px-4 py-3 text-sm flex items-start gap-3"
@@ -18849,6 +19043,131 @@ function AuthenticatedApp({
           notificationPermission={notificationPermission}
           onRequestPushPermission={requestNotificationPermission}
         />
+        {isPhoneViewport && isPhoneMoreMenuOpen ? (
+          <div
+            className="workspace-phone-more-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-label="More navigation and account actions"
+          >
+            <button
+              type="button"
+              className="workspace-phone-more-sheet-backdrop"
+              aria-label="Close more menu"
+              onClick={() => setIsPhoneMoreMenuOpen(false)}
+            />
+            <div className="workspace-phone-more-sheet-panel">
+              <div className="workspace-phone-more-sheet-handle" aria-hidden="true" />
+              <div className="workspace-phone-more-sheet-header">
+                <div>
+                  <p className="workspace-chip-label">More</p>
+                  <h3 className="mt-1 text-base font-semibold text-app-text">
+                    Navigation and account actions
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPhoneMoreMenuOpen(false)}
+                  className="workspace-icon-button"
+                  aria-label="Close more menu"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="workspace-phone-more-sheet-section">
+                <p className="workspace-chip-label">Navigate</p>
+                <div className="workspace-phone-more-sheet-grid">
+                  <button
+                    type="button"
+                    className="workspace-phone-more-action"
+                    onClick={() => {
+                      setViewMode("compare");
+                      setIsPhoneMoreMenuOpen(false);
+                    }}
+                  >
+                    <Layers className="h-4 w-4" />
+                    <span>Compare Apps</span>
+                  </button>
+                  <button
+                    type="button"
+                    className="workspace-phone-more-action"
+                    onClick={() => {
+                      setViewMode("bookmarks");
+                      setIsPhoneMoreMenuOpen(false);
+                    }}
+                  >
+                    <Bookmark className="h-4 w-4" />
+                    <span>Bookmarks</span>
+                  </button>
+                </div>
+              </div>
+              <div className="workspace-phone-more-sheet-section">
+                <p className="workspace-chip-label">Settings</p>
+                <div className="workspace-phone-more-sheet-stack">
+                  {!isDemoMode ? (
+                    <button
+                      type="button"
+                      className="workspace-phone-more-action"
+                      onClick={() => {
+                        setViewMode("upgrade");
+                        setIsPhoneMoreMenuOpen(false);
+                      }}
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      <span>Billing / plans</span>
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="workspace-phone-more-action"
+                    onClick={() => {
+                      setIsPhoneMoreMenuOpen(false);
+                      if (notificationPermission !== "granted") {
+                        void requestNotificationPermission();
+                      }
+                    }}
+                  >
+                    <BellRing className="h-4 w-4" />
+                    <span>Notifications</span>
+                    <span className="workspace-account-menu-item-status">
+                      {notificationPermission === "granted" ? "Enabled" : "Enable"}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="workspace-phone-more-action"
+                    onClick={() => {
+                      onToggleTheme();
+                      setIsPhoneMoreMenuOpen(false);
+                    }}
+                  >
+                    <span className="workspace-account-menu-theme-dot" />
+                    <span>Theme</span>
+                    <span className="workspace-account-menu-item-status">
+                      {themeMode === "light" ? "Light" : "Dark"}
+                    </span>
+                  </button>
+                </div>
+              </div>
+              <div className="workspace-phone-more-sheet-section">
+                <p className="workspace-chip-label">Account</p>
+                <div className="workspace-phone-more-sheet-stack">
+                  <button
+                    type="button"
+                    className="workspace-phone-more-action"
+                    onClick={() => {
+                      setIsPhoneMoreMenuOpen(false);
+                      void onSignOut();
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign out</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
       )}
     </ErrorBoundary>

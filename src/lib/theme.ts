@@ -14,10 +14,26 @@ export function getStoredTheme(): ThemeMode | null {
 }
 
 export function getInitialTheme(): ThemeMode {
-  return getStoredTheme() ?? "light";
+  const storedTheme = getStoredTheme();
+  if (storedTheme) {
+    return storedTheme;
+  }
+  if (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches
+  ) {
+    return "dark";
+  }
+  return "light";
 }
 
 export function applyTheme(theme: ThemeMode): void {
   if (typeof document === "undefined") return;
   document.documentElement.dataset.theme = theme;
+  document.documentElement.style.colorScheme = theme;
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeColorMeta instanceof HTMLMetaElement) {
+    themeColorMeta.content = theme === "dark" ? "#0b1120" : "#f8fafc";
+  }
 }

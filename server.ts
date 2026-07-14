@@ -1,4 +1,6 @@
 import 'dotenv/config';
+import dotenv from 'dotenv';
+dotenv.config({ path: '.env.local', override: true });
 import crypto from 'crypto';
 import { GoogleGenAI, Type } from '@google/genai';
 import OpenAI from 'openai';
