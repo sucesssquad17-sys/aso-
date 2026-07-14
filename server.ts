@@ -3990,11 +3990,11 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           createdAt: diff.detectedAt,
           readAt: null,
         };
+        const created = await persistAlertEvent(userDocRef, event);
+        if (!created) {
+          continue;
+        }
         if (rule.channels.inApp) {
-          const created = await persistAlertEvent(userDocRef, event);
-          if (!created) {
-            continue;
-          }
           createdEvents.push(event);
         }
         if (rule.channels.push) {
@@ -4618,15 +4618,15 @@ function getEmailPreferenceUrl(input: {
   email: string;
   campaignId?: string;
 }) {
-  const unsubscribeUrl = new URL('/api/email/unsubscribe', ALERT_EMAIL_APP_URL);
-  unsubscribeUrl.searchParams.set('kind', input.kind);
-  unsubscribeUrl.searchParams.set('uid', input.userId);
-  unsubscribeUrl.searchParams.set('email', input.email);
+  const preferencesUrl = new URL('/api/email/preferences', ALERT_EMAIL_APP_URL);
+  preferencesUrl.searchParams.set('kind', input.kind);
+  preferencesUrl.searchParams.set('uid', input.userId);
+  preferencesUrl.searchParams.set('email', input.email);
   if (input.campaignId) {
-    unsubscribeUrl.searchParams.set('campaignId', input.campaignId);
+    preferencesUrl.searchParams.set('campaignId', input.campaignId);
   }
-  unsubscribeUrl.searchParams.set('token', buildEmailPreferenceToken(input.kind, input.userId, input.email));
-  return unsubscribeUrl.toString();
+  preferencesUrl.searchParams.set('token', buildEmailPreferenceToken(input.kind, input.userId, input.email));
+  return preferencesUrl.toString();
 }
 
 async function resolveAnnouncementRecipientEmail(
@@ -4998,11 +4998,11 @@ async function evaluateAndDispatchAlertRules(
             createdAt: new Date().toISOString(),
             readAt: null,
           };
+          const created = await persistAlertEvent(userDocRef, event);
+          if (!created) {
+            continue;
+          }
           if (rule.channels.inApp) {
-            const created = await persistAlertEvent(userDocRef, event);
-            if (!created) {
-              continue;
-            }
             createdEvents.push(event);
           }
           if (rule.channels.push) {
@@ -10316,17 +10316,223 @@ async function startServer() {
     }
   });
 
+  const sendEmailPreferenceHtml = (
+    res: express.Response,
+    status: number,
+    title: string,
+    message: string,
+    actions: Array<{ href: string; label: string; primary?: boolean }> = [],
+  ) => {
+    const actionsHtml = actions.length
+      ? `<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px;">
+          ${actions
+            .map(
+              (action) =>
+                `<a href="${escapeAlertEmailHtml(action.href)}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid ${action.primary ? '#2563eb' : '#cbd5e1'}; background: ${action.primary ? '#2563eb' : '#ffffff'}; color: ${action.primary ? '#ffffff' : '#0f172a'}; font-size: 15px; font-weight: 600; text-decoration: none;">${escapeAlertEmailHtml(action.label)}</a>`,
+            )
+            .join('')}
+        </div>`
+      : '';
+    res.status(status).type('html').send(`
+      <html>
+        <body style="font-family: Arial, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 16px; color: #0f172a; background: #f8fafc;">
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 24px; padding: 28px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);">
+            <p style="margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: 0.28em; color: #2563eb; text-transform: uppercase;">Email preferences</p>
+            <h1 style="font-size: 28px; margin: 0 0 12px;">${escapeAlertEmailHtml(title)}</h1>
+            <p style="margin: 0; font-size: 16px; line-height: 1.7; color: #334155;">${escapeAlertEmailHtml(message)}</p>
+            ${actionsHtml}
+          </div>
+        </body>
+      </html>
+    `);
+  };
+
+  const buildEmailPreferenceQuery = (input: {
+    kind: EmailPreferenceKind;
+    uid: string;
+    email: string;
+    token: string;
+    campaignId?: string;
+    set?: 'on' | 'off';
+  }) => {
+    const query = new URLSearchParams();
+    query.set('kind', input.kind);
+    query.set('uid', input.uid);
+    query.set('email', input.email);
+    query.set('token', input.token);
+    if (input.campaignId) {
+      query.set('campaignId', input.campaignId);
+    }
+    if (input.set) {
+      query.set('set', input.set);
+    }
+    return query.toString();
+  };
+
+  const getEmailPreferenceMeta = (kind: EmailPreferenceKind) => {
+    switch (kind) {
+      case 'alert':
+        return {
+          title: 'Alert emails',
+          enabledMessage: 'Keyword and competitor alert emails are currently enabled for this account.',
+          disabledMessage: 'Keyword and competitor alert emails are currently turned off for this account.',
+          turnedOn: 'Alert emails have been turned on for this account.',
+          turnedOff: 'Alert emails have been turned off for this account.',
+          enableLabel: 'Turn on alert emails',
+          disableLabel: 'Turn off alert emails',
+        };
+      case 'weekly':
+        return {
+          title: 'Weekly report emails',
+          enabledMessage: 'Weekly report summary emails are currently enabled for this account.',
+          disabledMessage: 'Weekly report summary emails are currently turned off for this account.',
+          turnedOn: 'Weekly report emails have been turned on for this account.',
+          turnedOff: 'Weekly report emails have been turned off for this account.',
+          enableLabel: 'Turn on weekly emails',
+          disableLabel: 'Turn off weekly emails',
+        };
+      default:
+        return {
+          title: 'Announcement emails',
+          enabledMessage: 'Announcement emails are currently enabled for this account.',
+          disabledMessage: 'Announcement emails are currently turned off for this account.',
+          turnedOn: 'Announcement emails have been turned on for this account.',
+          turnedOff: 'Announcement emails have been turned off for this account.',
+          enableLabel: 'Turn on announcement emails',
+          disableLabel: 'Turn off announcement emails',
+        };
+    }
+  };
+
+  app.get('/api/email/preferences', strictRateLimit, async (req, res) => {
+    try {
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const uid = readRequiredString(req.query.uid, 'uid', 200);
+      const email = normalizeEmailAddress(readRequiredString(req.query.email, 'email', 320));
+      const token = readRequiredString(req.query.token, 'token', 300);
+      const kind: EmailPreferenceKind =
+        req.query.kind === 'alert' || req.query.kind === 'weekly'
+          ? req.query.kind
+          : 'announcement';
+      const campaignId = readOptionalString(req.query.campaignId, 'campaignId', 120).trim();
+      const setValue = readOptionalString(req.query.set, 'set', 12).trim().toLowerCase();
+      if (!email || !isValidEmailAddress(email)) {
+        throw createBadRequestError('A valid email address is required.');
+      }
+      if (!verifyEmailPreferenceToken(kind, uid, email, token)) {
+        throw createForbiddenError('This preferences link is invalid or has expired.');
+      }
+      if (setValue && setValue !== 'on' && setValue !== 'off') {
+        throw createBadRequestError('The requested preference update is invalid.');
+      }
+
+      const userDocRef = adminDb.collection('users').doc(uid);
+      const userSnapshot = await userDocRef.get();
+      const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+      let enabled =
+        kind === 'alert'
+          ? userData?.alertEmailsEnabled !== false
+          : kind === 'weekly'
+            ? userData?.weeklyReportSettings?.enabled !== false
+            : userData?.announcementEmailsEnabled !== false;
+
+      const meta = getEmailPreferenceMeta(kind);
+      if (setValue === 'on' || setValue === 'off') {
+        enabled = setValue === 'on';
+        const updatedAt = new Date().toISOString();
+        if (kind === 'alert') {
+          await userDocRef.set({
+            alertEmailsEnabled: enabled,
+            alertEmailsUpdatedAt: updatedAt,
+            updatedAt,
+          } satisfies Partial<UserTrackingDocument>, { merge: true });
+        } else if (kind === 'weekly') {
+          await userDocRef.set(
+            {
+              weeklyReportSettings: {
+                enabled,
+                lastAttemptedAt: updatedAt,
+              },
+              updatedAt,
+            } as DocumentData,
+            { merge: true },
+          );
+        } else {
+          await userDocRef.set({
+            announcementEmailsEnabled: enabled,
+            announcementEmailsUpdatedAt: updatedAt,
+            ...(campaignId ? { lastAnnouncementEmailCampaignId: campaignId } : {}),
+            updatedAt,
+          } satisfies Partial<UserTrackingDocument>, { merge: true });
+        }
+        const nextQuery = buildEmailPreferenceQuery({
+          kind,
+          uid,
+          email,
+          token,
+          ...(campaignId ? { campaignId } : {}),
+          set: enabled ? 'off' : 'on',
+        });
+        return sendEmailPreferenceHtml(
+          res,
+          200,
+          meta.title,
+          enabled ? meta.turnedOn : meta.turnedOff,
+          [
+            {
+              href: `${ALERT_EMAIL_APP_URL}/?viewMode=reports&period=7d`,
+              label: 'Open dashboard',
+              primary: true,
+            },
+            {
+              href: `${ALERT_EMAIL_APP_URL}/api/email/preferences?${nextQuery}`,
+              label: enabled ? meta.disableLabel : meta.enableLabel,
+            },
+          ],
+        );
+      }
+
+      const nextQuery = buildEmailPreferenceQuery({
+        kind,
+        uid,
+        email,
+        token,
+        ...(campaignId ? { campaignId } : {}),
+        set: enabled ? 'off' : 'on',
+      });
+      return sendEmailPreferenceHtml(
+        res,
+        200,
+        meta.title,
+        enabled ? meta.enabledMessage : meta.disabledMessage,
+        [
+          {
+            href: `${ALERT_EMAIL_APP_URL}/?viewMode=reports&period=7d`,
+            label: 'Open dashboard',
+            primary: true,
+          },
+          {
+            href: `${ALERT_EMAIL_APP_URL}/api/email/preferences?${nextQuery}`,
+            label: enabled ? meta.disableLabel : meta.enableLabel,
+          },
+        ],
+      );
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'The email preferences request could not be completed.';
+      return sendEmailPreferenceHtml(res, 400, 'Unable to manage preferences', message);
+    }
+  });
+
   app.get('/api/email/unsubscribe', strictRateLimit, async (req, res) => {
-    const sendHtml = (status: number, title: string, message: string) => {
-      res.status(status).type('html').send(`
-        <html>
-          <body style="font-family: Arial, sans-serif; max-width: 640px; margin: 48px auto; padding: 0 16px; color: #0f172a;">
-            <h1 style="font-size: 28px; margin-bottom: 12px;">${escapeAlertEmailHtml(title)}</h1>
-            <p style="font-size: 16px; line-height: 1.7; color: #334155;">${escapeAlertEmailHtml(message)}</p>
-          </body>
-        </html>
-      `);
-    };
+    const sendHtml = (status: number, title: string, message: string) =>
+      sendEmailPreferenceHtml(res, status, title, message);
 
     try {
       const adminDb = getFirebaseAdminDb();
@@ -10349,26 +10555,21 @@ async function startServer() {
         throw createForbiddenError('This unsubscribe link is invalid or has expired.');
       }
 
-      const updatedAt = new Date().toISOString();
-      if (kind === 'alert') {
-        await adminDb.collection('users').doc(uid).set({
-          alertEmailsEnabled: false,
-          alertEmailsUpdatedAt: updatedAt,
-          updatedAt,
-        } satisfies Partial<UserTrackingDocument>, { merge: true });
-
-        return sendHtml(200, 'Alert emails turned off', 'Alert email delivery has been turned off for this account.');
-      }
-      if (kind === 'weekly') {
-        await adminDb.collection('users').doc(uid).update({
-          'weeklyReportSettings.enabled': false,
-          'weeklyReportSettings.lastAttemptedAt': updatedAt,
-          updatedAt,
+      if (kind === 'alert' || kind === 'weekly') {
+        const preferencesQuery = buildEmailPreferenceQuery({
+          kind,
+          uid,
+          email,
+          token,
+          ...(campaignId ? { campaignId } : {}),
         });
-
-        return sendHtml(200, 'Weekly emails turned off', 'Weekly report emails have been turned off for this account.');
+        return res.redirect(
+          302,
+          `${ALERT_EMAIL_APP_URL}/api/email/preferences?${preferencesQuery}`,
+        );
       }
 
+      const updatedAt = new Date().toISOString();
       await adminDb.collection('users').doc(uid).set({
         announcementEmailsEnabled: false,
         announcementEmailsUpdatedAt: updatedAt,

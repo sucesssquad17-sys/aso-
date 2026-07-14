@@ -1163,12 +1163,12 @@ function getEmailPreferenceUrl(input: {
   if (!token) {
     return ALERT_EMAIL_APP_URL;
   }
-  const unsubscribeUrl = new URL('/api/email/unsubscribe', ALERT_EMAIL_APP_URL);
-  unsubscribeUrl.searchParams.set('kind', input.kind);
-  unsubscribeUrl.searchParams.set('uid', input.userId);
-  unsubscribeUrl.searchParams.set('email', input.email);
-  unsubscribeUrl.searchParams.set('token', token);
-  return unsubscribeUrl.toString();
+  const preferencesUrl = new URL('/api/email/preferences', ALERT_EMAIL_APP_URL);
+  preferencesUrl.searchParams.set('kind', input.kind);
+  preferencesUrl.searchParams.set('uid', input.userId);
+  preferencesUrl.searchParams.set('email', input.email);
+  preferencesUrl.searchParams.set('token', token);
+  return preferencesUrl.toString();
 }
 
 function formatAlertEmailTimestamp(timestamp: string) {
@@ -1764,11 +1764,11 @@ async function evaluateAndDispatchAlertRules(
             createdAt: new Date().toISOString(),
             readAt: null,
           };
+          const created = await persistAlertEvent(userDocRef, event);
+          if (!created) {
+            continue;
+          }
           if (rule.channels.inApp) {
-            const created = await persistAlertEvent(userDocRef, event);
-            if (!created) {
-              continue;
-            }
             createdEvents.push(event);
           }
           if (rule.channels.push) {
@@ -1868,11 +1868,11 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           createdAt: diff.detectedAt,
           readAt: null,
         };
+        const created = await persistAlertEvent(userDocRef, event);
+        if (!created) {
+          continue;
+        }
         if (rule.channels.inApp) {
-          const created = await persistAlertEvent(userDocRef, event);
-          if (!created) {
-            continue;
-          }
           createdEvents.push(event);
         }
         if (rule.channels.push) {
