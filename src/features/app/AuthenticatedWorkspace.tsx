@@ -5179,6 +5179,12 @@ function AuthenticatedApp({
       setHasLoadedBillingStatus(true);
     }
   }, [currentUser.uid, fetchAuthedJson]);
+  const currentPlanEntitlements = React.useMemo<PlanEntitlements>(
+    () =>
+      billingStatus?.planEntitlements ||
+      getPlanEntitlements(billingStatus?.subscriptionTier),
+    [billingStatus],
+  );
   const loadChartCategories = React.useCallback(async () => {
     setIsLoadingChartCategories(true);
     setChartError(null);
@@ -5258,11 +5264,31 @@ function AuthenticatedApp({
     void loadCharts();
   }, [loadCharts]);
   useEffect(() => {
-    if (isDemoMode || !userStateHydrated) return;
+    if (
+      isDemoMode ||
+      !userStateHydrated ||
+      !currentPlanEntitlements.alertDelivery
+    ) {
+      setAlertEvents([]);
+      setAlertEventsError(null);
+      return;
+    }
     void loadAlertEvents();
-  }, [alertRefreshNonce, isDemoMode, loadAlertEvents, userStateHydrated]);
+  }, [
+    alertRefreshNonce,
+    isDemoMode,
+    loadAlertEvents,
+    currentPlanEntitlements.alertDelivery,
+    userStateHydrated,
+  ]);
   useEffect(() => {
-    if (isDemoMode || !userStateHydrated) return;
+    if (
+      isDemoMode ||
+      !userStateHydrated ||
+      !currentPlanEntitlements.alertDelivery
+    ) {
+      return;
+    }
     const intervalId = window.setInterval(() => {
       pendingAlertFetchAnnouncementRef.current = true;
       void loadAlertEvents();
@@ -5270,17 +5296,44 @@ function AuthenticatedApp({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [isDemoMode, loadAlertEvents, userStateHydrated]);
+  }, [
+    isDemoMode,
+    loadAlertEvents,
+    currentPlanEntitlements.alertDelivery,
+    userStateHydrated,
+  ]);
   useEffect(() => {
-    if (isDemoMode || !userStateHydrated) return;
+    if (
+      isDemoMode ||
+      !userStateHydrated ||
+      !currentPlanEntitlements.alertRules
+    ) {
+      setCompetitorAsoDiffs([]);
+      setCompetitorAsoHistoryError(null);
+      return;
+    }
     void loadCompetitorAsoHistory();
-  }, [isDemoMode, loadCompetitorAsoHistory, userStateHydrated]);
+  }, [
+    isDemoMode,
+    loadCompetitorAsoHistory,
+    currentPlanEntitlements.alertRules,
+    userStateHydrated,
+  ]);
   useEffect(() => {
-    if (isDemoMode || !userStateHydrated) return;
+    if (
+      isDemoMode ||
+      !userStateHydrated ||
+      !currentPlanEntitlements.alertDelivery
+    ) {
+      setNotificationServerStatus(null);
+      setNotificationServerStatusError(null);
+      return;
+    }
     void loadNotificationServerStatus();
   }, [
     isDemoMode,
     loadNotificationServerStatus,
+    currentPlanEntitlements.alertDelivery,
     tokenRegistrationStatus,
     userStateHydrated,
   ]);
@@ -5300,7 +5353,7 @@ function AuthenticatedApp({
 
     const status = (url.searchParams.get("status") || "").toLowerCase();
     if (status === "active" || status === "succeeded") {
-      toast.success("Checkout completed. Activating your trial.");
+      toast.success("Checkout completed. Activating your plan.");
       setBillingActivationTimedOut(false);
     } else if (status === "cancelled" || status === "failed") {
       toast.error("Checkout did not complete.");
@@ -5782,7 +5835,7 @@ function AuthenticatedApp({
   const showUpgradePage = viewMode === "upgrade" || !hasActiveBillingAccess;
   const openUpgradeForBillingAccess = React.useCallback(
     (
-      message = "Select a subscription to start your 7-day trial before using the workspace.",
+      message = "Choose a plan to continue. Free keeps core tracking open, and paid plans unlock reports, alerts, and larger capacity.",
     ) => {
       toast.error(message);
       setViewMode("upgrade");
@@ -13004,7 +13057,12 @@ function AuthenticatedApp({
                 </div>
               </WorkspacePanel>
             )}
+            {(viewMode !== "single" &&
+              viewMode !== "compare") ||
+            workspaceSummaryCards.length > 0 ? (
             <WorkspacePanel className="workspace-page-header-panel" tone="strong">
+                {viewMode !== "single" &&
+                viewMode !== "compare" ? (
                 <WorkspacePageIntro
                   eyebrow={
                     visibleWorkspaceMode === "single" ||
@@ -13217,6 +13275,7 @@ function AuthenticatedApp({
                     </div>
                   }
                 />
+                ) : null}
                 {workspaceSummaryCards.length > 0 ? (
                   <WorkspaceMetricGrid compact dense={isDenseWorkspaceLandingSummary}>
                     {workspaceSummaryCards.map((card) => (
@@ -13234,6 +13293,7 @@ function AuthenticatedApp({
                   </WorkspaceMetricGrid>
                 ) : null}
             </WorkspacePanel>
+            ) : null}
 
           {/* Search Section */}{" "}
           {visibleWorkspaceMode !== "bookmarks" &&

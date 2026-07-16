@@ -245,7 +245,7 @@ export default function LandingPage({
             onClick={onGetStarted}
             className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-gradient-to-r from-cyan-400 to-teal-400 px-4 py-2 text-sm font-bold text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.16)] transition-all hover:shadow-[0_0_30px_rgba(34,211,238,0.24)] sm:px-5 sm:py-2.5"
           >
-            <span className="hidden sm:inline">Start 7-Day Trial</span>
+            <span className="hidden sm:inline">Start Free</span>
             <span className="sm:hidden">Start</span>
           </button>
 
@@ -296,7 +296,7 @@ export default function LandingPage({
               }}
               className="mt-2 inline-flex items-center justify-center rounded-xl bg-gradient-to-r from-cyan-400 to-teal-400 px-4 py-3 font-bold text-slate-950"
             >
-              Start 7-Day Trial
+              Start Free
             </button>
           </div>
         </div>
@@ -325,7 +325,7 @@ export default function LandingPage({
                   onClick={onGetStarted}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-cyan-500 px-8 py-4 text-base font-bold text-white shadow-[0_0_20px_rgba(6,182,212,0.3)] transition-all hover:bg-cyan-400 hover:shadow-[0_0_25px_rgba(6,182,212,0.4)] sm:w-auto"
                 >
-                  Start 7-Day Trial
+                  Start Free
                   <ArrowRight className="h-4 w-4" />
                 </button>
                 <div className="flex items-center gap-3">
@@ -333,7 +333,7 @@ export default function LandingPage({
                     <Check className="h-3.5 w-3.5" />
                   </div>
                   <div className="text-sm text-app-text-muted max-w-[200px] leading-snug">
-                    7-day trial, fast setup, and full access from day one.
+                    Free start, fast setup, and core tracking from day one.
                   </div>
                 </div>
               </div>
@@ -566,7 +566,7 @@ export default function LandingPage({
             </SupportEmailLink>
           </div>
 
-          <div className="mx-auto mt-8 max-w-7xl overflow-hidden rounded-[1.5rem] border border-app-border/80 bg-app-surface-muted/58">
+          <div className="mx-auto mt-8 hidden max-w-7xl overflow-hidden rounded-[1.5rem] border border-app-border/80 bg-app-surface-muted/58 md:block">
             <div className="border-b border-app-border/70 px-5 py-4 sm:px-6">
               <h3 className="text-lg font-bold text-app-text">Plan comparison</h3>
               <p className="mt-1 text-sm text-app-text-muted">
@@ -672,7 +672,7 @@ export default function LandingPage({
               onClick={onGetStarted}
               className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-400 to-teal-400 px-5 py-3 text-[13px] font-bold text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.22)] transition-all hover:shadow-[0_0_40px_rgba(34,211,238,0.3)] sm:w-auto md:text-sm"
             >
-              Start 7-Day Trial
+              Start Free
               <ArrowRight className="h-4 w-4" />
             </button>
           </div>

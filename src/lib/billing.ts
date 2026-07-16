@@ -88,19 +88,15 @@ export type PricingComparisonRow = {
 };
 
 export const PRICING_INCLUDED_COPY =
-  "Plans scale by tracked capacity, reporting access, competitor depth, and alert automation.";
+  "Every plan includes core tracking and keyword research. Paid tiers add reports, alerts, and weekly summaries.";
 
 export const PRICING_INCLUDED_CAPABILITIES: PricingIncludedCapability[] = [
   { label: "App Store & Google Play tracking", sub: "iOS + Android in one workspace" },
   { label: "Keyword rank tracking", sub: "Per country, per store" },
-  { label: "AI-Powered Keyword Discovery", sub: "Intelligent keyword recommendations" },
-  { label: "Competitor ASO change alerts", sub: "Rival ASO change alerts" },
-  { label: "Competitor analysis", sub: "Track rivals side by side" },
-  { label: "Daily automated monitoring", sub: "Runs every day, hands-free" },
-  { label: "Rank change alerts", sub: "Notified when positions shift" },
+  { label: "Fast keyword discovery", sub: "Discover relevant opportunities quickly" },
+  { label: "Manual rank refresh", sub: "Check live visibility when you need it" },
+  { label: "Bookmarks and saved apps", sub: "Keep important listings ready to reopen" },
   { label: "Trend charts & history", sub: "See rank movement over time" },
-  { label: "Weekly Email Reports", sub: "Movement summaries delivered to your inbox" },
-  { label: "PDF reports & data export", sub: "Share or archive at any time" },
 ];
 
 const PLAN_SHARED_FEATURES = PRICING_INCLUDED_CAPABILITIES.map(
@@ -112,7 +108,7 @@ export const BILLING_PLANS: BillingPlanDefinition[] = [
     id: "free",
     name: "Free",
     priceLabel: "$0",
-    description: "Try the full workflow with a small portfolio.",
+    description: "Start with core tracking for a small portfolio.",
     cta: "Continue on free",
     features: [...getPlanLimitFeatureLines("free")],
   },

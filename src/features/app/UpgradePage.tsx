@@ -290,7 +290,7 @@ export function UpgradePage({
           className={plan.highlight ? highlightCta : normalCta}
         >
           <Loader2 className="h-4 w-4 animate-spin" />
-          Activating trial
+          Activating plan
         </button>
       );
     }
@@ -442,7 +442,7 @@ export function UpgradePage({
             </p>
               <p className="mt-3 text-[1.45rem] font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-4 sm:text-[1.75rem]">
               {isActivating
-                ? "Activating trial"
+                ? "Activating plan"
                 : isSelectionRequired
                 ? "Choose a plan"
                 : currentPlanId === "free"
@@ -873,7 +873,7 @@ export function UpgradePage({
         </div>
 
         {/* ── Footer ────────────────────────────────────────────────────── */}
-        <div className="workspace-panel mt-8 overflow-hidden p-0">
+        <div className="workspace-panel mt-8 hidden overflow-hidden p-0 md:block">
           <div className="border-b workspace-divider px-4 py-4 sm:px-6">
             <div className="workspace-chip-label">Plan comparison</div>
             <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-app-text">
@@ -940,7 +940,7 @@ export function UpgradePage({
           <span className="hidden sm:inline">·</span>
           <span className="flex items-center gap-2">
             <Lock className="h-3.5 w-3.5 text-app-text-muted" />
-            Secure checkout via Stripe.
+            Secure checkout via Dodo Payments.
           </span>
         </div>
       </div>

@@ -41,7 +41,7 @@ interface BillingPaywallProps {
 }
 
 function formatStatusLabel(status?: string | null) {
-  if (!status) return "Trial access";
+  if (!status) return "Free access";
   return status
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
@@ -567,7 +567,7 @@ export function BillingPaywall({
           </SupportEmailLink>
         </div>
 
-        <div className="mt-8 overflow-hidden rounded-[24px] border border-white/[0.07] bg-app-surface">
+        <div className="mt-8 hidden overflow-hidden rounded-[24px] border border-white/[0.07] bg-app-surface md:block">
           <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-app-text-muted">
               Plan comparison
