@@ -13,11 +13,13 @@ import {
 } from "lucide-react";
 import SupportEmailLink from "./SupportEmailLink";
 import {
+  DISPLAY_BILLING_PLANS,
   PUBLIC_BILLING_PLANS,
   DEFAULT_PUBLIC_BILLING_PLAN_IDS,
   getAvailableBillingIntervals,
   getPlanBillingIntervals,
   getPlanPriceLabel,
+  PRICING_COMPARISON_ROWS,
   PRICING_INCLUDED_CAPABILITIES,
   PRICING_INCLUDED_COPY,
   type BillingInterval,
@@ -136,6 +138,7 @@ export function BillingPaywall({
   const availablePlans = new Set(
     billingStatus?.availablePlans || DEFAULT_PUBLIC_BILLING_PLAN_IDS,
   );
+  const currentPlanId = billingStatus?.subscriptionTier || "free";
   const currentPeriodEnd = formatDate(billingStatus?.currentPeriodEnd);
   const billingConnected = Boolean(
     billingStatus?.configured && billingStatus?.productConfigured,
@@ -178,18 +181,17 @@ export function BillingPaywall({
                 <span className="font-semibold text-app-text">
                   {currentUserLabel}
                 </span>
-                . Start with the 7-day trial, then choose a plan that matches
-                the size of your ASO workflow.
+                . Stay on free for core tracking, then move up when you need reports, alerts, and more capacity.
               </p>
 
               <div className="mt-7 grid gap-3 sm:grid-cols-3">
                 {[
                   {
                     label: "Tracking scale",
-                    value: billingStatus?.isPremium ? "Premium" : "Trial",
-                    hint: billingStatus?.isPremium
-                      ? "Higher limits unlocked"
-                      : "Full access during your first 7 days",
+                    value: currentPlanId === "free" ? "Free" : "Paid",
+                    hint: currentPlanId === "free"
+                      ? "Core tracking is active"
+                      : "Reports and alerts unlocked",
                   },
                   {
                     label: "Renewal",
@@ -271,7 +273,7 @@ export function BillingPaywall({
             <div>
               <div className="workspace-chip-label">Current Access</div>
               <h2 className="mt-2 text-2xl font-semibold text-app-text">
-                {billingStatus?.isPremium ? "Premium active" : "7-day trial"}
+                {currentPlanId === "free" ? "Free active" : "Paid plan active"}
               </h2>
               <p className="mt-2 text-sm leading-6 text-app-text-muted">
                 {formatStatusLabel(billingStatus?.subscriptionStatus)}
@@ -339,7 +341,7 @@ export function BillingPaywall({
 
             <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 p-4">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-app-text-muted">
-                Everything included in every plan
+                Plan access overview
               </p>
               <p className="mt-1.5 text-xs leading-5 text-app-text-muted">
                 {PRICING_INCLUDED_COPY}
@@ -410,12 +412,10 @@ export function BillingPaywall({
         </div>
 
         <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {PUBLIC_BILLING_PLANS.map((plan) => {
+          {DISPLAY_BILLING_PLANS.map((plan) => {
             const planStyle = PLAN_STYLES[plan.id];
             const Icon = planStyle.icon;
-            const isCurrentPlan =
-              Boolean(billingStatus?.isPremium) &&
-              billingStatus?.subscriptionTier === plan.id;
+            const isCurrentPlan = currentPlanId === plan.id;
             const isPlanAvailable =
               plan.contactOnly || availablePlans.has(plan.id);
             const supportsSelectedInterval =
@@ -556,6 +556,62 @@ export function BillingPaywall({
               </section>
             );
           })}
+        </div>
+
+        <div className="mt-5 text-center">
+          <SupportEmailLink
+            subject="Rank Analyzer Pro Custom Terms"
+            className="text-sm font-semibold text-cyan-300 underline-offset-4 transition-colors hover:text-cyan-200 hover:underline"
+          >
+            Contact us for custom terms
+          </SupportEmailLink>
+        </div>
+
+        <div className="mt-8 overflow-hidden rounded-[24px] border border-white/[0.07] bg-app-surface">
+          <div className="border-b border-white/[0.06] px-5 py-4 sm:px-6">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-app-text-muted">
+              Plan comparison
+            </p>
+            <p className="mt-1 text-sm text-app-text-muted">
+              Free keeps core tracking open. Paid plans add reports, alerts, and weekly email summaries.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[42rem] w-full text-left">
+              <thead>
+                <tr className="border-b border-white/[0.06]">
+                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-app-text-muted sm:px-6">
+                    Capability
+                  </th>
+                  {DISPLAY_BILLING_PLANS.map((plan) => (
+                    <th
+                      key={`paywall-compare-${plan.id}`}
+                      className="px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-app-text-muted sm:px-6"
+                    >
+                      {plan.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PRICING_COMPARISON_ROWS.map((row) => (
+                  <tr key={row.label} className="border-b border-white/[0.06] last:border-b-0">
+                    <td className="px-5 py-3 text-sm font-semibold text-app-text sm:px-6">
+                      {row.label}
+                    </td>
+                    {DISPLAY_BILLING_PLANS.map((plan) => (
+                      <td
+                        key={`${row.label}-${plan.id}`}
+                        className="px-5 py-3 text-sm text-app-text-muted sm:px-6"
+                      >
+                        {row.values[plan.id]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

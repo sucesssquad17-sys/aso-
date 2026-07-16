@@ -75,6 +75,7 @@ import {
   getResendEmailId,
   sendAlertEmailEvents as sendSharedAlertEmailEvents,
 } from './src/lib/backendEmail';
+import { resolveCategoryEmailRecipient } from './src/lib/backendEmailRecipients';
 import {
   DISCOVERY_CANDIDATE_CACHE_TTL,
   DISCOVERY_CACHE_VERSION,
@@ -94,11 +95,13 @@ import {
   countPlanUsage,
   getBillingPlanRank,
   getCompetitorTrackedKeywordIdentityKey,
+  getPlanEntitlements,
   getPlanLimits,
   getTrackedAppIdentityKeysForPlanUsage,
   getTrackedKeywordActivity,
   getTrackedKeywordIdentityKey,
   resolveBillingPlanId,
+  type PlanEntitlements,
   type PlanLimits,
 } from './src/lib/planLimits';
 import { COUNTRY_CODE_SET, normalizeCountryCode } from './src/lib/countries';
@@ -120,6 +123,14 @@ import {
   shouldSendWeeklyReportForDate,
   type WeeklyReportSettings,
 } from './src/lib/weeklyReports';
+import {
+  claimWeeklyReportDelivery,
+  finalizeWeeklyReportDelivery,
+} from './src/lib/weeklyReportDelivery';
+import {
+  buildAlertEventId as buildSharedAlertEventId,
+  buildCompetitorAsoAlertEventId,
+} from './src/lib/alertEventIdentity';
 import {
   findChartCategory,
   getChartCategoryOptions,
@@ -627,36 +638,36 @@ type DiscoveryProfile = {
 
 const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
   fast: {
-    keywordLimit: 80,
+    keywordLimit: 100,
     batchSize: 2,
     searchDepth: 100,
     initialSearchDepth: 100,
-    rankingCheckLimit: 20,
-    proxyVerificationLimit: 2,
+    rankingCheckLimit: 25,
+    proxyVerificationLimit: 3,
     extendedDepthCandidateLimit: 0,
-    competitorSeedLimit: 2,
-    competitorResultsPerSeed: 3,
+    competitorSeedLimit: 3,
+    competitorResultsPerSeed: 4,
     competitorMiningTimeoutMs: 2000,
     competitorProxyFallbackOnEmpty: false,
     verificationTimeoutMs: 3500,
-    competitorTermLimit: 40,
-    finalRankingLimit: 15,
+    competitorTermLimit: 50,
+    finalRankingLimit: 18,
   },
   deep: {
-    keywordLimit: 180,
+    keywordLimit: 240,
     batchSize: 3,
     searchDepth: 150,
     initialSearchDepth: 100,
-    rankingCheckLimit: 40,
-    proxyVerificationLimit: 5,
+    rankingCheckLimit: 60,
+    proxyVerificationLimit: 10,
     extendedDepthCandidateLimit: 4,
-    competitorSeedLimit: 4,
-    competitorResultsPerSeed: 5,
+    competitorSeedLimit: 6,
+    competitorResultsPerSeed: 6,
     competitorMiningTimeoutMs: 5000,
     competitorProxyFallbackOnEmpty: false,
     verificationTimeoutMs: 4500,
-    competitorTermLimit: 72,
-    finalRankingLimit: 30,
+    competitorTermLimit: 100,
+    finalRankingLimit: 40,
   },
 };
 const TRACKING_STATE_FILE = path.join(process.cwd(), 'data', 'tracking-state.json');
@@ -1007,6 +1018,7 @@ function getConfiguredDodoProductIdsByPlan() {
 function getConfiguredBillingPlans(): BillingPlanId[] {
   const productIds = getConfiguredDodoProductIdsByPlan();
   return [
+    'free',
     ...(productIds.indie.monthly || productIds.indie.yearly ? (['indie'] as const) : []),
     ...(productIds.starter.monthly || productIds.starter.yearly ? (['starter'] as const) : []),
     ...(productIds.pro.monthly || productIds.pro.yearly ? (['pro'] as const) : []),
@@ -2866,6 +2878,12 @@ function getResolvedPlanLimits(
   return getPlanLimits(getEffectiveBillingPlanId(data));
 }
 
+function getResolvedPlanEntitlements(
+  data: Pick<UserTrackingDocument, 'dodoProductId' | 'subscriptionTier'> | null | undefined,
+) {
+  return getPlanEntitlements(getEffectiveBillingPlanId(data));
+}
+
 function readPendingPlanId(planId?: string | null): BillingPlanId | null {
   return planId === 'indie' ||
     planId === 'starter' ||
@@ -2931,13 +2949,13 @@ function deriveBillingAccessState(
     | 'subscriptionUpdatedAt'
   > | null | undefined,
 ): BillingAccessState {
-  if (hasActiveBillingEntitlement(data)) {
-    return 'active';
-  }
   if (hasPendingBillingActivation(data)) {
     return 'activating';
   }
-  return 'selection_required';
+  if (isDeletedUserTrackingDocument(data)) {
+    return 'selection_required';
+  }
+  return 'active';
 }
 
 function hasActiveBillingEntitlement(
@@ -3486,27 +3504,32 @@ function buildTrackedAlertCountryKey(
   return `${rule.id}:${rule.groupId}:${appId}:${rule.store}:${rule.keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
 }
 
-function sanitizeAlertEventId(input: string) {
-  return input.replace(/[^a-zA-Z0-9:_-]/g, '-').slice(0, 200);
-}
-
 function buildAlertEventId(
   runKey: string,
+  groupId: string,
   ruleId: string,
+  keyword: string,
+  store: string,
   country: string,
   eventType: AlertConditionType,
   threshold: number | null,
   appId = '',
 ) {
-  return sanitizeAlertEventId(
-    `${runKey}:${ruleId}:${appId}:${country}:${eventType}:${threshold ?? 0}`,
-  );
+  return buildSharedAlertEventId({
+    runKey,
+    ruleId,
+    groupId,
+    appId,
+    keyword,
+    store,
+    country,
+    eventType,
+    threshold,
+  });
 }
 
 function createAlertRunKey(prefix: 'schedule' | 'manual' | 'test') {
-  return sanitizeAlertEventId(
-    `${prefix}:${new Date().toISOString()}:${Math.random().toString(36).slice(2, 8)}`,
-  );
+  return `${prefix}:${new Date().toISOString()}:${Math.random().toString(36).slice(2, 8)}`
 }
 
 function getComparableTrackedKey({
@@ -3967,9 +3990,17 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
         if (!shouldTriggerCompetitorAsoAlertCondition(condition, diff)) {
           continue;
         }
-        const eventId = sanitizeAlertEventId(
-          `${runKey}:${rule.id}:${diff.diffId}:${condition.type}`,
-        );
+        const eventId = buildCompetitorAsoAlertEventId({
+          runKey,
+          ruleId: rule.id,
+          groupId: diff.groupId,
+          appId: diff.appId,
+          keyword: diff.appTitle,
+          store: diff.store,
+          country: diff.country,
+          eventType: condition.type,
+          asoDiffId: diff.diffId,
+        });
         const event: AlertEvent = {
           id: eventId,
           ruleId: rule.id,
@@ -4178,61 +4209,53 @@ function formatAlertEmailTimestamp(timestamp: string) {
   return `${istTime} ${GLOBAL_TRACKING_TIMEZONE} (${utcTime} UTC)`;
 }
 
+async function resolveAccountAuthEmail(
+  userDocRef: DocumentReference<DocumentData>,
+) {
+  const authClient = getFirebaseAdminAuthClient();
+  if (!authClient) {
+    throw new Error('firebase-admin-auth-not-configured');
+  }
+
+  const userRecord = await authClient.getUser(userDocRef.id);
+  return userRecord.email?.trim().toLowerCase() || null;
+}
+
 async function resolveAlertEmailRecipient(
   userDocRef: DocumentReference<DocumentData>,
 ) {
-  try {
-    const userSnapshot = await userDocRef.get();
-    const userData = userSnapshot.data() as UserTrackingDocument | undefined;
-    if (
-      userData?.accountStatus === 'deleted' ||
-      userData?.accountStatus === 'deleting'
-    ) {
-      return null;
-    }
-    if (userData?.alertEmailsEnabled === false) {
-      return null;
-    }
-    const billingEmail = normalizeEmailAddress(userData?.billingEmail);
-    if (billingEmail && isValidEmailAddress(billingEmail)) {
-      return billingEmail;
-    }
-  } catch (error) {
-    console.warn(`[email] Failed to read billing email for user ${userDocRef.id}`, error);
-  }
+  return resolveCategoryEmailRecipient(userDocRef, {
+    category: 'alert',
+    resolveAuthEmail: async () => resolveAccountAuthEmail(userDocRef),
+  });
+}
 
-  const authClient = getFirebaseAdminAuthClient();
-  if (!authClient) {
-    console.info('[email] Skipping alert email because Firebase Admin Auth is not configured.');
-    return null;
-  }
-
-  try {
-    const userRecord = await authClient.getUser(userDocRef.id);
-    return userRecord.email?.trim().toLowerCase() || null;
-  } catch (error) {
-    console.warn(`[email] Failed to resolve alert email for user ${userDocRef.id}`, error);
-    return null;
-  }
+async function resolveWeeklyReportEmailRecipient(
+  userDocRef: DocumentReference<DocumentData>,
+) {
+  return resolveCategoryEmailRecipient(userDocRef, {
+    category: 'weekly',
+    resolveAuthEmail: async () => resolveAccountAuthEmail(userDocRef),
+  });
 }
 
 async function sendEmailAlertEvents(
   userDocRef: DocumentReference<DocumentData>,
   events: AlertEvent[],
 ) {
-  const recipient = await resolveAlertEmailRecipient(userDocRef);
+  const recipientResolution = await resolveAlertEmailRecipient(userDocRef);
   await sendSharedAlertEmailEvents(userDocRef, events, {
     resend,
     fromEmail: RESEND_FROM_EMAIL,
     dashboardUrl: ALERT_EMAIL_APP_URL,
-    preferencesUrl: recipient
+    preferencesUrl: recipientResolution.status === 'ready' && recipientResolution.email
       ? getEmailPreferenceUrl({
           kind: 'alert',
           userId: userDocRef.id,
-          email: recipient,
+          email: recipientResolution.email,
         })
       : ALERT_EMAIL_APP_URL,
-    resolveRecipient: async () => recipient,
+    resolveRecipient: async () => recipientResolution,
   });
 }
 
@@ -4368,9 +4391,17 @@ async function maybeSendWeeklyReportEmail(
   if (!eligibility.matchesWeekday || eligibility.alreadySent) {
     return null;
   }
+  const deliveryClaim = await claimWeeklyReportDelivery(userDocRef, {
+    deliveryKey: eligibility.deliveryKey,
+    claimOwner: `server:${process.pid}`,
+    now: date,
+  });
+  if (!deliveryClaim.acquired) {
+    return null;
+  }
   const attemptedAt = new Date().toISOString();
   const buildDeliveryUpdate = (
-    status: 'delivered' | 'failed',
+    status: 'accepted' | 'failed' | 'skipped',
     error?: string,
     sentAt?: string,
   ): WeeklyReportSettings => {
@@ -4392,20 +4423,39 @@ async function maybeSendWeeklyReportEmail(
   };
   if (!resend) {
     console.info('[email] Skipping weekly report email because Resend is not configured.');
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'failed',
+      now: new Date(),
+      error: 'resend-not-configured',
+    });
     return buildDeliveryUpdate('failed', 'resend-not-configured');
   }
 
   const sender = getConfiguredResendSender();
   if (!sender) {
     console.info('[email] Skipping weekly report email because sender email is not configured.');
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'failed',
+      now: new Date(),
+      error: 'sender-not-configured',
+    });
     return buildDeliveryUpdate('failed', 'sender-not-configured');
   }
 
-  const recipient = await resolveAlertEmailRecipient(userDocRef);
-  if (!recipient) {
-    console.info(`[email] Skipping weekly report email for user ${userDocRef.id} because no account email is available.`);
-    return buildDeliveryUpdate('failed', 'no-account-email');
+  const recipientResolution = await resolveWeeklyReportEmailRecipient(userDocRef);
+  if (recipientResolution.status !== 'ready' || !recipientResolution.email) {
+    console.info(`[email] Skipping weekly report email for user ${userDocRef.id} because ${recipientResolution.reason}.`);
+    const isSkipped =
+      recipientResolution.status === 'opted_out' ||
+      recipientResolution.status === 'account_deleted';
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: isSkipped ? 'skipped' : 'failed',
+      now: new Date(),
+      error: recipientResolution.reason,
+    });
+    return buildDeliveryUpdate(isSkipped ? 'skipped' : 'failed', recipientResolution.reason);
   }
+  const recipient = recipientResolution.email;
 
   const hydratedState = await hydrateWeeklyReportStateWithArchive(
     userDocRef,
@@ -4451,6 +4501,14 @@ async function maybeSendWeeklyReportEmail(
     });
     if (result.error) {
       console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, result.error);
+      await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+        status: 'failed',
+        now: new Date(),
+        error:
+          typeof result.error.message === 'string' && result.error.message.trim()
+            ? result.error.message.trim()
+            : 'provider-error',
+      });
       return buildDeliveryUpdate(
         'failed',
         typeof result.error.message === 'string' && result.error.message.trim()
@@ -4463,10 +4521,24 @@ async function maybeSendWeeklyReportEmail(
     }
 
     const sentAt = new Date().toISOString();
-    console.info(`[email] Delivered weekly report email to ${recipient}.`);
-    return buildDeliveryUpdate('delivered', undefined, sentAt);
+    const providerMessageId = getResendEmailId(result);
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'accepted',
+      now: new Date(sentAt),
+      providerMessageId,
+    });
+    console.info(`[email] Accepted weekly report email for ${recipient}.`);
+    return buildDeliveryUpdate('accepted', undefined, sentAt);
   } catch (error) {
     console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, error);
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'failed',
+      now: new Date(),
+      error:
+        error instanceof Error && error.message.trim()
+          ? error.message.trim().slice(0, 500)
+          : 'unknown-delivery-failure',
+    });
     return buildDeliveryUpdate(
       'failed',
       error instanceof Error && error.message.trim()
@@ -4886,7 +4958,7 @@ async function sendCronFailureEmail(input: {
     if (!getResendEmailId(result)) {
       console.warn(`[email] Cron failure email for ${input.runKey} returned no message id.`);
     }
-    console.info(`[email] Delivered cron failure email for ${input.runKey}.`);
+    console.info(`[email] Accepted cron failure email for ${input.runKey}.`);
   } catch (error) {
     console.warn('[email] Failed to deliver cron failure email.', error);
   }
@@ -4970,7 +5042,10 @@ async function evaluateAndDispatchAlertRules(
 
           const eventId = buildAlertEventId(
             runKey,
+            rule.groupId,
             rule.id,
+            rule.keyword,
+            rule.store,
             country,
             condition.type,
             condition.value ?? null,
@@ -6894,6 +6969,7 @@ async function captureCompetitorAsoState(
   runKey: string,
   options?: {
     mode?: TrackingRefreshMode;
+    alertsEnabled?: boolean;
   },
 ) {
   if (!state.competitorGroups.length) {
@@ -6999,13 +7075,16 @@ async function captureCompetitorAsoState(
     });
   });
 
-  const { createdEvents } = await evaluateAndDispatchCompetitorAsoAlertRules(
-    userDocRef,
-    state.alertRules,
-    state.notificationSettings,
-    createdDiffs,
-    runKey,
-  );
+  const { createdEvents } =
+    options?.alertsEnabled === false
+      ? { createdEvents: [] as AlertEvent[] }
+      : await evaluateAndDispatchCompetitorAsoAlertRules(
+          userDocRef,
+          state.alertRules,
+          state.notificationSettings,
+          createdDiffs,
+          runKey,
+        );
 
   return {
     nextLatestSnapshots: Array.from(latestByKey.values()).sort((a, b) =>
@@ -7273,6 +7352,7 @@ async function runAllUserTrackingSchedules(
         return;
       }
       const state = normalizeUserTrackingDocument(userData);
+      const planEntitlements = getResolvedPlanEntitlements(userData);
       const hasTrackedData =
         state.trackedKeywords.length > 0 ||
         state.competitorTrackedKeywords.length > 0 ||
@@ -7332,24 +7412,29 @@ async function runAllUserTrackingSchedules(
               state.competitorTrackedKeywords,
               refreshed.nextState.competitorTrackedKeywords,
             );
-            const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
-              userDoc.ref,
-              [
-                ...state.trackedKeywords,
-                ...flattenCompetitorTrackedKeywordsForAlerts(
-                  state.competitorTrackedKeywords,
-                ),
-              ],
-              [
-                ...nextTrackedKeywords,
-                ...flattenCompetitorTrackedKeywordsForAlerts(
-                  nextCompetitorTrackedKeywords,
-                ),
-              ],
-              state.alertRules,
-              state.notificationSettings,
-              runKey,
-            );
+            const { updatedRules: updatedAlertRules } =
+              planEntitlements.alertRules || planEntitlements.alertDelivery
+                ? await evaluateAndDispatchAlertRules(
+                    userDoc.ref,
+                    [
+                      ...state.trackedKeywords,
+                      ...flattenCompetitorTrackedKeywordsForAlerts(
+                        state.competitorTrackedKeywords,
+                      ),
+                    ],
+                    [
+                      ...nextTrackedKeywords,
+                      ...flattenCompetitorTrackedKeywordsForAlerts(
+                        nextCompetitorTrackedKeywords,
+                      ),
+                    ],
+                    state.alertRules,
+                    state.notificationSettings,
+                    runKey,
+                  )
+                : {
+                    updatedRules: state.alertRules,
+                  };
             const asoResult = await captureCompetitorAsoState(
               userDoc.ref,
               {
@@ -7360,7 +7445,11 @@ async function runAllUserTrackingSchedules(
                 notificationSettings: state.notificationSettings,
               },
               runKey,
-              { mode: options?.mode },
+              {
+                mode: options?.mode,
+                alertsEnabled:
+                  planEntitlements.alertRules || planEntitlements.alertDelivery,
+              },
             );
             const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
               userDoc.ref,
@@ -7399,11 +7488,13 @@ async function runAllUserTrackingSchedules(
         }
       }
 
-      const nextWeeklyReportSettings = await maybeSendWeeklyReportEmail(
-        userDoc.ref,
-        weeklyEmailState,
-        now,
-      );
+      const nextWeeklyReportSettings = planEntitlements.weeklyEmailReports
+        ? await maybeSendWeeklyReportEmail(
+            userDoc.ref,
+            weeklyEmailState,
+            now,
+          )
+        : null;
       if (nextWeeklyReportSettings) {
         updatePayload.weeklyReportSettings = nextWeeklyReportSettings;
       }
@@ -8204,12 +8295,15 @@ const groqClient = process.env.GROQ_API_KEY
 const DISCOVERY_PRIMARY_MODEL_FAST =
   process.env.DISCOVERY_PRIMARY_MODEL_FAST ||
   process.env.DISCOVERY_PRIMARY_MODEL ||
-  'openai/gpt-oss-20b';
+  'openai/gpt-oss-120b';
 const DISCOVERY_PRIMARY_MODEL_DEEP =
   process.env.DISCOVERY_PRIMARY_MODEL_DEEP ||
   process.env.DISCOVERY_PRIMARY_MODEL ||
-  'openai/gpt-oss-20b';
-const DISCOVERY_FALLBACK_MODEL = process.env.DISCOVERY_FALLBACK_MODEL || 'gemini-2.5-flash-lite';
+  'openai/gpt-oss-120b';
+const DISCOVERY_FALLBACK_MODEL =
+  process.env.DISCOVERY_FALLBACK_MODEL || 'openai/gpt-oss-20b';
+const DISCOVERY_GEMINI_REPAIR_MODEL =
+  process.env.DISCOVERY_GEMINI_REPAIR_MODEL || 'gemini-2.5-flash-lite';
 const DISCOVERY_REFINEMENT_RETRY_DELAYS_MS = [600, 1500] as const;
 const DISCOVERY_REFINEMENT_LIMITS = {
   fast: {
@@ -8227,11 +8321,11 @@ const DISCOVERY_REFINEMENT_LIMITS = {
     rawDescriptionExcerptChars: 1800,
   },
   deep: {
-    promptCandidateLimit: 220,
+    promptCandidateLimit: 260,
     featureSummaryLimit: 44,
-    outputKeywordLimit: 60,
-    outputTokenLimit: 960,
-    minimumUsableCount: 14,
+    outputKeywordLimit: 75,
+    outputTokenLimit: 1200,
+    minimumUsableCount: 18,
     appPurposeLimit: 6,
     targetUsersLimit: 6,
     coreFeaturesLimit: 12,
@@ -8258,7 +8352,7 @@ const DISCOVERY_PROMPT_FLOOR_LIMITS = {
     rawDescriptionExcerptChars: 2400,
   },
   deep: {
-    promptCandidateLimit: 220,
+    promptCandidateLimit: 260,
     featureSummaryLimit: 44,
     appPurposeLimit: 8,
     targetUsersLimit: 8,
@@ -8469,13 +8563,24 @@ function getDiscoveryPrimaryModel(mode: DiscoveryMode) {
     : DISCOVERY_PRIMARY_MODEL_FAST;
 }
 
-async function generateGroqKeywordList(prompt: string, mode: DiscoveryMode) {
+function getDiscoveryGroqModel(mode: DiscoveryMode, provider: 'primary' | 'fallback') {
+  if (provider === 'fallback') {
+    return DISCOVERY_FALLBACK_MODEL;
+  }
+  return getDiscoveryPrimaryModel(mode);
+}
+
+async function generateGroqKeywordList(
+  prompt: string,
+  mode: DiscoveryMode,
+  provider: 'primary' | 'fallback' = 'primary',
+) {
   if (!groqClient) {
     return null;
   }
 
   let lastError: unknown = null;
-  const model = getDiscoveryPrimaryModel(mode);
+  const model = getDiscoveryGroqModel(mode, provider);
   for (let attempt = 0; attempt <= DISCOVERY_REFINEMENT_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
       const response = await groqClient.chat.completions.create({
@@ -8515,7 +8620,7 @@ async function generateGeminiDiscoveryKeywordList(prompt: string, mode: Discover
   for (let attempt = 0; attempt <= DISCOVERY_REFINEMENT_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
       const response = await genai.models.generateContent({
-        model: DISCOVERY_FALLBACK_MODEL,
+        model: DISCOVERY_GEMINI_REPAIR_MODEL,
         contents: prompt,
         config: {
           temperature: getDiscoveryRefinementTemperature(mode),
@@ -8547,13 +8652,15 @@ async function runDiscoveryProviderAttempt(input: {
   mode: DiscoveryMode;
   prompt: string;
   provider: DiscoveryProviderName;
+  groqTier?: 'primary' | 'fallback';
 }): Promise<DiscoveryProviderAttempt> {
   if (input.provider === 'groq') {
     if (!groqClient) {
       return { result: null, failureReason: 'unconfigured' };
     }
     try {
-      const keywords = await generateGroqKeywordList(input.prompt, input.mode);
+      const groqTier = input.groqTier || 'primary';
+      const keywords = await generateGroqKeywordList(input.prompt, input.mode, groqTier);
       if (!keywords) {
         return { result: null, failureReason: 'invalid_json' };
       }
@@ -8564,7 +8671,7 @@ async function runDiscoveryProviderAttempt(input: {
         result: {
           keywords,
           provider: 'groq',
-          model: getDiscoveryPrimaryModel(input.mode),
+          model: getDiscoveryGroqModel(input.mode, groqTier),
         },
         failureReason: null,
       };
@@ -8592,7 +8699,7 @@ async function runDiscoveryProviderAttempt(input: {
       result: {
         keywords,
         provider: 'gemini',
-        model: DISCOVERY_FALLBACK_MODEL,
+        model: DISCOVERY_GEMINI_REPAIR_MODEL,
       },
       failureReason: null,
     };
@@ -8697,6 +8804,7 @@ async function refineKeywordsWithModel(
       prompt,
       mode,
       provider: 'groq',
+      groqTier: 'primary',
     });
     if (primaryAttempt.result) {
       const sanitizedPrimary = sanitizeRefinedKeywords(
@@ -8704,7 +8812,9 @@ async function refineKeywordsWithModel(
         excludedBrandTokenSet,
         mode,
       );
-      if (sanitizedPrimary.length >= DISCOVERY_REFINEMENT_LIMITS[mode].minimumUsableCount) {
+      // A valid 120B response is authoritative even when it is shorter than
+      // the preferred pool size. Use 20B only when the primary truly fails.
+      if (sanitizedPrimary.length > 0) {
         providerUsed = primaryAttempt.result.provider;
         modelUsed = primaryAttempt.result.model;
         modelKeywords = sanitizedPrimary;
@@ -8720,7 +8830,8 @@ async function refineKeywordsWithModel(
       const fallbackAttempt = await runDiscoveryProviderAttempt({
         prompt,
         mode,
-        provider: 'gemini',
+        provider: 'groq',
+        groqTier: 'fallback',
       });
       if (fallbackAttempt.result) {
         const sanitizedFallback = sanitizeRefinedKeywords(
@@ -8738,6 +8849,31 @@ async function refineKeywordsWithModel(
         }
       } else if (!fallbackReason) {
         fallbackReason = fallbackAttempt.failureReason;
+      }
+
+      if (!modelKeywords.length) {
+        const repairAttempt = await runDiscoveryProviderAttempt({
+          prompt,
+          mode,
+          provider: 'gemini',
+        });
+        if (repairAttempt.result) {
+          const sanitizedRepair = sanitizeRefinedKeywords(
+            repairAttempt.result.keywords,
+            excludedBrandTokenSet,
+            mode,
+          );
+          if (sanitizedRepair.length >= DISCOVERY_REFINEMENT_LIMITS[mode].minimumUsableCount) {
+            providerUsed = repairAttempt.result.provider;
+            modelUsed = repairAttempt.result.model;
+            modelKeywords = sanitizedRepair;
+          } else if (!fallbackReason) {
+            fallbackReason =
+              sanitizedRepair.length === 0 ? 'empty_output' : 'insufficient_output';
+          }
+        } else if (!fallbackReason) {
+          fallbackReason = repairAttempt.failureReason;
+        }
       }
     }
   }
@@ -9542,6 +9678,7 @@ async function startServer() {
   });
 
   app.use(express.json({ limit: '5mb' }));
+  app.use(express.urlencoded({ extended: false }));
   app.use((error: unknown, _req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (error instanceof SyntaxError) {
       res.status(400).json({
@@ -9627,10 +9764,12 @@ async function startServer() {
           : userData;
         pendingPlanId = null;
         pendingInterval = null;
-        accessState = 'selection_required';
+        accessState = deriveBillingAccessState(userData);
       }
       const planLimits =
         accessState === 'active' ? getResolvedPlanLimits(userData) : null;
+      const planEntitlements =
+        accessState === 'active' ? getResolvedPlanEntitlements(userData) : null;
       const usage =
         accessState === 'active' && planLimits
           ? getNormalizedPlanUsage(normalizedUserState, planLimits)
@@ -9652,6 +9791,7 @@ async function startServer() {
         currentPeriodEnd: userData?.subscriptionCurrentPeriodEnd || null,
         cancelAtPeriodEnd: Boolean(userData?.subscriptionCancelAtPeriodEnd),
         planLimits,
+        planEntitlements,
         usage,
       });
     } catch (error) {
@@ -10006,6 +10146,14 @@ async function startServer() {
         userDocRef,
         mergedState.competitorRankHistory,
       );
+      const planEntitlements = getResolvedPlanEntitlements(currentUserData);
+      const alertRulesChanged =
+        JSON.stringify(currentState.alertRules) !== JSON.stringify(mergedState.alertRules);
+      const shouldRestoreAlertEmails =
+        planEntitlements.alertDelivery &&
+        currentUserData?.alertEmailsEnabled === false &&
+        alertRulesChanged &&
+        mergedState.alertRules.some((rule) => rule.enabled && rule.channels.email);
 
       await userDocRef.set({
         bookmarks: mergedState.bookmarks,
@@ -10022,6 +10170,12 @@ async function startServer() {
         weeklyReportSettings: mergedState.weeklyReportSettings,
         alertRules: mergedState.alertRules,
         notificationSettings: mergedState.notificationSettings,
+        ...(shouldRestoreAlertEmails
+          ? {
+            alertEmailsEnabled: true,
+            alertEmailsUpdatedAt: serverUpdatedAt,
+          }
+          : {}),
         ...(mergedState.migratedFromLocalAt
           ? { migratedFromLocalAt: mergedState.migratedFromLocalAt }
           : {}),
@@ -10316,19 +10470,43 @@ async function startServer() {
     }
   });
 
+  type EmailPreferenceAction =
+    | {
+      href: string;
+      label: string;
+      primary?: boolean;
+    }
+    | {
+      label: string;
+      primary?: boolean;
+      method: 'post';
+      fields: Record<string, string>;
+    };
+
   const sendEmailPreferenceHtml = (
     res: express.Response,
     status: number,
     title: string,
     message: string,
-    actions: Array<{ href: string; label: string; primary?: boolean }> = [],
+    actions: EmailPreferenceAction[] = [],
   ) => {
     const actionsHtml = actions.length
       ? `<div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px;">
           ${actions
             .map(
-              (action) =>
-                `<a href="${escapeAlertEmailHtml(action.href)}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid ${action.primary ? '#2563eb' : '#cbd5e1'}; background: ${action.primary ? '#2563eb' : '#ffffff'}; color: ${action.primary ? '#ffffff' : '#0f172a'}; font-size: 15px; font-weight: 600; text-decoration: none;">${escapeAlertEmailHtml(action.label)}</a>`,
+              (action) => {
+                const baseStyle = `display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 999px; border: 1px solid ${action.primary ? '#2563eb' : '#cbd5e1'}; background: ${action.primary ? '#2563eb' : '#ffffff'}; color: ${action.primary ? '#ffffff' : '#0f172a'}; font-size: 15px; font-weight: 600; text-decoration: none;`;
+                if ('href' in action) {
+                  return `<a href="${escapeAlertEmailHtml(action.href)}" style="${baseStyle}">${escapeAlertEmailHtml(action.label)}</a>`;
+                }
+                const fieldsHtml = Object.entries(action.fields)
+                  .map(
+                    ([key, value]) =>
+                      `<input type="hidden" name="${escapeAlertEmailHtml(key)}" value="${escapeAlertEmailHtml(value)}" />`,
+                  )
+                  .join('');
+                return `<form method="post" style="margin: 0;">${fieldsHtml}<button type="submit" style="${baseStyle}; cursor: pointer;">${escapeAlertEmailHtml(action.label)}</button></form>`;
+              },
             )
             .join('')}
         </div>`
@@ -10404,6 +10582,42 @@ async function startServer() {
     }
   };
 
+  const updateEmailPreferenceSetting = async (input: {
+    userDocRef: DocumentReference<DocumentData>;
+    kind: EmailPreferenceKind;
+    enabled: boolean;
+    campaignId?: string;
+  }) => {
+    const updatedAt = new Date().toISOString();
+    if (input.kind === 'alert') {
+      await input.userDocRef.set({
+        alertEmailsEnabled: input.enabled,
+        alertEmailsUpdatedAt: updatedAt,
+        updatedAt,
+      } satisfies Partial<UserTrackingDocument>, { merge: true });
+      return;
+    }
+    if (input.kind === 'weekly') {
+      await input.userDocRef.set(
+        {
+          weeklyReportSettings: {
+            enabled: input.enabled,
+            lastAttemptedAt: updatedAt,
+          },
+          updatedAt,
+        } as DocumentData,
+        { merge: true },
+      );
+      return;
+    }
+    await input.userDocRef.set({
+      announcementEmailsEnabled: input.enabled,
+      announcementEmailsUpdatedAt: updatedAt,
+      ...(input.campaignId ? { lastAnnouncementEmailCampaignId: input.campaignId } : {}),
+      updatedAt,
+    } satisfies Partial<UserTrackingDocument>, { merge: true });
+  };
+
   app.get('/api/email/preferences', strictRateLimit, async (req, res) => {
     try {
       const adminDb = getFirebaseAdminDb();
@@ -10442,46 +10656,20 @@ async function startServer() {
 
       const meta = getEmailPreferenceMeta(kind);
       if (setValue === 'on' || setValue === 'off') {
-        enabled = setValue === 'on';
-        const updatedAt = new Date().toISOString();
-        if (kind === 'alert') {
-          await userDocRef.set({
-            alertEmailsEnabled: enabled,
-            alertEmailsUpdatedAt: updatedAt,
-            updatedAt,
-          } satisfies Partial<UserTrackingDocument>, { merge: true });
-        } else if (kind === 'weekly') {
-          await userDocRef.set(
-            {
-              weeklyReportSettings: {
-                enabled,
-                lastAttemptedAt: updatedAt,
-              },
-              updatedAt,
-            } as DocumentData,
-            { merge: true },
-          );
-        } else {
-          await userDocRef.set({
-            announcementEmailsEnabled: enabled,
-            announcementEmailsUpdatedAt: updatedAt,
-            ...(campaignId ? { lastAnnouncementEmailCampaignId: campaignId } : {}),
-            updatedAt,
-          } satisfies Partial<UserTrackingDocument>, { merge: true });
-        }
-        const nextQuery = buildEmailPreferenceQuery({
+        const confirmationQuery = buildEmailPreferenceQuery({
           kind,
           uid,
           email,
           token,
           ...(campaignId ? { campaignId } : {}),
-          set: enabled ? 'off' : 'on',
         });
         return sendEmailPreferenceHtml(
           res,
           200,
           meta.title,
-          enabled ? meta.turnedOn : meta.turnedOff,
+          setValue === 'on'
+            ? `Confirm turning on ${meta.title.toLowerCase()} for this account.`
+            : `Confirm turning off ${meta.title.toLowerCase()} for this account.`,
           [
             {
               href: `${ALERT_EMAIL_APP_URL}/?viewMode=reports&period=7d`,
@@ -10489,8 +10677,20 @@ async function startServer() {
               primary: true,
             },
             {
-              href: `${ALERT_EMAIL_APP_URL}/api/email/preferences?${nextQuery}`,
-              label: enabled ? meta.disableLabel : meta.enableLabel,
+              href: `${ALERT_EMAIL_APP_URL}/api/email/preferences?${confirmationQuery}`,
+              label: 'Cancel',
+            },
+            {
+              method: 'post',
+              label: setValue === 'on' ? meta.enableLabel : meta.disableLabel,
+              fields: {
+                kind,
+                uid,
+                email,
+                token,
+                ...(campaignId ? { campaignId } : {}),
+                set: setValue,
+              },
             },
           ],
         );
@@ -10509,6 +10709,76 @@ async function startServer() {
         200,
         meta.title,
         enabled ? meta.enabledMessage : meta.disabledMessage,
+        [
+          {
+            href: `${ALERT_EMAIL_APP_URL}/?viewMode=reports&period=7d`,
+            label: 'Open dashboard',
+            primary: true,
+          },
+          {
+            href: `${ALERT_EMAIL_APP_URL}/api/email/preferences?${nextQuery}`,
+            label: enabled ? meta.disableLabel : meta.enableLabel,
+          },
+        ],
+      );
+    } catch (error) {
+      const message =
+        error instanceof ApiError
+          ? error.message
+          : 'The email preferences request could not be completed.';
+      return sendEmailPreferenceHtml(res, 400, 'Unable to manage preferences', message);
+    }
+  });
+
+  app.post('/api/email/preferences', strictRateLimit, async (req, res) => {
+    try {
+      const adminDb = getFirebaseAdminDb();
+      if (!adminDb) {
+        throw createConfigurationError('Firebase Admin is not configured on the server.');
+      }
+
+      const uid = readRequiredString(req.body?.uid, 'uid', 200);
+      const email = normalizeEmailAddress(readRequiredString(req.body?.email, 'email', 320));
+      const token = readRequiredString(req.body?.token, 'token', 300);
+      const kind: EmailPreferenceKind =
+        req.body?.kind === 'alert' || req.body?.kind === 'weekly'
+          ? req.body.kind
+          : 'announcement';
+      const campaignId = readOptionalString(req.body?.campaignId, 'campaignId', 120).trim();
+      const setValue = readRequiredString(req.body?.set, 'set', 12).trim().toLowerCase();
+      if (!email || !isValidEmailAddress(email)) {
+        throw createBadRequestError('A valid email address is required.');
+      }
+      if (!verifyEmailPreferenceToken(kind, uid, email, token)) {
+        throw createForbiddenError('This preferences link is invalid or has expired.');
+      }
+      if (setValue !== 'on' && setValue !== 'off') {
+        throw createBadRequestError('The requested preference update is invalid.');
+      }
+
+      const enabled = setValue === 'on';
+      const userDocRef = adminDb.collection('users').doc(uid);
+      await updateEmailPreferenceSetting({
+        userDocRef,
+        kind,
+        enabled,
+        ...(campaignId ? { campaignId } : {}),
+      });
+
+      const meta = getEmailPreferenceMeta(kind);
+      const nextQuery = buildEmailPreferenceQuery({
+        kind,
+        uid,
+        email,
+        token,
+        ...(campaignId ? { campaignId } : {}),
+        set: enabled ? 'off' : 'on',
+      });
+      return sendEmailPreferenceHtml(
+        res,
+        200,
+        meta.title,
+        enabled ? meta.turnedOn : meta.turnedOff,
         [
           {
             href: `${ALERT_EMAIL_APP_URL}/?viewMode=reports&period=7d`,
@@ -10608,6 +10878,7 @@ async function startServer() {
       const userSnapshot = await userDocRef.get();
       const userData = userSnapshot.data() as UserTrackingDocument | undefined;
       const state = normalizeUserTrackingDocument(userData);
+      const planEntitlements = getResolvedPlanEntitlements(userData);
       const requestedTrackedKeywordIdentityKey = getTrackedKeywordIdentityKey({
         appId,
         keyword,
@@ -10685,14 +10956,20 @@ async function startServer() {
         userDocRef,
         nextRankHistory,
       );
-      const { updatedRules, createdEvents } = await evaluateAndDispatchAlertRules(
-        userDocRef,
-        state.trackedKeywords,
-        nextTrackedKeywords,
-        state.alertRules,
-        state.notificationSettings,
-        createAlertRunKey('manual'),
-      );
+      const { updatedRules, createdEvents } =
+        planEntitlements.alertRules || planEntitlements.alertDelivery
+          ? await evaluateAndDispatchAlertRules(
+              userDocRef,
+              state.trackedKeywords,
+              nextTrackedKeywords,
+              state.alertRules,
+              state.notificationSettings,
+              createAlertRunKey('manual'),
+            )
+          : {
+              updatedRules: state.alertRules,
+              createdEvents: [] as AlertEvent[],
+            };
 
       await userDocRef.set({
         trackedKeywords: nextTrackedKeywords,
@@ -11499,6 +11776,8 @@ async function startServer() {
 
   // Vite middleware for development
   if (isDevelopment) {
+    // Blog pages are static HTML and must be served before the custom Vite app fallback.
+    app.use('/blog', express.static(path.join(process.cwd(), 'public', 'blog')));
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
@@ -11531,7 +11810,7 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
+    app.use(express.static(distPath, { extensions: ['html'] }));
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });

@@ -1,6 +1,6 @@
 export const DISCOVERY_CACHE_TTL = 1000 * 60 * 30;
 export const DISCOVERY_CANDIDATE_CACHE_TTL = 1000 * 60 * 30;
-export const DISCOVERY_CACHE_VERSION = "v28";
+export const DISCOVERY_CACHE_VERSION = "v29";
 
 export type DiscoveryMode = "fast" | "deep";
 
@@ -27,13 +27,13 @@ type DiscoveryPayloadLike<TRanking = unknown, TSuggestion = unknown> = {
 
 const DISCOVERY_MODE_LIMITS = {
   fast: {
-    keywordLimit: 80,
-    finalRankingLimit: 15,
+    keywordLimit: 100,
+    finalRankingLimit: 18,
     searchDepth: 100,
   },
   deep: {
-    keywordLimit: 180,
-    finalRankingLimit: 30,
+    keywordLimit: 240,
+    finalRankingLimit: 40,
     searchDepth: 150,
   },
 } as const;

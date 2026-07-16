@@ -19,7 +19,7 @@ export type WeeklyReportSettings = {
   lastSentWeekKey?: string;
   lastSentAt?: string;
   lastAttemptedAt?: string;
-  lastDeliveryStatus?: "delivered" | "failed";
+  lastDeliveryStatus?: "accepted" | "delivered" | "failed" | "skipped";
   lastDeliveryError?: string;
 };
 
@@ -79,7 +79,9 @@ export function normalizeWeeklyReportSettings(
         ? input.lastAttemptedAt.trim()
         : undefined,
     lastDeliveryStatus:
+      input?.lastDeliveryStatus === "accepted" ||
       input?.lastDeliveryStatus === "delivered" ||
+      input?.lastDeliveryStatus === "skipped" ||
       input?.lastDeliveryStatus === "failed"
         ? input.lastDeliveryStatus
         : undefined,

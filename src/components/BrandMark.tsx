@@ -1,6 +1,5 @@
 import React from "react";
 import { motion, useReducedMotion } from "motion/react";
-import { Search } from "lucide-react";
 import { cn } from "../lib/utils";
 
 type BrandVariant = "mark" | "lockup";
@@ -184,20 +183,22 @@ export function BrandMark({
   const mark = (
     <motion.div
       className={cn(
-        "brand-mark-shell inline-flex items-center justify-center bg-gradient-to-br from-cyan-300 to-teal-400 text-slate-950 shadow-[0_12px_36px_rgba(34,211,238,0.22)]",
+        "brand-mark-shell inline-flex items-center justify-center overflow-hidden bg-gradient-to-br from-cyan-300 to-teal-400 text-slate-950 shadow-[0_12px_36px_rgba(34,211,238,0.22)]",
         config.mark,
       )}
       initial={markInitial}
       animate={markAnimate}
       transition={markTransition}
     >
-      <motion.div
+      <motion.img
+        src="/apple-touch-icon.svg"
+        alt=""
+        aria-hidden="true"
+        className="h-full w-full object-cover"
         initial={iconInitial}
         animate={iconAnimate}
         transition={iconTransition}
-      >
-        <Search className={cn(config.icon)} strokeWidth={2.5} />
-      </motion.div>
+      />
     </motion.div>
   );
 

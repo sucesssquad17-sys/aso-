@@ -43,6 +43,7 @@ export type UnifiedAlertRuleManagerModalProps = {
   onClose: () => void;
   onChange: (rules: AlertRule[]) => void;
   notificationPermission: NotificationPermission | "unsupported";
+  alertEmailsEnabled: boolean;
   onRequestPushPermission: () => Promise<NotificationPermission | "unsupported">;
 };
 
@@ -99,6 +100,7 @@ export function UnifiedAlertRuleManagerModal({
   onClose,
   onChange,
   notificationPermission,
+  alertEmailsEnabled,
   onRequestPushPermission,
 }: UnifiedAlertRuleManagerModalProps) {
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
@@ -184,12 +186,13 @@ export function UnifiedAlertRuleManagerModal({
     [notificationPermission, onRequestPushPermission],
   );
 
-  const pushEnabled = notificationsEnabled;
+  const pushEnabled =
+    notificationsEnabled && notificationPermission === "granted";
 
   const notificationsHelperText =
     notificationPermission === "granted"
       ? "Workspace feed and browser notification."
-      : "Workspace feed. Browser notification will be enabled when permission is allowed.";
+      : "Workspace feed only until browser notification permission is allowed.";
 
   const pushPermissionWarning =
     notificationsEnabled && notificationPermission !== "granted";
@@ -383,9 +386,9 @@ export function UnifiedAlertRuleManagerModal({
       : "Watch daily metadata changes across the competitor apps in this group.";
 
   return (
-    <div className="workspace-mobile-overlay unified-alert-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 p-4 backdrop-blur-sm">
-      <div className="workspace-mobile-dialog unified-alert-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-app-border/60 bg-app-surface/95 shadow-2xl">
-        <div className="unified-alert-modal-header flex items-center justify-between border-b border-app-border/50 px-6 py-4">
+    <div className="workspace-mobile-overlay unified-alert-modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--color-canvas)]/80 p-4 backdrop-blur-sm">
+      <div className="workspace-mobile-dialog unified-alert-modal max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border workspace-border-strong bg-[color:var(--color-surface-elevated)] shadow-2xl">
+        <div className="unified-alert-modal-header flex items-center justify-between border-b workspace-divider px-6 py-4">
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-400">
               {eyebrow}
@@ -415,7 +418,7 @@ export function UnifiedAlertRuleManagerModal({
                   key={preset.id}
                   type="button"
                   onClick={() => applyPreset(preset.conditions)}
-                  className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-3 py-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
+                  className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface-muted)] px-3 py-1.5 text-xs font-semibold text-app-text-muted transition-colors hover:border-[color:var(--color-border-strong)] hover:text-app-text"
                   title={preset.description}
                 >
                   {preset.label}
@@ -423,7 +426,7 @@ export function UnifiedAlertRuleManagerModal({
               ))}
             </div>
 
-            <div className="unified-alert-builder rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
+            <div className="unified-alert-builder rounded-2xl border workspace-border-default bg-[color:var(--color-surface-muted)] p-4">
               <div className="mb-3 flex items-center justify-between">
                 <h4 className="text-sm font-semibold text-app-text">
                   {editingRuleId ? "Edit rule" : "Create rule"}
@@ -460,8 +463,8 @@ export function UnifiedAlertRuleManagerModal({
                           }
                           className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-colors ${
                             isSelected
-                              ? "border-cyan-500/40 bg-cyan-500/15 text-cyan-200"
-                              : "border-app-border/60 bg-app-surface/40 text-app-text-muted hover:text-app-text"
+                              ? "border-[color:var(--color-brand-border)] bg-[color:var(--color-brand-soft)] text-[color:var(--color-brand)]"
+                              : "workspace-border-default bg-[color:var(--color-surface)] text-app-text-muted hover:text-app-text"
                           }`}
                         >
                           {country.toUpperCase()}
@@ -479,7 +482,7 @@ export function UnifiedAlertRuleManagerModal({
                     {conditionTypes.map((conditionType) => (
                       <label
                         key={conditionType}
-                        className="unified-alert-condition rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-2 text-sm text-app-text-muted"
+                        className="unified-alert-condition rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text-muted"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0 flex items-center gap-2">
@@ -509,7 +512,7 @@ export function UnifiedAlertRuleManagerModal({
                                   [conditionType]: event.target.value,
                                 }))
                               }
-                              className="w-16 rounded-lg border border-app-border/60 bg-app-surface-muted px-2 py-1 text-right text-xs text-app-text"
+                              className="input-field w-16 rounded-lg px-2 py-1 text-right text-xs text-app-text"
                             />
                           ) : null}
                         </div>
@@ -523,7 +526,7 @@ export function UnifiedAlertRuleManagerModal({
                     Delivery
                   </p>
                   <div className="unified-alert-delivery-grid grid gap-3 sm:grid-cols-2">
-                    <label className="unified-alert-delivery-card rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
+                    <label className="unified-alert-delivery-card rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] px-3 py-3 text-sm text-app-text-muted">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-semibold text-app-text">Notifications</p>
@@ -546,7 +549,7 @@ export function UnifiedAlertRuleManagerModal({
                         </p>
                       ) : null}
                     </label>
-                    <label className="unified-alert-delivery-card rounded-2xl border border-app-border/60 bg-app-surface/40 px-3 py-3 text-sm text-app-text-muted">
+                    <label className="unified-alert-delivery-card rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] px-3 py-3 text-sm text-app-text-muted">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="font-semibold text-app-text">Email</p>
@@ -593,7 +596,7 @@ export function UnifiedAlertRuleManagerModal({
             </div>
           </div>
 
-          <div className="unified-alert-saved rounded-2xl border border-app-border/60 bg-app-surface-muted/60 p-4">
+          <div className="unified-alert-saved rounded-2xl border workspace-border-default bg-[color:var(--color-surface-muted)] p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h4 className="text-sm font-semibold text-app-text">
@@ -614,28 +617,31 @@ export function UnifiedAlertRuleManagerModal({
                     : "These rules cover the selected keyword context."}
                 </p>
               </div>
-              <span className="rounded-full border border-app-border/60 bg-app-surface/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+              <span className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                 {groupRules.length} saved
               </span>
             </div>
 
             <div className="mt-4 space-y-3">
               {groupRules.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
+                <div className="rounded-2xl border border-dashed workspace-border-subtle bg-[color:var(--color-surface)] px-4 py-6 text-sm text-app-text-muted">
                   {mode === "competitor_aso"
                     ? "No ASO alert rules yet. Create one to monitor title, description, screenshots, icon, or category changes."
                     : "No alert rules yet. Start with a preset or create your own."}
                 </div>
               ) : (
                 groupRules.map((rule) => {
-                  const isEnabled = rule.enabled !== false;
+                  const isRuleEnabled = rule.enabled !== false;
+                  const isEmailDeliveryPaused =
+                    isRuleEnabled && rule.channels.email && !alertEmailsEnabled;
+                  const isEnabled = isRuleEnabled && !isEmailDeliveryPaused;
                   return (
                     <div
                       key={rule.id}
                       className={`unified-alert-rule-card rounded-2xl border p-4 transition-colors ${
                         isEnabled
-                          ? "border-app-border/60 bg-app-surface/50"
-                          : "border-amber-500/25 bg-amber-500/5"
+                          ? "workspace-border-default bg-[color:var(--color-surface)]"
+                          : "border-[color:var(--color-warning-border)] bg-[color:var(--color-warning-soft)]"
                       }`}
                     >
                       <div className="unified-alert-rule-row flex items-start justify-between gap-3">
@@ -662,6 +668,11 @@ export function UnifiedAlertRuleManagerModal({
                           <p className="mt-1 text-xs text-app-text-muted">
                             Channels: {getRuleChannels(rule)}
                           </p>
+                          {isEmailDeliveryPaused ? (
+                            <p className="mt-1 text-xs text-amber-300">
+                              Email delivery is paused in account preferences.
+                            </p>
+                          ) : null}
                           <p className="mt-1 text-xs text-app-text-muted">
                             Updated{" "}
                             {formatAlertEventTime(
@@ -675,17 +686,17 @@ export function UnifiedAlertRuleManagerModal({
                             type="button"
                             onClick={() => toggleRuleEnabled(rule)}
                             className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                              isEnabled
+                              isRuleEnabled
                                 ? "border-amber-500/30 bg-amber-500/10 text-amber-200 hover:bg-amber-500/20"
                                 : "border-cyan-500/30 bg-cyan-500/10 text-cyan-200 hover:bg-cyan-500/20"
                             }`}
                           >
-                            {isEnabled ? "Pause" : "Enable"}
+                            {isRuleEnabled ? "Pause" : "Enable"}
                           </button>
                           <button
                             type="button"
                             onClick={() => startEditingRule(rule)}
-                            className="rounded-xl border border-app-border/60 bg-app-surface-muted/80 px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/40 hover:text-cyan-200"
+                            className="rounded-xl border workspace-border-default bg-[color:var(--color-surface-muted)] px-3 py-2 text-xs font-semibold text-app-text transition-colors hover:border-[color:var(--color-border-strong)]"
                           >
                             Edit
                           </button>

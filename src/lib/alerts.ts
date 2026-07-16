@@ -75,12 +75,14 @@ export type AlertEvent = {
   changedFields?: string[];
   createdAt: string;
   readAt?: string | null;
-  emailDeliveryStatus?: "delivered" | "failed";
+  emailDeliveryStatus?: "accepted" | "delivered" | "failed" | "skipped";
   emailDeliveryRecipient?: string;
   emailDeliveryAttemptedAt?: string;
+  emailDeliveryAcceptedAt?: string;
   emailDeliveryDeliveredAt?: string;
   emailDeliveryFailedAt?: string;
   emailDeliveryLastError?: string;
+  emailProviderMessageId?: string;
 };
 
 export type AlertPreset = {

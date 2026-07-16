@@ -34,9 +34,9 @@ export function WorkspacePanel({
   return (
     <section
       className={cn(
-        "workspace-surface workspace-card workspace-panel",
-        tone === "muted" && "workspace-muted workspace-panel-muted",
-        tone === "strong" && "workspace-strong workspace-panel-strong",
+        "workspace-surface workspace-card workspace-panel workspace-border-default",
+        tone === "muted" && "workspace-muted workspace-panel-muted workspace-border-default",
+        tone === "strong" && "workspace-strong workspace-panel-strong workspace-border-strong",
         className,
       )}
     >
@@ -97,7 +97,7 @@ export function WorkspaceMetricCard({
   dense?: boolean;
 }) {
   return (
-    <div className={cn("workspace-card workspace-metric-card flex flex-col", compact && "workspace-metric-card-compact", dense && "workspace-metric-card-dense", `workspace-metric-${accent}`)}>
+    <div className={cn("workspace-card workspace-metric-card workspace-border-default flex flex-col", compact && "workspace-metric-card-compact", dense && "workspace-metric-card-dense", `workspace-metric-${accent}`)}>
       <div className={cn("workspace-metric-label mb-0.5 !text-[10px] sm:!text-[10px]", dense && "workspace-metric-label-dense")}>{label}</div>
       <div className={cn("workspace-metric-value !text-[1.25rem] sm:!text-3xl", compact && "workspace-metric-value-compact", dense && "workspace-metric-value-dense")}>{value}</div>
       {hint ? (
@@ -140,7 +140,7 @@ export function WorkspaceNavButton({
       type="button"
       onClick={onClick}
       className={cn(
-        "workspace-button workspace-nav-button",
+        "workspace-button workspace-nav-button workspace-border-default",
         active && "workspace-nav-button-active",
       )}
     >
@@ -172,7 +172,7 @@ export function WorkspaceEmptyBlock({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="workspace-surface workspace-card workspace-empty-state workspace-empty-block px-5 py-6 sm:px-8 sm:py-8">
+    <div className="workspace-surface workspace-card workspace-border-subtle workspace-empty-state workspace-empty-block px-5 py-6 sm:px-8 sm:py-8">
       <div className="workspace-empty-icon h-11 w-11 sm:h-14 sm:w-14">
         <Icon className="h-6 w-6" />
       </div>
@@ -286,7 +286,7 @@ export function MobileDataCard({
   return (
     <div
       className={cn(
-        "workspace-surface workspace-card workspace-mobile-data-card !gap-2 !p-3 sm:!gap-3 sm:!p-4 md:hidden",
+        "workspace-surface workspace-card workspace-border-default workspace-mobile-data-card !gap-2 !p-3 sm:!gap-3 sm:!p-4 md:hidden",
         className,
       )}
     >

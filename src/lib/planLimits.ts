@@ -14,6 +14,13 @@ export type PlanLimits = {
   trackedKeywords: number | null;
 };
 
+export type PlanEntitlements = {
+  reportsWorkspace: boolean;
+  weeklyEmailReports: boolean;
+  alertRules: boolean;
+  alertDelivery: boolean;
+};
+
 export type PlanUsage = {
   trackedApps: number;
   competitorGroups: number;
@@ -104,6 +111,42 @@ export const BILLING_PLAN_LIMITS: Record<BillingPlanId, PlanLimits> = {
   },
 };
 
+export const BILLING_PLAN_ENTITLEMENTS: Record<
+  BillingPlanId,
+  PlanEntitlements
+> = {
+  free: {
+    reportsWorkspace: false,
+    weeklyEmailReports: false,
+    alertRules: false,
+    alertDelivery: false,
+  },
+  indie: {
+    reportsWorkspace: true,
+    weeklyEmailReports: true,
+    alertRules: true,
+    alertDelivery: true,
+  },
+  starter: {
+    reportsWorkspace: true,
+    weeklyEmailReports: true,
+    alertRules: true,
+    alertDelivery: true,
+  },
+  pro: {
+    reportsWorkspace: true,
+    weeklyEmailReports: true,
+    alertRules: true,
+    alertDelivery: true,
+  },
+  agency: {
+    reportsWorkspace: true,
+    weeklyEmailReports: true,
+    alertRules: true,
+    alertDelivery: true,
+  },
+};
+
 export function resolveBillingPlanId(
   planId?: string | null,
 ): BillingPlanId {
@@ -123,6 +166,14 @@ export function getPlanLimits(planId?: string | null): PlanLimits {
 
 export function getBillingPlanRank(planId?: string | null): number {
   return BILLING_PLAN_ORDER[resolveBillingPlanId(planId)];
+}
+
+export function getPlanEntitlements(
+  planId?: string | null,
+): PlanEntitlements {
+  return {
+    ...BILLING_PLAN_ENTITLEMENTS[resolveBillingPlanId(planId)],
+  };
 }
 
 export function getPlanLimitFeatureLines(planId: BillingPlanId): string[] {

@@ -3,9 +3,12 @@ import test from "node:test";
 
 import {
   BILLING_PLANS,
+  PUBLIC_BILLING_PLANS,
+  getYearlyMonthlyEquivalentLabel,
   getPlanPriceLabel,
   type BillingPricingCatalog,
 } from "../src/lib/billing";
+import { getPlanEntitlements } from "../src/lib/planLimits";
 
 const starterPlan = BILLING_PLANS.find((plan) => plan.id === "starter");
 
@@ -46,4 +49,61 @@ test("paid plan prices use Dodo pricing catalog labels", () => {
 
   assert.equal(getPlanPriceLabel(pricingCatalog, starterPlan, "monthly"), "$42/mo");
   assert.equal(getPlanPriceLabel(pricingCatalog, starterPlan, "yearly"), null);
+});
+
+test("yearly pricing displays the monthly equivalent instead of compounding the yearly total", () => {
+  const indiePlan = BILLING_PLANS.find((plan) => plan.id === "indie");
+  assert.ok(indiePlan);
+
+  const pricingCatalog: BillingPricingCatalog = {
+    configured: true,
+    productConfigured: true,
+    availablePlans: ["indie"],
+    availableBillingIntervals: ["yearly"],
+    availablePlanIntervals: {
+      indie: ["yearly"],
+      starter: [],
+      pro: [],
+    },
+    planPricing: {
+      indie: {
+        yearly: {
+          productId: "pdt_indie_yearly",
+          priceLabel: "$289/year",
+          currency: "USD",
+          amount: 28900,
+          productName: "Indie Yearly",
+        },
+      },
+      starter: {},
+      pro: {},
+    },
+    environment: "test",
+  };
+
+  assert.equal(getYearlyMonthlyEquivalentLabel(pricingCatalog, indiePlan), "$24");
+});
+
+test("public pricing includes the free tier", () => {
+  assert.equal(PUBLIC_BILLING_PLANS.some((plan) => plan.id === "free"), true);
+});
+
+test("free plan entitlements disable reports and alerts", () => {
+  const freeEntitlements = getPlanEntitlements("free");
+  assert.deepEqual(freeEntitlements, {
+    reportsWorkspace: false,
+    weeklyEmailReports: false,
+    alertRules: false,
+    alertDelivery: false,
+  });
+});
+
+test("paid plan entitlements keep reports and alerts enabled", () => {
+  const proEntitlements = getPlanEntitlements("pro");
+  assert.deepEqual(proEntitlements, {
+    reportsWorkspace: true,
+    weeklyEmailReports: true,
+    alertRules: true,
+    alertDelivery: true,
+  });
 });

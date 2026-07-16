@@ -29,11 +29,15 @@ import {
 import SupportEmailLink from "../../components/SupportEmailLink";
 import {
   type BillingAccessState,
+  DISPLAY_BILLING_PLANS,
   PUBLIC_BILLING_PLANS,
   DEFAULT_PUBLIC_BILLING_PLAN_IDS,
   getAvailableBillingIntervals,
   getPlanBillingIntervals,
+  getPlanPrice,
   getPlanPriceLabel,
+  getYearlyMonthlyEquivalentLabel,
+  PRICING_COMPARISON_ROWS,
   PRICING_INCLUDED_CAPABILITIES,
   type BillingInterval,
   type BillingPlanDefinition,
@@ -78,9 +82,10 @@ function formatDate(value?: string | null) {
 }
 
 function getCurrentPlanId(billingStatus: BillingStatus | null): BillingPlanId {
-  if (!billingStatus?.isPremium) return "free";
-  const id = billingStatus.subscriptionTier;
-  if (id === "indie" || id === "starter" || id === "pro" || id === "agency") return id;
+  const id = billingStatus?.subscriptionTier;
+  if (id === "free" || id === "indie" || id === "starter" || id === "pro" || id === "agency") {
+    return id;
+  }
   return "free";
 }
 
@@ -100,7 +105,7 @@ const FEATURE_ICONS: Record<string, React.ElementType> = {
   "App Store & Google Play tracking": Globe,
   "Keyword rank tracking": TrendingUp,
   "AI-Powered Keyword Discovery": Sparkles,
-  "Visibility comparison": Target,
+  "Competitor ASO change alerts": Target,
   "Competitor analysis": Swords,
   "Daily automated monitoring": Zap,
   "Rank change alerts": Bell,
@@ -218,13 +223,13 @@ export function UpgradePage({
   const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
   const prioritizePlanAction = isSelectionRequired || isActivating;
   const signedInAccount = currentUserEmail || currentUserLabel;
-  const capacityPreviewPlans = PUBLIC_BILLING_PLANS;
+  const capacityPreviewPlans = DISPLAY_BILLING_PLANS;
   const [selectedCapacityPlanId, setSelectedCapacityPlanId] =
     React.useState<BillingPlanId>(() => {
       const defaultPlan =
         capacityPreviewPlans.find((plan) => plan.id === "starter") ||
         capacityPreviewPlans[0] ||
-        PUBLIC_BILLING_PLANS[0];
+        DISPLAY_BILLING_PLANS[0];
 
       return defaultPlan?.id || "starter";
     });
@@ -353,12 +358,12 @@ export function UpgradePage({
       </div>
 
       {/* ── Sticky nav bar ────────────────────────────────────────────────── */}
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200/50 dark:border-app-border/50 bg-white/80 dark:bg-app-surface/80 px-3 py-2 backdrop-blur-md sm:px-6 sm:py-3">
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b workspace-divider bg-[color:var(--color-surface-elevated)] px-3 py-2 sm:px-6 sm:py-3">
         <div className="flex min-w-0 items-center gap-2">
           {canReturnToWorkspace ? (
             <button
               onClick={onReturn}
-              className="group inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 shadow-sm transition-all hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white sm:px-3 sm:text-xs"
+              className="group inline-flex items-center gap-1.5 rounded-lg border workspace-border-default bg-[color:var(--color-surface)] px-2.5 py-1.5 text-[11px] font-semibold text-app-text-muted shadow-sm transition-all hover:border-[color:var(--color-border-strong)] hover:bg-[color:var(--color-surface-hover)] hover:text-app-text sm:px-3 sm:text-xs"
             >
               <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
               Back to workspace
@@ -370,7 +375,7 @@ export function UpgradePage({
             </div>
           )}
           {signedInAccount ? (
-            <div className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 shadow-sm dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted lg:inline-flex">
+            <div className="hidden items-center gap-2 rounded-lg border workspace-border-default bg-[color:var(--color-surface)] px-3 py-1.5 text-xs font-medium text-app-text-muted shadow-sm lg:inline-flex">
               <Mail className="h-3.5 w-3.5" />
               {signedInAccount}
             </div>
@@ -386,7 +391,7 @@ export function UpgradePage({
             <button
               type="button"
               onClick={onSignOut}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white"
+              className="inline-flex items-center gap-1.5 rounded-lg border workspace-border-default bg-[color:var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-app-text-muted shadow-sm transition-colors hover:border-[color:var(--color-border-strong)] hover:bg-[color:var(--color-surface-hover)] hover:text-app-text"
             >
               Use different account
             </button>
@@ -395,7 +400,7 @@ export function UpgradePage({
             <button
               onClick={onOpenPortal}
               disabled={isOpeningPortal}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-app-border dark:bg-app-surface-muted dark:text-app-text-muted dark:hover:bg-app-surface-strong/80 dark:hover:text-white disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-lg border workspace-border-default bg-[color:var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-app-text-muted shadow-sm transition-colors hover:border-[color:var(--color-border-strong)] hover:bg-[color:var(--color-surface-hover)] hover:text-app-text disabled:opacity-50"
             >
               {isOpeningPortal ? (
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -423,7 +428,7 @@ export function UpgradePage({
             </span>
           </h1>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-5 sm:text-base">
-            Every plan includes all features. Only tracked apps, competitor groups, and keyword capacity scale per tier.
+            Free covers core tracking. Paid plans unlock reports, alerts, weekly email summaries, and more monitoring headroom.
           </p>
         </div>
 
@@ -440,14 +445,14 @@ export function UpgradePage({
                 ? "Activating trial"
                 : isSelectionRequired
                 ? "Choose a plan"
-                : !billingStatus?.isPremium
-                ? "7-day trial"
+                : currentPlanId === "free"
+                ? "Free"
                 : PUBLIC_BILLING_PLANS.find((p) => p.id === currentPlanId)?.name ||
                   "Premium"}
             </p>
             {isSelectionRequired ? (
               <p className="mt-2 text-xs font-medium text-app-text-muted dark:text-app-text-muted">
-                Select a subscription to start your 7-day trial and unlock the workspace.
+                Start on free, or choose a paid plan to unlock reports, alerts, and larger capacity.
               </p>
             ) : null}
             {isActivating ? (
@@ -639,10 +644,10 @@ export function UpgradePage({
               </div>
 
               {selectedCapacityPlan && selectedCapacityLimits ? (
-                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 dark:border-app-border dark:bg-app-surface/50 sm:mt-6 sm:p-5">
+                <div className="mt-4 rounded-2xl border workspace-border-default bg-[color:var(--color-surface-muted)] p-3.5 sm:mt-6 sm:p-5">
                   {selectedCapacityPlan.contactOnly ? (
                     <div className="grid gap-4 md:grid-cols-3">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-app-border dark:bg-app-surface-muted/70">
+                      <div className="rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] p-5">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                           Tracked apps
                         </p>
@@ -650,7 +655,7 @@ export function UpgradePage({
                           {formatCapacityLimit(selectedCapacityLimits.trackedApps, "tracked apps")}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-app-border dark:bg-app-surface-muted/70">
+                      <div className="rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] p-5">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                           Competitor groups
                         </p>
@@ -658,7 +663,7 @@ export function UpgradePage({
                           {formatCapacityLimit(selectedCapacityLimits.competitorGroups, "competitor groups")}
                         </p>
                       </div>
-                      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-app-border dark:bg-app-surface-muted/70">
+                      <div className="rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] p-5">
                         <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
                           Tracked keywords
                         </p>
@@ -700,13 +705,13 @@ export function UpgradePage({
           <div className="relative z-10">
             <div className="mb-6 flex flex-col items-center text-center sm:mb-10">
               <div className="workspace-billing-brand-pill inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[9px] font-bold uppercase tracking-widest shadow-sm sm:px-4 sm:py-1.5 sm:text-[10px]">
-                Every plan includes
+                Compare access
               </div>
               <h2 className="mt-3 text-[1.6rem] font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-5 md:text-[2rem]">
-                All features. Every tier.
+                Core tracking first, automation when you need it
               </h2>
               <p className="mt-2 max-w-md text-xs leading-relaxed text-app-text-muted dark:text-app-text-muted sm:mt-3 sm:text-sm">
-                Features are never gated. Only tracked apps, competitor groups, and keyword slots scale.
+                Free keeps the core workflow open. Paid tiers add reports, alerts, and weekly email summaries.
               </p>
             </div>
 
@@ -752,26 +757,41 @@ export function UpgradePage({
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
-          {PUBLIC_BILLING_PLANS.map((plan) => {
+        <div className="grid items-stretch gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4 xl:gap-6">
+          {DISPLAY_BILLING_PLANS.map((plan) => {
             const isHighlight = plan.highlight;
             const priceLabel = getPlanPriceLabel(billingStatus, plan, selectedInterval);
-            const priceCadence = getBillingCadence(priceLabel);
+            const selectedPrice = getPlanPrice(billingStatus, plan, selectedInterval);
+            const yearlyDisplayAmount =
+              selectedInterval === "yearly"
+                ? getYearlyMonthlyEquivalentLabel(billingStatus, plan)
+                : null;
+            const yearlyTotalLabel =
+              selectedInterval === "yearly" && selectedPrice
+                ? stripBillingCadence(
+                    getPlanPriceLabel(billingStatus, plan, "yearly") || "",
+                  ) || null
+                : null;
+            const displayPrice =
+              selectedInterval === "yearly" && yearlyDisplayAmount
+                ? `${yearlyDisplayAmount}/mo`
+                : priceLabel;
+            const priceCadence = getBillingCadence(displayPrice);
             const featureLines = getPlanLimitFeatureLines(plan.id as BillingPlanId);
             const PlanIcon = PLAN_ICONS[plan.id] || CheckCircle2;
 
             return (
               <div
                 key={plan.id}
-                className={`workspace-panel relative h-full transition-all ${
+                className={`workspace-panel relative flex h-full min-h-[23.5rem] flex-col transition-all ${
                   isHighlight
-                    ? "workspace-billing-plan-highlight border-2 px-4 pb-4 pt-8 z-10 sm:px-6 sm:pb-6 sm:pt-10 xl:-mx-2 xl:-my-3 xl:pb-8 xl:pt-12"
-                    : "workspace-billing-plan-normal !border hover:shadow-md"
+                    ? "workspace-billing-plan-highlight !border px-4 pb-5 pt-8 z-10 ring-1 ring-[color:var(--color-brand-hover)]/35 shadow-[0_22px_54px_rgba(37,99,235,0.18)] sm:px-6 sm:pb-6 sm:pt-10"
+                    : "workspace-billing-plan-normal !border px-4 pb-5 pt-5 hover:shadow-md sm:px-6 sm:pb-6 sm:pt-6"
                 }`}
               >
                 {/* Popular banner */}
                 {isHighlight && (
-                    <div className="workspace-billing-plan-banner absolute inset-x-0 top-0 flex h-[22px] items-center justify-center rounded-t-[18px] sm:h-[26px]">
+                  <div className="workspace-billing-plan-banner absolute inset-x-0 top-0 flex h-[22px] items-center justify-center rounded-t-[18px] sm:h-[26px]">
                     <span className="text-[9px] font-bold uppercase tracking-widest">Popular</span>
                   </div>
                 )}
@@ -795,15 +815,19 @@ export function UpgradePage({
                 {/* Price */}
                 <div className="mt-4 sm:mt-5">
                   <div className="text-[1.8rem] font-black leading-none tracking-tight text-slate-900 dark:text-app-text sm:text-[2.25rem]">
-                    {priceLabel
-                      ? stripBillingCadence(priceLabel)
+                    {displayPrice
+                      ? stripBillingCadence(displayPrice)
                       : plan.contactOnly
                         ? "Custom"
                         : "Loading"}
                   </div>
                   <div className="mt-1 min-h-[1rem] text-[10px] font-medium text-app-text-muted dark:text-app-text-muted sm:mt-2 sm:min-h-[1.25rem] sm:text-[11px]">
                     {!plan.contactOnly &&
-                      `${priceCadence ? `${priceCadence} · ` : ""}${formatIntervalLabel(selectedInterval).toLowerCase()} billing`}
+                      (selectedInterval === "yearly"
+                        ? yearlyTotalLabel
+                          ? `billed annually at ${yearlyTotalLabel}/year`
+                          : "billed annually"
+                        : `${priceCadence ? `${priceCadence} · ` : ""}${formatIntervalLabel(selectedInterval).toLowerCase()} billing`)}
                     {plan.contactOnly && "custom terms"}
                   </div>
                 </div>
@@ -833,13 +857,70 @@ export function UpgradePage({
                 </div>
 
                 {/* CTA */}
-                <div className="mt-8">{renderCta(plan)}</div>
+                <div className="mt-6 pt-2">{renderCta(plan)}</div>
               </div>
             );
           })}
         </div>
 
+        <div className="mt-10 text-center">
+          <SupportEmailLink
+            subject="Rank Analyzer Pro Custom Terms"
+            className="text-sm font-semibold text-[color:var(--color-brand-hover)] underline-offset-4 transition-colors hover:text-app-text hover:underline"
+          >
+            Contact us for custom terms
+          </SupportEmailLink>
+        </div>
+
         {/* ── Footer ────────────────────────────────────────────────────── */}
+        <div className="workspace-panel mt-8 overflow-hidden p-0">
+          <div className="border-b workspace-divider px-4 py-4 sm:px-6">
+            <div className="workspace-chip-label">Plan comparison</div>
+            <h3 className="mt-1 text-lg font-semibold text-slate-900 dark:text-app-text">
+              Capacity and access at a glance
+            </h3>
+            <p className="mt-1 text-sm text-app-text-muted">
+              Reports and alerts start on paid plans. Capacity expands with the portfolio.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-[42rem] w-full text-left">
+              <thead>
+                <tr className="border-b workspace-divider">
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-app-text-muted sm:px-6">
+                    Capability
+                  </th>
+                  {DISPLAY_BILLING_PLANS.map((plan) => (
+                    <th
+                      key={`compare-${plan.id}`}
+                      className="px-4 py-3 text-[10px] font-bold uppercase tracking-[0.18em] text-app-text-muted sm:px-6"
+                    >
+                      {plan.name}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {PRICING_COMPARISON_ROWS.map((row) => (
+                  <tr key={row.label} className="border-b workspace-divider last:border-b-0">
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900 dark:text-app-text sm:px-6">
+                      {row.label}
+                    </td>
+                    {DISPLAY_BILLING_PLANS.map((plan) => (
+                      <td
+                        key={`${row.label}-${plan.id}`}
+                        className="px-4 py-3 text-sm text-app-text-muted sm:px-6"
+                      >
+                        {row.values[plan.id]}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         <div className="mt-12 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-xs font-medium text-app-text-muted dark:text-app-text-muted">
           <span className="flex items-center gap-2">
             <Headphones className="h-3.5 w-3.5 text-app-text-muted" />

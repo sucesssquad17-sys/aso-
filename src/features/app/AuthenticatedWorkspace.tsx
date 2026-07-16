@@ -52,6 +52,7 @@ import {
   Label,
 } from "recharts";
 import { toast } from "sonner";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { User } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { getToken, onMessage } from "firebase/messaging";
@@ -116,10 +117,12 @@ import {
 import {
   countPlanUsage,
   getCompetitorTrackedKeywordIdentityKey,
+  getPlanEntitlements,
   getTrackedAppIdentityKeysForPlanUsage,
   getTrackedAppIdentityKeysFromTrackedKeywords,
   getTrackedKeywordActivity,
   getTrackedKeywordIdentityKey as getPlanTrackedKeywordIdentityKey,
+  type PlanEntitlements,
   type PlanLimits,
 } from "../../lib/planLimits";
 import {
@@ -197,6 +200,14 @@ import {
   type WorkspacePageConfig,
   type WorkspaceViewMode,
 } from "./workspacePrimitives";
+import {
+  WorkspaceActiveFilterSummary,
+  WorkspaceFilterSelect,
+  WorkspaceMobileFilterDrawer,
+  WorkspaceMoreActionsMenu,
+  WorkspaceSearchInput,
+  WorkspaceSearchToolbar,
+} from "./workspaceControls";
 import ReportsWorkspace, {
   type ReportMode,
   type ReportPeriodKey,
@@ -3033,7 +3044,7 @@ function getNotificationDiagnosticToneClass(tone: NotificationDiagnosticTone) {
     case "bad":
       return "border-red-500/25 bg-red-500/10 text-red-200";
     default:
-      return "border-app-border/60 bg-app-surface-muted/70 text-app-text-muted";
+      return "border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] text-app-text-muted";
   }
 }
 
@@ -3246,6 +3257,7 @@ function CountrySearchSelect({
   ariaLabel,
   includeAllOption,
   className,
+  variant = "default",
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -3253,11 +3265,13 @@ function CountrySearchSelect({
   ariaLabel: string;
   includeAllOption?: CountryOption;
   className?: string;
+  variant?: "default" | "search";
 }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const triggerRef = React.useRef<HTMLButtonElement | null>(null);
   const menuRef = React.useRef<HTMLDivElement | null>(null);
+  const menuId = React.useId();
   const [menuStyle, setMenuStyle] = React.useState<React.CSSProperties | null>(
     null,
   );
@@ -3274,10 +3288,24 @@ function CountrySearchSelect({
         option.code.toLowerCase().includes(normalizedQuery),
     );
   }, [fullOptions, query]);
-  const selectedLabel = React.useMemo(() => {
-    const selected = fullOptions.find((option) => option.code === value);
-    return selected ? selected.name : value.toUpperCase();
-  }, [fullOptions, value]);
+  const selectedOption = React.useMemo(
+    () => fullOptions.find((option) => option.code === value) || null,
+    [fullOptions, value],
+  );
+  const selectedLabel = selectedOption ? selectedOption.name : value.toUpperCase();
+  const selectedCode = selectedOption?.code?.toUpperCase() || value.toUpperCase();
+  const selectedFlag = React.useMemo(() => {
+    if (!selectedOption || selectedOption.code === "all") {
+      return null;
+    }
+    const code = selectedOption.code.trim().toUpperCase();
+    if (!/^[A-Z]{2}$/.test(code)) {
+      return null;
+    }
+    return String.fromCodePoint(
+      ...Array.from(code).map((char) => 127397 + char.charCodeAt(0)),
+    );
+  }, [selectedOption]);
   const updateMenuPosition = React.useCallback(() => {
     if (typeof window === "undefined" || !triggerRef.current) {
       return;
@@ -3328,26 +3356,38 @@ function CountrySearchSelect({
         setIsOpen(false);
       }
     };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        setQuery("");
+        triggerRef.current?.focus();
+      }
+    };
     window.addEventListener("resize", handleViewportChange);
     window.addEventListener("scroll", handleViewportChange, true);
     document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
     return () => {
       window.removeEventListener("resize", handleViewportChange);
       window.removeEventListener("scroll", handleViewportChange, true);
       document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, updateMenuPosition]);
   const menu = isOpen && menuStyle && typeof document !== "undefined"
     ? createPortal(
         <div
           ref={menuRef}
+          id={menuId}
+          role="listbox"
           style={menuStyle}
-          className="rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl"
+          className="rounded-2xl border workspace-border-strong bg-[color:var(--color-surface-elevated)] p-3 shadow-2xl"
         >
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search countries..."
+            aria-label="Search countries"
             className="input-field mb-3 w-full py-2"
             autoFocus
           />
@@ -3359,12 +3399,14 @@ function CountrySearchSelect({
               <button
                 key={option.code}
                 type="button"
+                role="option"
+                aria-selected={value === option.code}
                 onClick={() => {
                   onChange(option.code);
                   setIsOpen(false);
                   setQuery("");
                 }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-[color:var(--color-brand-soft)] text-[color:var(--color-brand)]" : "text-app-text-muted hover:bg-[color:var(--color-surface-hover)]"}`}
               >
                 <div className="font-medium">{option.name}</div>
                 <div className="text-xs uppercase text-app-text-muted">
@@ -3388,12 +3430,24 @@ function CountrySearchSelect({
         ref={triggerRef}
         type="button"
         aria-label={ariaLabel}
+        aria-expanded={isOpen}
+        aria-controls={menuId}
         onClick={() => setIsOpen((prev) => !prev)}
-        className="workspace-select-trigger input-field w-full text-left flex items-center justify-between gap-2 py-1.5 text-xs sm:py-2 sm:text-sm"
+        className={cn(
+          "workspace-select-trigger input-field w-full text-left flex items-center justify-between gap-2 py-1.5 text-xs sm:py-2 sm:text-sm",
+          variant === "search" && "workspace-select-trigger-search",
+        )}
       >
-        <span className="truncate">{selectedLabel}</span>
-        <span className="text-[10px] uppercase text-app-text-muted sm:text-xs">
-          {value.toUpperCase()}
+        <span className="workspace-select-trigger-main min-w-0">
+          {variant === "search" && selectedFlag ? (
+            <span className="workspace-select-trigger-flag" aria-hidden="true">
+              {selectedFlag}
+            </span>
+          ) : null}
+          <span className="truncate">{selectedLabel}</span>
+        </span>
+        <span className="workspace-select-trigger-code text-[10px] uppercase text-app-text-muted sm:text-xs">
+          {selectedCode}
         </span>
       </button>{" "}
       {menu}
@@ -3472,7 +3526,7 @@ function CountryMultiSelectModal({
               onToggleCountry(option.code);
             }
           }}
-          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-[color:var(--color-brand-soft)] text-[color:var(--color-brand)]" : isDisabled ? "cursor-not-allowed text-[color:var(--color-text-disabled)]" : "text-app-text-muted hover:bg-[color:var(--color-surface-hover)]"}`}
         >
           <div>
             <div className="font-medium">{option.name}</div>
@@ -3499,9 +3553,9 @@ function CountryMultiSelectModal({
   );
   if (!isOpen) return null;
   return (
-    <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
+    <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--color-canvas)]/80 px-4 backdrop-blur-sm">
       {" "}
-      <div className="workspace-mobile-dialog w-full max-w-2xl rounded-3xl border border-app-border/70 bg-app-surface/95 p-6 shadow-2xl">
+      <div className="workspace-mobile-dialog w-full max-w-2xl rounded-3xl border workspace-border-strong bg-[color:var(--color-surface-elevated)] p-6 shadow-2xl">
         {" "}
         <div className="flex items-start justify-between gap-4">
           {" "}
@@ -3536,6 +3590,7 @@ function CountryMultiSelectModal({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search countries..."
+            aria-label="Search countries"
             className="input-field py-3 w-full"
             autoFocus
           />{" "}
@@ -3545,7 +3600,7 @@ function CountryMultiSelectModal({
           {disabledCountries.map((countryCode) => (
             <span
               key={`tracked-${countryCode}`}
-              className="rounded-full border border-app-border/70 bg-app-surface/60 px-3 py-1 text-xs text-app-text-muted"
+              className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface-muted)] px-3 py-1 text-xs text-app-text-muted"
             >
               {findCountryName(countryCode)} already tracked
             </span>
@@ -3565,7 +3620,7 @@ function CountryMultiSelectModal({
             </span>
           )}{" "}
         </div>{" "}
-        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border border-app-border/60 bg-app-surface-muted/40 p-3">
+        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border workspace-border-default bg-[color:var(--color-surface-muted)] p-3">
           {query.trim() ? (
             <>
               {filteredOptions.map(renderCountryButton)}
@@ -3580,7 +3635,7 @@ function CountryMultiSelectModal({
                   {priorityOptions.map(renderCountryButton)}
                 </div>
               </div>
-              <div className="border-t border-app-border/50 pt-3">
+              <div className="border-t workspace-divider pt-3">
                 <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                   All Countries
                 </p>
@@ -3652,6 +3707,7 @@ function AuthenticatedApp({
   demoMode?: boolean;
 }) {
   const isDemoMode = demoMode === true;
+  const prefersReducedMotion = useReducedMotion();
   const [fcmToken, setFcmToken] = useState<string | null>(null);
   const [messagingWorkerRegistration, setMessagingWorkerRegistration] =
     useState<ServiceWorkerRegistration | null>(null);
@@ -4642,6 +4698,7 @@ function AuthenticatedApp({
   );
   const [weeklyReportSettings, setWeeklyReportSettings] =
     useState<WeeklyReportSettings>(getDefaultWeeklyReportSettings);
+  const [alertEmailsEnabled, setAlertEmailsEnabled] = useState(true);
   const [isWeeklyReportSettingsOpen, setIsWeeklyReportSettingsOpen] =
     useState(false);
   useEffect(() => {
@@ -4680,6 +4737,7 @@ function AuthenticatedApp({
       setCompetitorSummaryCountryByKeywordGroup({});
       setTrackingSchedule(getDefaultTrackingSchedule());
       setWeeklyReportSettings(getDefaultWeeklyReportSettings());
+      setAlertEmailsEnabled(true);
       setAlertRules([]);
       setAlertEvents([]);
       setAlertEventsError(null);
@@ -4826,6 +4884,9 @@ function AuthenticatedApp({
         const nextAlertRules = normalizeAlertRules(
           hasRemoteState ? remoteState?.alertRules : [],
         );
+        const nextAlertEmailsEnabled = hasRemoteState
+          ? remoteState?.alertEmailsEnabled !== false
+          : true;
         const nextNotificationSettings = normalizeNotificationSettings(
           hasRemoteState ? remoteState?.notificationSettings : undefined,
           getBrowserNotificationPermission(),
@@ -4920,6 +4981,7 @@ function AuthenticatedApp({
         setCompetitorRankHistory(nextCompetitorRankHistory);
         setTrackingSchedule(nextTrackingSchedule);
         setWeeklyReportSettings(nextWeeklyReportSettings);
+        setAlertEmailsEnabled(nextAlertEmailsEnabled);
         setAlertRules(nextAlertRules);
         setNotificationSettings(nextNotificationSettings);
         setHasAcceptedLegal(
@@ -4978,6 +5040,14 @@ function AuthenticatedApp({
       setIsSavingLegalConsent(false);
     }
   };
+  const handleAlertRulesChange = React.useCallback((nextRules: AlertRule[]) => {
+    setAlertRules(nextRules);
+    if (
+      nextRules.some((rule) => rule.enabled !== false && rule.channels.email)
+    ) {
+      setAlertEmailsEnabled(true);
+    }
+  }, []);
   useEffect(() => {
     if (isDemoMode || !userStateHydrated || isApplyingUserState.current) return;
     const persistUserState = async () => {
@@ -5703,6 +5773,12 @@ function AuthenticatedApp({
         : null,
     [billingStatus, effectivePlanLimits, localPlanUsage],
   );
+  const planEntitlementsForUi = React.useMemo<PlanEntitlements>(
+    () =>
+      billingStatusForUi?.planEntitlements ||
+      getPlanEntitlements(billingStatusForUi?.subscriptionTier),
+    [billingStatusForUi],
+  );
   const showUpgradePage = viewMode === "upgrade" || !hasActiveBillingAccess;
   const openUpgradeForBillingAccess = React.useCallback(
     (
@@ -5736,6 +5812,59 @@ function AuthenticatedApp({
       setViewMode("upgrade");
     },
     [hasActiveBillingAccess, openUpgradeForBillingAccess],
+  );
+  const openUpgradeForFeature = React.useCallback((message: string) => {
+    toast.error(message);
+    setViewMode("upgrade");
+  }, []);
+  const openLockedWeeklyReports = React.useCallback(() => {
+    openUpgradeForFeature(
+      "Weekly email reports are available on paid plans. Upgrade to turn on automated summaries.",
+    );
+  }, [openUpgradeForFeature]);
+  const openLockedAlerts = React.useCallback(
+    (scope: "keyword" | "competitor_keyword" | "competitor_aso") => {
+      const label =
+        scope === "competitor_aso"
+          ? "Competitor ASO alerts"
+          : scope === "competitor_keyword"
+            ? "Competitor keyword alerts"
+            : "Rank alerts";
+      openUpgradeForFeature(
+        `${label} are available on paid plans. Upgrade to unlock alert rules, email delivery, and push notifications.`,
+      );
+    },
+    [openUpgradeForFeature],
+  );
+  const openTrackedKeywordAlerts = React.useCallback(
+    (groupId: string) => {
+      if (!planEntitlementsForUi.alertRules) {
+        openLockedAlerts("keyword");
+        return;
+      }
+      setActiveAlertGroupId(groupId);
+    },
+    [openLockedAlerts, planEntitlementsForUi.alertRules],
+  );
+  const openCompetitorKeywordAlerts = React.useCallback(
+    (groupKey: string) => {
+      if (!planEntitlementsForUi.alertRules) {
+        openLockedAlerts("competitor_keyword");
+        return;
+      }
+      setActiveCompetitorKeywordAlertGroupKey(groupKey);
+    },
+    [openLockedAlerts, planEntitlementsForUi.alertRules],
+  );
+  const openCompetitorAsoAlerts = React.useCallback(
+    (groupId: string) => {
+      if (!planEntitlementsForUi.alertRules) {
+        openLockedAlerts("competitor_aso");
+        return;
+      }
+      setActiveCompetitorAsoAlertGroupId(groupId);
+    },
+    [openLockedAlerts, planEntitlementsForUi.alertRules],
   );
   const guardGovernedAddition = React.useCallback(
     (
@@ -7412,10 +7541,6 @@ function AuthenticatedApp({
             : "");
         if (payload.rankings.length === 0) {
           toast.info(`${summary}. No ranked keywords found in this scan.`);
-        } else if ((payload.failedLookups ?? 0) > 0) {
-          toast.info(
-            `${summary}. ${payload.failedLookups} lookup${payload.failedLookups === 1 ? "" : "s"} timed out.`,
-          );
         } else {
           toast.success(summary);
         }
@@ -10498,7 +10623,7 @@ function AuthenticatedApp({
           setViewMode("tracked");
           const firstGroupId = processedTrackedKeywordGroups[0]?.groupId;
           if (firstGroupId) {
-            setActiveAlertGroupId(firstGroupId);
+            openTrackedKeywordAlerts(firstGroupId);
           }
         },
       },
@@ -10508,6 +10633,7 @@ function AuthenticatedApp({
       appAnalysisSnapshots.length,
       competitorGroups.length,
       focusAppSearch,
+      openTrackedKeywordAlerts,
       ownTrackedAppCount,
       processedTrackedKeywordGroups,
       selectedApp,
@@ -10574,6 +10700,19 @@ function AuthenticatedApp({
       }),
     [processedTrackedAppGroups, storeType, trackedSelectedStoreByApp],
   );
+  const trackedActiveFilterCount =
+    Number(trackFilterCountry !== "all") + Number(trackFilterApp !== "all");
+  const trackedActiveControlCount =
+    trackedActiveFilterCount +
+    Number(trackSearchTerm.trim().length > 0) +
+    Number(trackSortBy !== "date_added");
+  const hasTrackedFilterChanges = trackedActiveControlCount > 0;
+  const resetTrackedFilters = () => {
+    setTrackSearchTerm("");
+    setTrackFilterCountry("all");
+    setTrackFilterApp("all");
+    setTrackSortBy("date_added");
+  };
   const selectedAppBookmarkKey = React.useMemo(
     () =>
       selectedApp
@@ -11118,7 +11257,7 @@ function AuthenticatedApp({
             ? "border-amber-300/80 hover:bg-amber-50 text-amber-600"
             : "border-blue-200/90 hover:bg-blue-50 text-blue-700"
         }`
-      : `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-app-surface-muted/90 px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
+      : `inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 rounded-xl border bg-[color:var(--color-surface-muted)] px-2.5 py-2 shadow-sm transition-all hover:scale-105 ${
           isTracked
             ? "border-amber-500/50 hover:bg-amber-500/20 text-amber-400"
             : "border-cyan-500/20 hover:bg-cyan-500/15 text-cyan-300"
@@ -11257,18 +11396,10 @@ function AuthenticatedApp({
     return (
       <ErrorBoundary>
         <div
-          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
+          className="min-h-screen flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
-          <div className="bg-orb bg-orb-1" />
-          <div className="bg-orb bg-orb-2" />
-          <div className="bg-orb bg-orb-3" />
-          <div className="card-glow relative z-10 px-8 py-10 text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
-            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
-              Checking billing access
-            </p>
-          </div>
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />
         </div>
       </ErrorBoundary>
     );
@@ -11277,18 +11408,10 @@ function AuthenticatedApp({
     return (
       <ErrorBoundary>
         <div
-          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
+          className="min-h-screen flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
-          <div className="bg-orb bg-orb-1" />
-          <div className="bg-orb bg-orb-2" />
-          <div className="bg-orb bg-orb-3" />
-          <div className="card-glow relative z-10 px-8 py-10 text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
-            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
-              Loading account data
-            </p>
-          </div>
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />
         </div>
       </ErrorBoundary>
     );
@@ -11395,18 +11518,7 @@ function AuthenticatedApp({
             </button>{" "}
           </div>{" "}
           <label
-            className="flex items-start gap-3 rounded-2xl px-4 py-3 text-sm mt-6"
-            style={{
-              background: isLightTheme
-                ? "rgba(255,255,255,0.9)"
-                : "rgba(15,23,42,0.65)",
-              border: isLightTheme
-                ? "1px solid rgba(148,163,184,0.32)"
-                : "1px solid rgba(51,65,85,0.45)",
-              boxShadow: isLightTheme
-                ? "0 12px 30px rgba(148,163,184,0.12), inset 0 1px 0 rgba(255,255,255,0.6)"
-                : undefined,
-            }}
+            className="mt-6 flex items-start gap-3 rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] px-4 py-3 text-sm shadow-sm"
           >
             {" "}
             <input
@@ -11439,14 +11551,14 @@ function AuthenticatedApp({
   }
 
   const renderSearchSection = (isCompact = false) => (
-    <WorkspacePanel className={`workspace-search-panel workspace-toolbar-panel ${isCompact ? (isMobileViewport ? "mb-4 p-2.5" : "mb-6 p-3") : isMobileViewport ? "mb-5" : "mb-8"}`} tone={isCompact ? "muted" : "strong"}>
+    <WorkspacePanel className={`workspace-search-panel workspace-search-workflow workspace-toolbar-panel ${isCompact ? (isMobileViewport ? "mb-4" : "mb-6") : isMobileViewport ? "mb-5" : "mb-8"}`} tone={isCompact ? "muted" : "strong"}>
       {isCompact && visibleWorkspaceMode === "single" && selectedApp ? (
-        <div className="workspace-selected-app-controls flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="workspace-search-composer-shell workspace-selected-app-controls flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-2.5">
             <img
               src={selectedApp.icon}
               alt=""
-              className="h-9 w-9 shrink-0 rounded-xl border border-app-border/60 object-cover"
+              className="h-9 w-9 shrink-0 rounded-xl border border-[color:var(--color-border-default)] object-cover"
             />
             <div className="min-w-0">
               <p className="workspace-chip-label">Selected app</p>
@@ -11481,7 +11593,10 @@ function AuthenticatedApp({
                   storeType === "ios" && "workspace-store-button-active",
                 )}
               >
-                <Apple className="h-3.5 w-3.5" />
+                <Apple
+                  className="h-3.5 w-3.5"
+                  fill={storeType === "ios" ? "currentColor" : "none"}
+                />
                 iOS
               </button>
             </div>
@@ -11515,8 +11630,9 @@ function AuthenticatedApp({
       ) : null}
       {!(isCompact && visibleWorkspaceMode === "single" && selectedApp) && (
         <>
+          <div className="workspace-search-composer-shell">
               {!isCompact && (
-<div className="workspace-search-composer-header mb-3 flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+<div className="workspace-search-composer-header mb-3 flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="workspace-chip-label">
                     {visibleWorkspaceMode === "single"
@@ -11525,14 +11641,14 @@ function AuthenticatedApp({
                         ? "Add apps to compare"
                         : "Discover competitors"}
                   </div>
-                  <h2 className="workspace-search-composer-title mt-1 text-base font-semibold text-app-text sm:text-lg">
+                  <h2 className="workspace-search-composer-title mt-1 text-[1.95rem] font-semibold leading-[1.02] tracking-[-0.045em] text-app-text sm:text-[2.55rem]">
                     {visibleWorkspaceMode === "single"
                       ? "Find an app to analyze"
                       : visibleWorkspaceMode === "competitors"
                         ? "Discover competitors"
                         : "Search and add apps to compare"}
                   </h2>
-                  <p className="workspace-search-composer-description mt-1 text-[11px] text-app-text-muted sm:text-sm">
+                  <p className="workspace-search-composer-description mt-1 text-sm leading-[1.45] text-app-text-muted sm:text-[1.05rem]">
                     {visibleWorkspaceMode === "single"
                       ? "Search by app name or paste a store URL."
                       : visibleWorkspaceMode === "competitors"
@@ -11632,8 +11748,8 @@ function AuthenticatedApp({
                   ) : null}
                 </div>
               ) : null}
-              <div className={`workspace-search-composer-body flex flex-col ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
-                <div className="workspace-search-composer-controls flex flex-wrap items-center gap-1.5">
+              <div className={`workspace-search-composer-body flex flex-col ${isMobileViewport ? "gap-2" : "gap-2.5"}`}>
+                <div className="workspace-search-composer-controls flex flex-wrap items-center gap-2">
                   <div className="workspace-store-toggle shrink-0">
                     <button
                       type="button"
@@ -11657,24 +11773,27 @@ function AuthenticatedApp({
                         storeType === "ios" && "workspace-store-button-active",
                       )}
                     >
-                      <Apple className="h-3.5 w-3.5" />
+                      <Apple
+                        className="h-3.5 w-3.5"
+                        fill={storeType === "ios" ? "currentColor" : "none"}
+                      />
                       iOS
                     </button>
                   </div>
                   <div className="workspace-topbar-country workspace-utility-chip shrink-0">
-                    <Globe className="hidden h-3.5 w-3.5 text-app-text-muted sm:block" />
                     <CountrySearchSelect
                       value={country}
                       onChange={handleCountryChange}
                       options={COUNTRIES}
                       ariaLabel="Select storefront country"
-                      className={`${isMobileViewport ? "w-[112px]" : "w-[120px]"} min-w-0 sm:w-[168px] sm:min-w-[168px]`}
+                      variant="search"
+                      className="w-full min-w-0"
                     />
                   </div>
                 </div>
                 <form
                   onSubmit={handleSearch}
-                  className="workspace-search-form flex flex-col gap-1.5 w-full sm:flex-row"
+                  className="workspace-search-form flex w-full flex-col gap-2 sm:flex-row sm:items-stretch"
                 >
                   <div className="relative flex-1">
                     <Search className="absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-app-text-muted" />
@@ -11687,7 +11806,7 @@ function AuthenticatedApp({
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder={`Search apps or paste a ${storeType === "android" ? "Play Store" : "App Store"} URL...`}
-                      className={`input-field workspace-search-composer-input w-full text-sm ${isMobileViewport ? "!py-1.5" : "!py-2"} sm:!py-2.5 sm:text-[0.95rem]`}
+                      className="input-field workspace-search-composer-input w-full text-base sm:text-[1rem]"
                       style={{
                         paddingLeft: "2.45rem",
                         paddingRight: searchTerm ? "2.45rem" : "1rem",
@@ -11711,7 +11830,7 @@ function AuthenticatedApp({
                   <button
                     type="submit"
                     disabled={isSearching || !searchTerm.trim()}
-                    className={`btn-primary workspace-search-composer-submit w-full text-sm sm:w-auto sm:!px-6 sm:!py-2.5 sm:text-[0.9rem] ${isMobileViewport ? "!px-4 !py-1.5" : "!px-4 !py-2"}`}
+                    className="btn-primary workspace-search-composer-submit w-full px-5 text-base sm:w-auto sm:min-w-[14rem] sm:px-8 sm:text-[1rem]"
                   >
                     {isSearching ? (
                       <Loader2 className="w-5 h-5 animate-spin" />
@@ -11726,10 +11845,10 @@ function AuthenticatedApp({
                 {visibleWorkspaceMode === "competitors" &&
                   !isCompact &&
                   competitorDraftStarted && (
-                  <div className={`mt-3 rounded-2xl border border-app-border/60 bg-app-surface/45 ${isMobileViewport ? "p-2.5" : "p-3 sm:p-4"}`}>
+                  <div className={`mt-3 rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] ${isMobileViewport ? "p-2.5" : "p-3 sm:p-4"}`}>
                     <div className="flex flex-col gap-3">
                       <div className="grid gap-2 md:grid-cols-2">
-                        <div className={`rounded-xl border border-app-border/60 bg-app-surface-muted/65 ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
+                        <div className={`rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
                               Your app
@@ -11745,7 +11864,7 @@ function AuthenticatedApp({
                               <img
                                 src={competitorDraftOwnApp.icon}
                                 alt={competitorDraftOwnApp.title}
-                                className="h-10 w-10 rounded-lg border border-app-border/60 bg-app-surface-muted/80"
+                                className="h-10 w-10 rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)]"
                               />
                               <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-semibold text-app-text">
@@ -11763,7 +11882,7 @@ function AuthenticatedApp({
                                 }}
                                 aria-label="Change selected app"
                                 title="Change app"
-                                className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
+                                className="rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-2 text-app-text-muted transition-colors hover:text-app-text"
                               >
                                 <X className="h-3.5 w-3.5" />
                               </button>
@@ -11774,7 +11893,7 @@ function AuthenticatedApp({
                             </p>
                           )}
                         </div>
-                        <div className={`rounded-xl border border-app-border/60 bg-app-surface-muted/65 ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
+                        <div className={`rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] ${isMobileViewport ? "px-2.5 py-2.5" : "px-3 py-3"}`}>
                           <div className="flex items-center justify-between gap-3">
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               Rival
@@ -11793,7 +11912,7 @@ function AuthenticatedApp({
                                   <img
                                     src={app.icon}
                                     alt={app.title}
-                                    className="h-10 w-10 rounded-lg border border-app-border/60 bg-app-surface-muted/80"
+                                    className="h-10 w-10 rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)]"
                                   />
                                   <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-semibold text-app-text">
@@ -11812,7 +11931,7 @@ function AuthenticatedApp({
                                     }
                                     aria-label="Change rival"
                                     title="Change rival"
-                                    className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
+                                    className="rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-2 text-app-text-muted transition-colors hover:text-app-text"
                                   >
                                     <X className="h-3.5 w-3.5" />
                                   </button>
@@ -11829,7 +11948,7 @@ function AuthenticatedApp({
                         </div>
                       </div>
                       <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="inline-flex w-fit rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
+                        <div className="inline-flex w-fit rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-1">
                           {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                             <button
                               key={mode}
@@ -11881,18 +12000,14 @@ function AuthenticatedApp({
                   </div>
                 )}
               </div>
+          </div>
               {error && (
                 <div
-                  className="mt-4 p-4 rounded-xl flex items-center justify-between gap-2"
-                  style={{
-                    background: "rgba(239,68,68,0.08)",
-                    border: "1px solid rgba(239,68,68,0.2)",
-                  }}
+                  className="mt-4 flex items-center justify-between gap-2 rounded-xl border border-[color:var(--color-danger-border)] bg-[color:var(--color-danger-soft)] p-4"
                 >
                   {" "}
                   <div
-                    className="flex items-center gap-2 text-sm font-medium"
-                    style={{ color: "#f87171" }}
+                    className="flex items-center gap-2 text-sm font-medium text-[color:var(--color-danger)]"
                   >
                     {" "}
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />{" "}
@@ -11910,17 +12025,16 @@ function AuthenticatedApp({
               {/* Search Results Skeleton */}{" "}
               {isSearching && (
                 <div
-                  className="workspace-search-results-list mt-4 rounded-2xl overflow-hidden border border-app-border/40 bg-app-surface/60"
+                  className="workspace-search-results-list mt-4 rounded-2xl overflow-hidden border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)]"
                 >
                   {" "}
                   {[1, 2, 3, 4].map((i) => (
                     <div
                       key={i}
-                      className="workspace-search-result-skeleton flex items-center justify-between gap-3 sm:gap-4"
-                      style={{
-                        borderBottom:
-                          i < 4 ? "1px solid rgba(30,41,59,0.8)" : "none",
-                      }}
+                      className={cn(
+                        "workspace-search-result-skeleton flex items-center justify-between gap-3 sm:gap-4",
+                        i < 4 && "border-b workspace-divider",
+                      )}
                     >
                       {" "}
                       <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
@@ -11977,23 +12091,7 @@ function AuthenticatedApp({
                       {" "}
                       <button
                         onClick={() => setSelectedCategory(null)}
-                        className={`min-h-11 px-3 py-2 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
-                        style={
-                          selectedCategory === null
-                            ? {
-                                background:
-                                  "linear-gradient(135deg,#67e8f9,#14b8a6)",
-                                boxShadow: "0 4px 12px rgba(34, 211, 238,0.25)",
-                              }
-                            : {
-                                background: isLightTheme
-                                  ? "rgba(241,245,249,0.96)"
-                                  : "rgba(30,41,59,0.6)",
-                                borderColor: isLightTheme
-                                  ? "rgba(148,163,184,0.45)"
-                                  : "rgba(51,65,85,0.5)",
-                              }
-                        }
+                        className={`workspace-category-filter min-h-11 px-3 py-2 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === null ? "workspace-category-filter-selected" : ""}`}
                       >
                         All
                       </button>{" "}
@@ -12001,23 +12099,7 @@ function AuthenticatedApp({
                         <button
                           key={cat}
                           onClick={() => setSelectedCategory(cat)}
-                          className={`min-h-11 px-3 py-2 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "text-black border-transparent" : "text-app-text-muted hover:text-app-text"}`}
-                          style={
-                            selectedCategory === cat
-                              ? {
-                                  background:
-                                    "linear-gradient(135deg,#67e8f9,#14b8a6)",
-                                  boxShadow: "0 4px 12px rgba(34, 211, 238,0.25)",
-                                }
-                              : {
-                                  background: isLightTheme
-                                    ? "rgba(241,245,249,0.96)"
-                                    : "rgba(30,41,59,0.6)",
-                                  borderColor: isLightTheme
-                                    ? "rgba(148,163,184,0.45)"
-                                    : "rgba(51,65,85,0.5)",
-                                }
-                          }
+                          className={`workspace-category-filter min-h-11 px-3 py-2 rounded-xl text-xs font-semibold transition-all border whitespace-nowrap ${selectedCategory === cat ? "workspace-category-filter-selected" : ""}`}
                         >
                           {cat}
                         </button>
@@ -12025,13 +12107,13 @@ function AuthenticatedApp({
                     </div>
                   )}{" "}
                   {filteredResults.length > 3 ? (
-                    <div className="flex items-center justify-between rounded-xl border border-app-border/40 bg-app-surface-muted/45 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-app-text-muted sm:hidden">
+                    <div className="flex items-center justify-between rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-app-text-muted sm:hidden">
                       <span>{filteredResults.length} apps found</span>
                       <span>Scroll for more</span>
                     </div>
                   ) : null}
                   <div
-                    className="workspace-search-results-list rounded-2xl overflow-hidden overflow-y-auto border border-app-border/40 bg-app-surface/70"
+                    className="workspace-search-results-list rounded-2xl overflow-hidden overflow-y-auto border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)]"
                   >
                     {" "}
                     {filteredResults.length > 0 ? (
@@ -12050,7 +12132,7 @@ function AuthenticatedApp({
                         <div
                           key={app.appId || app.id}
                           className={`workspace-search-result-row group flex items-center justify-between gap-3 sm:gap-4 transition-all hover:bg-app-surface-strong/50 ${
-                            idx < filteredResults.length - 1 ? "border-b border-app-border/70" : ""
+                            idx < filteredResults.length - 1 ? "border-b border-[color:var(--color-border-default)]" : ""
                           }`}
                         >
                           {" "}
@@ -12066,7 +12148,7 @@ function AuthenticatedApp({
                             <img
                               src={app.icon}
                               alt={app.title}
-                              className="h-11 w-11 rounded-xl border border-app-border/40 object-cover shadow-lg flex-shrink-0 sm:h-14 sm:w-14 sm:rounded-2xl"
+                              className="h-11 w-11 rounded-xl border border-[color:var(--color-border-subtle)] object-cover shadow-lg flex-shrink-0 sm:h-14 sm:w-14 sm:rounded-2xl"
                             />{" "}
                             <div className="min-w-0">
                               {" "}
@@ -12092,20 +12174,10 @@ function AuthenticatedApp({
                             <button
                               onClick={() => handleSelectApp(app)}
                               disabled={isComparedApp || comparedApps.length >= 5}
-                              className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40 flex-shrink-0"
-                              style={
-                                isComparedApp
-                                  ? {
-                                      background: "rgba(16,185,129,0.1)",
-                                      border: "1px solid rgba(16,185,129,0.3)",
-                                      color: "#34d399",
-                                    }
-                                  : {
-                                      background: "rgba(34, 211, 238,0.08)",
-                                      border: "1px solid rgba(34, 211, 238,0.2)",
-                                      color: "#22d3ee",
-                                    }
-                              }
+                              className={cn(
+                                "workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40 flex-shrink-0",
+                                isComparedApp && "workspace-search-result-action-selected",
+                              )}
                             >
                               {" "}
                               {isComparedApp
@@ -12120,20 +12192,10 @@ function AuthenticatedApp({
                                 <button
                                   onClick={() => void assignCompetitorDraftOwnApp(app)}
                                   disabled={isDraftOwnApp}
-                                  className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
-                                  style={
-                                    isDraftOwnApp
-                                      ? {
-                                          background: "rgba(16,185,129,0.1)",
-                                          border: "1px solid rgba(16,185,129,0.3)",
-                                          color: "#34d399",
-                                        }
-                                      : {
-                                          background: "rgba(34, 211, 238,0.08)",
-                                          border: "1px solid rgba(34, 211, 238,0.2)",
-                                          color: "#22d3ee",
-                                        }
-                                  }
+                                  className={cn(
+                                    "workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40",
+                                    isDraftOwnApp && "workspace-search-result-action-selected",
+                                  )}
                                 >
                                   {isDraftOwnApp ? "Selected" : "Select App"}
                                 </button>
@@ -12141,12 +12203,7 @@ function AuthenticatedApp({
                                 <button
                                   type="button"
                                   disabled
-                                  className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
-                                  style={{
-                                    background: "rgba(16,185,129,0.1)",
-                                    border: "1px solid rgba(16,185,129,0.3)",
-                                    color: "#34d399",
-                                  }}
+                                  className="workspace-search-result-action workspace-search-result-action-selected text-[11px] font-bold transition-all disabled:opacity-40"
                                 >
                                   Selected App
                                 </button>
@@ -12156,20 +12213,10 @@ function AuthenticatedApp({
                                   disabled={
                                     isDraftCompetitorApp || competitorDraftApps.length >= 1
                                   }
-                                  className="workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40"
-                                  style={
-                                    isDraftCompetitorApp
-                                      ? {
-                                          background: "rgba(16,185,129,0.1)",
-                                          border: "1px solid rgba(16,185,129,0.3)",
-                                          color: "#34d399",
-                                        }
-                                      : {
-                                          background: "rgba(34, 211, 238,0.08)",
-                                          border: "1px solid rgba(34, 211, 238,0.2)",
-                                          color: "#22d3ee",
-                                        }
-                                  }
+                                  className={cn(
+                                    "workspace-search-result-action text-[11px] font-bold transition-all disabled:opacity-40",
+                                    isDraftCompetitorApp && "workspace-search-result-action-selected",
+                                  )}
                                 >
                                   {isDraftCompetitorApp ? "Selected" : "Add Competitor"}
                                 </button>
@@ -12202,28 +12249,58 @@ function AuthenticatedApp({
   );
   return (
     <ErrorBoundary>
-      {showUpgradePage ? (
-        <UpgradePage
-          billingStatus={billingStatusForUi}
-          accessState={billingAccessState}
-          billingError={billingError}
-          isLoading={isLoadingBillingStatus}
-          isStartingCheckout={isStartingBillingCheckout}
-          isOpeningPortal={isOpeningBillingPortal}
-          currentUserLabel={
-            currentUser.displayName || currentUser.email || "Authenticated user"
-          }
-          currentUserEmail={currentUser.email}
-          isPollingActivation={isPollingBillingActivation}
-          activationTimedOut={billingActivationTimedOut}
-          onStartCheckout={(planId, interval) => void startBillingCheckout(planId, interval)}
-          onOpenPortal={() => void openBillingPortal()}
-          onRetryBillingStatus={() => void pollForBillingActivation()}
-          onSignOut={() => void onSignOut()}
-          onReturn={hasActiveBillingAccess ? () => setViewMode("single") : undefined}
-        />
-      ) : (
-      <div className="workspace-shell min-h-screen text-app-text font-sans relative pb-20 md:pb-0">
+      <AnimatePresence mode="wait" initial={false}>
+        {showUpgradePage ? (
+          <motion.div
+            key="workspace-upgrade"
+            initial={
+              prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }
+            }
+            animate={{ opacity: 1, y: 0 }}
+            exit={
+              prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: -8 }
+            }
+            transition={{
+              duration: prefersReducedMotion ? 0 : 0.16,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+          >
+            <UpgradePage
+              billingStatus={billingStatusForUi}
+              accessState={billingAccessState}
+              billingError={billingError}
+              isLoading={isLoadingBillingStatus}
+              isStartingCheckout={isStartingBillingCheckout}
+              isOpeningPortal={isOpeningBillingPortal}
+              currentUserLabel={
+                currentUser.displayName || currentUser.email || "Authenticated user"
+              }
+              currentUserEmail={currentUser.email}
+              isPollingActivation={isPollingBillingActivation}
+              activationTimedOut={billingActivationTimedOut}
+              onStartCheckout={(planId, interval) => void startBillingCheckout(planId, interval)}
+              onOpenPortal={() => void openBillingPortal()}
+              onRetryBillingStatus={() => void pollForBillingActivation()}
+              onSignOut={() => void onSignOut()}
+              onReturn={hasActiveBillingAccess ? () => setViewMode("single") : undefined}
+            />
+          </motion.div>
+        ) : (
+      <motion.div
+        key="workspace-shell"
+        initial={
+          prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 10 }
+        }
+        animate={{ opacity: 1, y: 0 }}
+        exit={
+          prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: -8 }
+        }
+        transition={{
+          duration: prefersReducedMotion ? 0 : 0.16,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="workspace-shell min-h-screen text-app-text font-sans relative pb-20 md:pb-0"
+      >
         <MobileBottomNav
           tabs={phoneWorkspacePageConfigs}
           extraAction={{
@@ -12334,7 +12411,7 @@ function AuthenticatedApp({
                             setDeleteAccountConfirmationInput(event.target.value)
                           }
                           placeholder={deleteAccountConfirmationPhrase}
-                          className="mt-2 w-full rounded-xl border border-app-border bg-app-surface/80 px-3 py-2 text-sm text-app-text outline-none transition-colors focus:border-cyan-500/40"
+                          className="mt-2 w-full rounded-xl border border-app-border bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text outline-none transition-colors focus:border-cyan-500/40"
                         />
                       </label>
                       <div className="flex gap-2">
@@ -12411,8 +12488,8 @@ function AuthenticatedApp({
                                 className={cn(
                                   "workspace-setup-step rounded-xl border p-2 sm:p-3",
                                   step.isComplete
-                                    ? "border-app-border/50 bg-app-surface-strong/50"
-                                    : "border-app-border/60 bg-app-surface-strong/80"
+                                    ? "border-[color:var(--color-border-subtle)] bg-app-surface-strong/50"
+                                    : "border-[color:var(--color-border-default)] bg-app-surface-strong/80"
                                 )}
                               >
                                 <div className="flex items-start gap-2 sm:gap-3">
@@ -12753,8 +12830,8 @@ function AuthenticatedApp({
                                 className={cn(
                                   "workspace-setup-step rounded-xl border p-2 sm:p-3",
                                   step.isComplete
-                                    ? "border-app-border/50 bg-app-surface-strong/50"
-                                    : "border-app-border/60 bg-app-surface-strong/80"
+                                    ? "border-[color:var(--color-border-subtle)] bg-app-surface-strong/50"
+                                    : "border-[color:var(--color-border-default)] bg-app-surface-strong/80"
                                 )}
                               >
                                 <div className="flex items-start gap-2 sm:gap-3">
@@ -12881,6 +12958,21 @@ function AuthenticatedApp({
                 </div>
               </div>
             ) : null}
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={visibleWorkspaceMode}
+                initial={
+                  prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 8 }
+                }
+                animate={{ opacity: 1, y: 0 }}
+                exit={
+                  prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: -6 }
+                }
+                transition={{
+                  duration: prefersReducedMotion ? 0 : 0.14,
+                  ease: [0.22, 1, 0.36, 1],
+                }}
+              >
             {successMessage && (
               <div className="workspace-success-banner">
                 <div className="flex items-center gap-2.5 text-sm font-medium text-cyan-300">
@@ -12988,6 +13080,10 @@ function AuthenticatedApp({
                               type="button"
                               onClick={() => {
                                 setIsPdfExportOptionsOpen(false);
+                                if (!planEntitlementsForUi.weeklyEmailReports) {
+                                  openLockedWeeklyReports();
+                                  return;
+                                }
                                 setIsWeeklyReportSettingsOpen(true);
                               }}
                               className="workspace-secondary-button inline-flex items-center gap-1.5 px-3 py-2 text-xs"
@@ -13021,7 +13117,17 @@ function AuthenticatedApp({
                             )}
                           </button>
                           {isPdfExportOptionsOpen ? (
+                            <>
+                              {isMobileViewport ? (
+                                <button
+                                  type="button"
+                                  className="workspace-pdf-export-backdrop fixed inset-0 z-50"
+                                  onClick={() => setIsPdfExportOptionsOpen(false)}
+                                  aria-label="Close PDF export options"
+                                />
+                              ) : null}
                             <div className="workspace-popover workspace-pdf-export-popover absolute right-0 top-full z-50 mt-2 w-[calc(100vw-1rem)] max-w-sm rounded-2xl p-3 shadow-xl sm:p-4">
+                              <div className="workspace-mobile-dialog-handle" aria-hidden="true" />
                               <div className="workspace-pdf-export-header flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                   <div className="workspace-chip-label">PDF Export</div>
@@ -13053,7 +13159,7 @@ function AuthenticatedApp({
                                           "workspace-pdf-timeline-option rounded-xl border px-3 py-2 text-xs font-semibold transition-colors",
                                           pdfHistoryRange === option.key
                                             ? "border-cyan-500/30 bg-cyan-500/15 text-cyan-200"
-                                            : "border-app-border/70 bg-app-surface/60 text-app-text-muted hover:text-app-text",
+                                            : "border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] text-app-text-muted hover:text-app-text",
                                         )}
                                       >
                                         {option.label}
@@ -13103,6 +13209,7 @@ function AuthenticatedApp({
                                 </button>
                               </div>
                             </div>
+                            </>
                           ) : null}
                         </div>
                         </div>
@@ -13228,7 +13335,7 @@ function AuthenticatedApp({
                             className="section-header-icon"
                             style={{
                               background: "rgba(148,163,184,0.12)",
-                              border: "1px solid rgba(125,211,252,0.16)",
+                              border: "1px solid var(--color-info-border)",
                             }}
                           >
                             <Layers className="w-4 h-4 text-cyan-100" />
@@ -13237,7 +13344,7 @@ function AuthenticatedApp({
                         </h3>
                       </div>
                       <div className={`flex flex-wrap ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
-                        <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
+                        <div className="inline-flex rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-1">
                           {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                             <button
                               key={mode}
@@ -13293,7 +13400,7 @@ function AuthenticatedApp({
                     <div className={isMobileViewport ? "space-y-3" : "space-y-4"}>
                       <div className={`grid ${isMobileViewport ? "gap-2.5" : "gap-4"} md:grid-cols-2`}>
                         <div className={cn(
-                          `rounded-2xl border border-app-border/60 bg-app-surface-muted/65 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
+                          `rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
                           competitorDraftOwnApp && competitorDraftApps.length > 0 ? "opacity-60 md:opacity-100" : "opacity-100"
                         )}>
                         <div className="flex items-center justify-between mb-2">
@@ -13309,7 +13416,7 @@ function AuthenticatedApp({
                             <img
                               src={competitorDraftOwnApp.icon}
                               alt={competitorDraftOwnApp.title}
-                              className={`${isMobileViewport ? "h-11 w-11 rounded-xl" : "h-14 w-14 rounded-2xl"} border border-app-border/60 bg-app-surface-muted/80`}
+                              className={`${isMobileViewport ? "h-11 w-11 rounded-xl" : "h-14 w-14 rounded-2xl"} border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)]`}
                             />
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-semibold text-app-text">
@@ -13327,7 +13434,7 @@ function AuthenticatedApp({
                               }}
                               aria-label="Change selected app"
                               title="Change app"
-                              className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
+                              className="rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-2 text-app-text-muted transition-colors hover:text-app-text"
                             >
                               <X className="h-3.5 w-3.5" />
                             </button>
@@ -13340,7 +13447,7 @@ function AuthenticatedApp({
                       </div>
 
                         <div className={cn(
-                          `rounded-2xl border border-app-border/70 bg-app-surface-muted/45 transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
+                          `rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
                           !competitorDraftOwnApp ? "hidden md:block opacity-40 pointer-events-none" : "block",
                           competitorDraftApps.length > 0 ? "opacity-60 md:opacity-100" : "opacity-100"
                         )}>
@@ -13357,12 +13464,12 @@ function AuthenticatedApp({
                             {competitorDraftApps.map((app) => (
                               <div
                                 key={getCompareAppKey(app, storeType)}
-                                className={`flex items-start rounded-2xl border border-app-border/50 bg-app-surface/45 ${isMobileViewport ? "gap-2.5 p-2.5" : "gap-3 p-3"}`}
+                                className={`flex items-start rounded-2xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)] ${isMobileViewport ? "gap-2.5 p-2.5" : "gap-3 p-3"}`}
                               >
                                 <img
                                   src={app.icon}
                                   alt={app.title}
-                                  className={`${isMobileViewport ? "h-10 w-10" : "h-12 w-12"} rounded-xl border border-app-border/60 bg-app-surface-muted/80`}
+                                  className={`${isMobileViewport ? "h-10 w-10" : "h-12 w-12"} rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)]`}
                                 />
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate text-sm font-semibold text-app-text">
@@ -13381,7 +13488,7 @@ function AuthenticatedApp({
                                   }
                                   aria-label="Change rival"
                                   title="Change rival"
-                                  className="rounded-lg border border-app-border/60 bg-app-surface-muted/70 p-2 text-app-text-muted transition-colors hover:text-app-text"
+                                  className="rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-2 text-app-text-muted transition-colors hover:text-app-text"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -13397,7 +13504,7 @@ function AuthenticatedApp({
                       </div>
 
                       <div className={cn(
-                        `rounded-2xl border border-app-border/60 bg-app-surface/40 transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
+                        `rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] transition-all ${isMobileViewport ? "p-3" : "p-4"}`,
                         competitorDraftApps.length === 0 ? "hidden md:block opacity-40 pointer-events-none" : "block"
                       )}>
                         <div className="md:hidden mb-3 border-b border-app-border pb-2.5">
@@ -13416,13 +13523,13 @@ function AuthenticatedApp({
                             {competitorDraftAnalysis.appInsights.map((insight) => (
                               <div
                                 key={`draft-${insight.appKey}`}
-                                className={`rounded-2xl border ${isMobileViewport ? "p-2.5" : "p-4"} ${insight.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/70 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/60 bg-app-surface-muted/60"}`}
+                                className={`rounded-2xl border ${isMobileViewport ? "p-2.5" : "p-4"} ${insight.role === "own" ? "border-cyan-400/20 bg-[color:var(--color-surface-muted)] ring-1 ring-inset ring-cyan-300/10" : "border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)]"}`}
                               >
                                 <div className={`flex items-start ${isMobileViewport ? "gap-2.5" : "gap-3"}`}>
                                   <img
                                     src={insight.app.icon}
                                     alt={insight.app.title}
-                                    className={`${isMobileViewport ? "h-9 w-9" : "h-11 w-11"} rounded-xl border border-app-border/60 bg-app-surface-muted/80`}
+                                    className={`${isMobileViewport ? "h-9 w-9" : "h-11 w-11"} rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)]`}
                                   />
                                   <div className="min-w-0 flex-1">
                                     <p className="truncate text-sm font-semibold text-app-text">
@@ -13434,13 +13541,13 @@ function AuthenticatedApp({
                                   </div>
                                 </div>
                                 <div className={`grid grid-cols-2 gap-2 text-xs ${isMobileViewport ? "mt-1.5" : "mt-3"}`}>
-                                  <div className={`rounded-xl border border-app-border/50 bg-app-surface-muted/60 text-app-text-muted ${isMobileViewport ? "px-2.5 py-1.5" : "px-3 py-2"}`}>
+                                  <div className={`rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)] text-app-text-muted ${isMobileViewport ? "px-2.5 py-1.5" : "px-3 py-2"}`}>
                                     Top 10/30/100
                                     <div className="mt-1 font-semibold text-app-text">
                                       {insight.top10}/{insight.top30}/{insight.top100}
                                     </div>
                                   </div>
-                                  <div className={`rounded-xl border border-app-border/50 bg-app-surface-muted/60 text-app-text-muted ${isMobileViewport ? "px-2.5 py-1.5" : "px-3 py-2"}`}>
+                                  <div className={`rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)] text-app-text-muted ${isMobileViewport ? "px-2.5 py-1.5" : "px-3 py-2"}`}>
                                     Avg rank
                                     <div className="mt-1 font-semibold text-app-text">
                                       {insight.averageRank ? `#${insight.averageRank}` : "No data"}
@@ -13458,7 +13565,7 @@ function AuthenticatedApp({
                               </div>
                             ))}
                           </div>
-                          <div className={`rounded-2xl border border-app-border/60 bg-app-surface-muted/65 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "p-2" : "p-4"}`}>
+                          <div className={`rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "p-2" : "p-4"}`}>
                             <div className={`flex flex-col ${isMobileViewport ? "gap-2.5" : "gap-3"} xl:flex-row xl:items-start xl:justify-between`}>
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -13493,7 +13600,7 @@ function AuthenticatedApp({
                                       }
                                     }}
                                     placeholder="Search a keyword for both apps"
-                                    className={`w-full rounded-xl border border-app-border/60 bg-app-surface/70 pl-9 pr-3 text-app-text outline-none transition-colors placeholder:text-app-text-muted focus:border-cyan-400/30 ${isMobileViewport ? "py-1.5 text-[12px]" : "py-2 sm:py-2.5 text-[13px] sm:text-sm"}`}
+                                    className={`w-full rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] pl-9 pr-3 text-app-text outline-none transition-colors placeholder:text-app-text-muted focus:border-cyan-400/30 ${isMobileViewport ? "py-1.5 text-[12px]" : "py-2 sm:py-2.5 text-[13px] sm:text-sm"}`}
                                   />
                                 </div>
                                 <button
@@ -13505,7 +13612,7 @@ function AuthenticatedApp({
                                     competitorDraftApps.length === 0 ||
                                     !competitorDraftKeywordSearch.trim()
                                   }
-                                  className={`rounded-xl border border-app-border/70 bg-app-surface-muted/80 font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted disabled:opacity-40 ${isMobileViewport ? "px-3 py-1.5 text-[12px]" : "px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm"}`}
+                                  className={`rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted disabled:opacity-40 ${isMobileViewport ? "px-3 py-1.5 text-[12px]" : "px-4 py-2 sm:py-2.5 text-[13px] sm:text-sm"}`}
                                 >
                                   {isCheckingCompetitorDraftKeyword ? (
                                     <span className="inline-flex items-center gap-2">
@@ -13527,7 +13634,7 @@ function AuthenticatedApp({
                                     onClick={() =>
                                       removeCompetitorDraftKeyword(selection.keyword)
                                     }
-                                    className={`inline-flex items-center gap-1.5 rounded-full border border-app-border/70 bg-app-surface-muted/80 font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted ${isMobileViewport ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted ${isMobileViewport ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}
                                   >
                                     {selection.keyword} · {selection.selectedCountries.length}{" "}
                                     {selection.selectedCountries.length === 1
@@ -13558,7 +13665,7 @@ function AuthenticatedApp({
                                   return (
                                     <div
                                       key={`${candidate.source}:${candidate.keyword}`}
-                                      className={`rounded-2xl border border-app-border/50 bg-app-surface/45 ${isMobileViewport ? "p-2" : "p-4"}`}
+                                      className={`rounded-2xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)] ${isMobileViewport ? "p-2" : "p-4"}`}
                                     >
                                       <div className={`flex flex-col lg:flex-row lg:items-start lg:justify-between ${isMobileViewport ? "gap-2" : "gap-3"}`}>
                                         <div>
@@ -13616,7 +13723,7 @@ function AuthenticatedApp({
                                               candidate.keyword,
                                             )
                                           }
-                                          className={`rounded-lg border font-semibold transition-colors ${isMobileViewport ? "px-2 py-1 text-[9px]" : "px-3 py-2 text-[11px]"} ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-app-border/70 bg-app-surface-muted/80 text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
+                                          className={`rounded-lg border font-semibold transition-colors ${isMobileViewport ? "px-2 py-1 text-[9px]" : "px-3 py-2 text-[11px]"} ${activeSelection ? "border-cyan-500/25 bg-cyan-500/10 text-cyan-200" : "border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] text-app-text hover:border-cyan-400/30 hover:bg-app-surface-muted"}`}
                                         >
                                           {activeSelection
                                                 ? "Edit Countries"
@@ -13642,7 +13749,7 @@ function AuthenticatedApp({
                                           return (
                                             <div
                                               key={`${candidate.keyword}:${app.appKey}`}
-                                              className={`rounded-xl border ${isMobileViewport ? "px-2 py-1.5" : "px-3 py-3"} ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
+                                              className={`rounded-xl border ${isMobileViewport ? "px-2 py-1.5" : "px-3 py-3"} ${app.role === "own" ? "border-cyan-400/20 bg-[color:var(--color-surface-muted)] ring-1 ring-inset ring-cyan-300/10" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                                             >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
@@ -13675,7 +13782,7 @@ function AuthenticatedApp({
                                   );
                                 })
                               ) : (
-                                <div className="rounded-2xl border border-dashed border-app-border/60 bg-app-surface/35 px-4 py-8 text-center">
+                                <div className="rounded-2xl border border-dashed border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-4 py-8 text-center">
                                   <p className="text-sm font-medium text-app-text-muted">
                                     No shared ranked keywords surfaced yet.
                                   </p>
@@ -13689,7 +13796,7 @@ function AuthenticatedApp({
                           </div>
                         </div>
                       ) : (
-                        <div className="rounded-2xl border border-dashed border-app-border/60 bg-app-surface/35 px-4 py-8 text-center">
+                        <div className="rounded-2xl border border-dashed border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-4 py-8 text-center">
                           <p className="text-sm font-medium text-app-text-muted">
                             Run analysis to load keyword battles for this comparison.
                           </p>
@@ -13857,7 +13964,7 @@ function AuthenticatedApp({
                           }
                         : groupAsoSnapshotCount === 0
                           ? {
-                              tone: "border-app-border/60 bg-app-surface/40 text-app-text-muted",
+                              tone: "border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] text-app-text-muted",
                               title: "Baseline pending",
                               message:
                                 "The first daily ASO run still needs to capture the initial store snapshot.",
@@ -13870,7 +13977,7 @@ function AuthenticatedApp({
                                   `Captured ${groupAsoSnapshotCount}/${groupAsoExpectedSnapshotCount || 1} ASO baseline snapshots. Comparison starts after all current targets have a baseline.`,
                               }
                             : {
-                                tone: "border-app-border/60 bg-app-surface/40 text-app-text-muted",
+                                tone: "border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] text-app-text-muted",
                                 title: "Baseline captured",
                                 message:
                                   "Monitoring is active. New rows appear when a later run detects store metadata changes.",
@@ -13878,22 +13985,22 @@ function AuthenticatedApp({
                     return (
                       <div
                         key={card.group.groupId}
-                        className={`competitor-group-card min-w-0 border border-app-border/80 bg-app-surface-muted/75 shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10 ${isMobileViewport ? "rounded-2xl" : "rounded-3xl"}`}
+                        className={`competitor-group-card min-w-0 border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] shadow-xl shadow-black/25 ring-1 ring-inset ring-slate-400/10 ${isMobileViewport ? "rounded-2xl" : "rounded-3xl"}`}
                       >
-                        <div className={`competitor-group-header border-b border-app-border/70 bg-app-surface-muted/35 ${isMobileViewport ? "px-2.5 py-2.5" : "px-5 py-5"}`}>
+                        <div className={`competitor-group-header border-b border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] ${isMobileViewport ? "px-2.5 py-2.5" : "px-5 py-5"}`}>
                           <div className={`flex flex-col ${isMobileViewport ? "gap-2" : "gap-4"} lg:flex-row lg:items-start lg:justify-between`}>
                             <div className="min-w-0">
                               <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                                 <h3 className="competitor-group-title max-w-full truncate text-base font-semibold text-app-text">
                                   {getCompetitorGroupLabel(card.group)}
                                 </h3>
-                                <span className="hidden rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 sm:inline-flex">
+                                <span className="hidden rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 sm:inline-flex">
                                   {card.group.store === "ios" ? "iOS" : "Android"}
                                 </span>
-                                <span className="hidden rounded-full border border-app-border/60 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted sm:inline-flex">
+                                <span className="hidden rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted sm:inline-flex">
                                   {card.group.country.toUpperCase()}
                                 </span>
-                                <span className="hidden rounded-full border border-app-border/70 bg-app-surface-muted/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted sm:inline-flex">
+                                <span className="hidden rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted sm:inline-flex">
                                   {card.group.mode}
                                 </span>
                               </div>
@@ -13926,7 +14033,7 @@ function AuthenticatedApp({
                                     card.group.groupId,
                                   )
                                 }
-                                className={`competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
+                                className={`competitor-group-action inline-flex items-center justify-center gap-2 rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] font-semibold text-app-text transition-colors hover:bg-[color:var(--color-surface-muted)] ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
                               >
                                 <ChevronDown
                                   className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
@@ -13935,7 +14042,7 @@ function AuthenticatedApp({
                               </button>
                               <details className="workspace-more-menu">
                                 <summary
-                                  className={`competitor-group-action inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-app-border/60 bg-app-surface-muted/70 font-semibold text-app-text transition-colors hover:bg-app-surface-muted/80 ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
+                                  className={`competitor-group-action inline-flex cursor-pointer list-none items-center justify-center gap-2 rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] font-semibold text-app-text transition-colors hover:bg-[color:var(--color-surface-muted)] ${isMobileViewport ? "px-2.5 py-1.5 text-[10px]" : "px-3 py-2 text-xs"}`}
                                   aria-label={`More actions for ${getCompetitorGroupLabel(card.group)}`}
                                 >
                                   <MoreHorizontal className="h-4 w-4" />
@@ -13977,7 +14084,7 @@ function AuthenticatedApp({
                                   <button
                                     type="button"
                                     onClick={() =>
-                                      setActiveCompetitorAsoAlertGroupId(
+                                      openCompetitorAsoAlerts(
                                         card.group.groupId,
                                       )
                                     }
@@ -14004,14 +14111,14 @@ function AuthenticatedApp({
 
                         <div className={`competitor-group-body ${isMobileViewport ? "space-y-2.5 p-2.5" : "space-y-4 p-5"}`}>
                           {!isExpanded ? (
-                            <div className={`rounded-2xl border border-app-border/70 bg-app-surface-muted/55 text-app-text-muted shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "px-2.5 py-2 text-[11px]" : "px-4 py-4 text-sm"}`}>
+                            <div className={`rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] text-app-text-muted shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "px-2.5 py-2 text-[11px]" : "px-4 py-4 text-sm"}`}>
                               {1 + card.group.competitors.length} apps,{" "}
                               {card.trackedKeywords.length} tracked keywords,{" "}
                               {card.rankedPairCount} ranked pairs.
                             </div>
                           ) : (
                             <>
-                          <div className={`competitor-group-section rounded-2xl border border-app-border/75 bg-app-surface-muted/60 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)] ${isMobileViewport ? "px-3 py-3" : "px-4 py-4"}`}>
+                          <div className={`competitor-group-section rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] shadow-[inset_0_1px_0_rgba(148,163,184,0.06)] ${isMobileViewport ? "px-3 py-3" : "px-4 py-4"}`}>
                             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                               Group Apps
                             </p>
@@ -14019,13 +14126,13 @@ function AuthenticatedApp({
                               {[card.group.ownApp, ...card.group.competitors].map((app) => (
                                 <div
                                   key={`${card.group.groupId}:${app.appKey}`}
-                                  className={`competitor-app-card rounded-2xl border shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "p-2.5" : "p-3"} ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/70 bg-app-surface/70"}`}
+                                  className={`competitor-app-card rounded-2xl border shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "p-2.5" : "p-3"} ${app.role === "own" ? "border-cyan-400/20 bg-[color:var(--color-surface-muted)] ring-1 ring-inset ring-cyan-300/10" : "border-[color:var(--color-border-default)] bg-[color:var(--color-surface)]"}`}
                                 >
                                   <div className={`flex items-start ${isMobileViewport ? "gap-2.5" : "gap-3"}`}>
                                     <img
                                       src={app.icon}
                                       alt={app.title}
-                                      className="h-9 w-9 rounded-xl border border-app-border/60 bg-app-surface-muted/80 sm:h-11 sm:w-11"
+                                      className="h-9 w-9 rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] sm:h-11 sm:w-11"
                                     />
                                     <div className="min-w-0 flex-1">
                                       <p className="truncate text-sm font-semibold text-app-text">
@@ -14056,7 +14163,7 @@ function AuthenticatedApp({
                             </div>
                           </div>
 
-                          <div className={`competitor-group-section rounded-2xl border border-app-border/60 bg-app-surface-muted/65 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "px-3 py-3" : "px-4 py-4"}`}>
+                          <div className={`competitor-group-section rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] shadow-[inset_0_1px_0_rgba(148,163,184,0.05)] ${isMobileViewport ? "px-3 py-3" : "px-4 py-4"}`}>
                             <div className={`flex flex-col ${isMobileViewport ? "gap-2" : "gap-3"} md:flex-row md:items-start md:justify-between`}>
                               <div>
                                 <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -14069,16 +14176,16 @@ function AuthenticatedApp({
                                 </p>
                               </div>
                               <div className={`competitor-aso-actions flex flex-wrap ${isMobileViewport ? "gap-1.5" : "gap-2"}`}>
-                                <span className={`rounded-full border border-app-border/60 bg-app-surface/60 font-semibold text-app-text ${isMobileViewport ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
+                                <span className={`rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] font-semibold text-app-text ${isMobileViewport ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
                                   {groupAsoDiffs.length} changes logged
                                 </span>
-                                <span className={`rounded-full border border-app-border/60 bg-app-surface/60 font-semibold text-app-text ${isMobileViewport ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
+                                <span className={`rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] font-semibold text-app-text ${isMobileViewport ? "px-2.5 py-1 text-[11px]" : "px-3 py-1.5 text-xs"}`}>
                                   {groupAsoSnapshotCount} snapshots
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() =>
-                                    setActiveCompetitorAsoAlertGroupId(
+                                    openCompetitorAsoAlerts(
                                       card.group.groupId,
                                     )
                                   }
@@ -14151,7 +14258,7 @@ function AuthenticatedApp({
                                 {groupAsoChangedFieldEntries.map((entry) => (
                                   <span
                                     key={`${card.group.groupId}:aso-field:${entry.field}`}
-                                    className="rounded-full border border-app-border/60 bg-app-surface/60 px-3 py-1.5 text-[11px] font-semibold text-app-text"
+                                    className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-[11px] font-semibold text-app-text"
                                   >
                                     {getCompetitorAsoFieldLabel(entry.field)}{" "}
                                     <span className="text-app-text-muted">
@@ -14234,11 +14341,11 @@ function AuthenticatedApp({
                               </div>
                             ) : null}
                             {isLoadingCompetitorAsoHistory ? (
-                              <div className="competitor-aso-empty mt-4 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
+                              <div className="competitor-aso-empty mt-4 rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-4 py-6 text-sm text-app-text-muted">
                                 Loading competitor ASO change history...
                               </div>
                             ) : filteredGroupAsoDiffs.length === 0 ? (
-                              <div className="competitor-aso-empty mt-4 rounded-2xl border border-dashed border-app-border/60 bg-app-surface/40 px-4 py-6 text-sm text-app-text-muted">
+                              <div className="competitor-aso-empty mt-4 rounded-2xl border border-dashed border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-4 py-6 text-sm text-app-text-muted">
                                 {groupAsoDiffs.length === 0
                                   ? groupAsoSnapshotCount === 0
                                     ? "Baseline not captured yet. The first ASO snapshot will appear after the next scheduled monitoring run."
@@ -14249,7 +14356,7 @@ function AuthenticatedApp({
                               </div>
                             ) : (
                               <div className="workspace-panel competitor-aso-diff-table mt-4 overflow-hidden !p-0">
-                                <div className="competitor-aso-diff-header grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                                <div className="competitor-aso-diff-header grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-[color:var(--color-border-default)] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                   <div>Detected</div>
                                   <div>App</div>
                                   <div>Country</div>
@@ -14260,7 +14367,7 @@ function AuthenticatedApp({
                                   {filteredGroupAsoDiffs.map((diff) => (
                                     <div
                                       key={diff.diffId}
-                                      className="competitor-aso-diff-row grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-app-border/80 px-4 py-3 text-sm text-app-text-muted last:border-b-0"
+                                      className="competitor-aso-diff-row grid min-w-[720px] grid-cols-[140px_170px_110px_minmax(0,150px)_minmax(0,1fr)] gap-3 border-b border-[color:var(--color-border-default)] px-4 py-3 text-sm text-app-text-muted last:border-b-0"
                                     >
                                       <div className="competitor-aso-diff-detected text-xs text-app-text-muted">
                                         {formatTrackingChartDateTime(
@@ -14279,7 +14386,7 @@ function AuthenticatedApp({
                                         {diff.changedFields.map((field) => (
                                           <span
                                             key={`${diff.diffId}:${field}`}
-                                            className="inline-flex self-start rounded-full border border-app-border/60 bg-app-surface-muted/70 px-2 py-1 text-[10px] font-semibold text-app-text"
+                                            className="inline-flex self-start rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-app-text"
                                           >
                                             {getCompetitorAsoFieldLabel(field)}
                                           </span>
@@ -14289,7 +14396,7 @@ function AuthenticatedApp({
                                         {diff.changes.map((change) => (
                                           <div
                                             key={`${diff.diffId}:${change.field}`}
-                                            className="rounded-xl border border-app-border/80 bg-app-surface-muted/60 px-3 py-2"
+                                            className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-3 py-2"
                                           >
                                             <div className="text-[11px] font-semibold text-app-text">
                                               {getCompetitorAsoFieldLabel(
@@ -14325,7 +14432,7 @@ function AuthenticatedApp({
                                                         alt=""
                                                         loading="lazy"
                                                         referrerPolicy="no-referrer"
-                                                        className="h-16 w-9 rounded-lg border border-app-border/60 bg-app-surface object-cover"
+                                                        className="h-16 w-9 rounded-lg border border-[color:var(--color-border-default)] bg-app-surface object-cover"
                                                         onError={(event) => {
                                                           event.currentTarget.style.display =
                                                             "none";
@@ -14360,7 +14467,7 @@ function AuthenticatedApp({
                                                         alt=""
                                                         loading="lazy"
                                                         referrerPolicy="no-referrer"
-                                                        className="h-16 w-9 rounded-lg border border-app-border/60 bg-app-surface object-cover"
+                                                        className="h-16 w-9 rounded-lg border border-[color:var(--color-border-default)] bg-app-surface object-cover"
                                                         onError={(event) => {
                                                           event.currentTarget.style.display =
                                                             "none";
@@ -14383,7 +14490,7 @@ function AuthenticatedApp({
 
                           <div
                             id={`competitor-tracked-keywords-${card.group.groupId}`}
-                            className="competitor-group-section rounded-2xl border border-app-border/60 bg-app-surface-muted/65 px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                            className="competitor-group-section rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-4 py-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                           >
                             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                               <div>
@@ -14395,11 +14502,11 @@ function AuthenticatedApp({
                                   lines for every app in this battle group.
                                 </p>
                               </div>
-                              <span className="rounded-full border border-app-border/60 bg-app-surface/60 px-3 py-1.5 text-xs font-semibold text-app-text">
+                              <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-xs font-semibold text-app-text">
                                 {card.trackedKeywordGroups.length} monitored
                               </span>
                             </div>
-                            <div className="mt-4 rounded-2xl border border-app-border/60 bg-app-surface/40 p-3">
+                            <div className="mt-4 rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] p-3">
                               <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                                 <div>
                                   <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
@@ -14428,7 +14535,7 @@ function AuthenticatedApp({
                                         }
                                       }}
                                       placeholder="Search a keyword for this group"
-                                      className="w-full rounded-xl border border-app-border/60 bg-app-surface/70 py-2 pl-9 pr-3 text-[13px] text-app-text outline-none transition-colors placeholder:text-app-text-muted focus:border-cyan-400/30"
+                                      className="w-full rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] py-2 pl-9 pr-3 text-[13px] text-app-text outline-none transition-colors placeholder:text-app-text-muted focus:border-cyan-400/30"
                                     />
                                   </div>
                                   <button
@@ -14440,7 +14547,7 @@ function AuthenticatedApp({
                                       isCheckingCompetitorTrackedKeywordByGroup[card.group.groupId] ||
                                       !(competitorTrackedKeywordSearchByGroup[card.group.groupId] || "").trim()
                                     }
-                                    className="rounded-xl border border-app-border/70 bg-app-surface-muted/80 px-4 py-2 text-[13px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted disabled:opacity-40"
+                                    className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-4 py-2 text-[13px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted disabled:opacity-40"
                                   >
                                     {isCheckingCompetitorTrackedKeywordByGroup[card.group.groupId] ? (
                                       <span className="inline-flex items-center gap-2">
@@ -14458,7 +14565,7 @@ function AuthenticatedApp({
                                   {(competitorTrackedKeywordSearchResultsByGroup[card.group.groupId] || []).map((candidate) => (
                                     <div
                                       key={`${card.group.groupId}:${candidate.keyword}`}
-                                      className="rounded-2xl border border-app-border/50 bg-app-surface/45 p-3"
+                                      className="rounded-2xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)] p-3"
                                     >
                                       <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
                                         <div>
@@ -14482,7 +14589,7 @@ function AuthenticatedApp({
                                               keyword: candidate.keyword,
                                             })
                                           }
-                                          className="rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted"
+                                          className="rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted"
                                         >
                                           Choose Countries
                                         </button>
@@ -14504,7 +14611,7 @@ function AuthenticatedApp({
                                           return (
                                             <div
                                               key={`${card.group.groupId}:${candidate.keyword}:${app.appKey}`}
-                                              className={`rounded-xl border px-3 py-3 ${app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
+                                              className={`rounded-xl border px-3 py-3 ${app.role === "own" ? "border-cyan-400/20 bg-[color:var(--color-surface-muted)] ring-1 ring-inset ring-cyan-300/10" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                                             >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
@@ -14557,7 +14664,7 @@ function AuthenticatedApp({
                                   return (
                                     <div
                                       key={keywordGroup.groupKey}
-                                      className="competitor-keyword-card rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/25 bg-app-surface-muted/70 p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                                      className="competitor-keyword-card rounded-2xl border border-[color:var(--color-border-default)] border-l-2 border-l-cyan-400/25 bg-[color:var(--color-surface-muted)] p-4 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                                     >
                                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                                         <div>
@@ -14581,7 +14688,7 @@ function AuthenticatedApp({
                                           <button
                                             type="button"
                                             onClick={() =>
-                                              setActiveCompetitorKeywordAlertGroupKey(
+                                              openCompetitorKeywordAlerts(
                                                 keywordGroup.groupKey,
                                               )
                                             }
@@ -14601,7 +14708,7 @@ function AuthenticatedApp({
                                                   event.target.value,
                                                 )
                                               }
-                                              className="rounded-lg border border-app-border/60 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text outline-none"
+                                              className="rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text outline-none"
                                               aria-label={`Select competitor keyword country for ${trackedKeyword.keyword}`}
                                             >
                                               {keywordGroup.countryViews.map(
@@ -14631,7 +14738,7 @@ function AuthenticatedApp({
                                                 keywordGroup.groupKey,
                                               )
                                             }
-                                            className="rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted"
+                                            className="rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted"
                                           >
                                             <span className="sm:hidden">
                                               {isExpanded ? "Hide" : "Chart"}
@@ -14641,7 +14748,7 @@ function AuthenticatedApp({
                                             </span>
                                           </button>
                                           <details className="workspace-more-menu">
-                                            <summary className="inline-flex min-h-[2.25rem] cursor-pointer list-none items-center justify-center gap-1.5 rounded-lg border border-app-border/70 bg-app-surface-muted/80 px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted">
+                                            <summary className="inline-flex min-h-[2.25rem] cursor-pointer list-none items-center justify-center gap-1.5 rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-3 py-2 text-[11px] font-semibold text-app-text transition-colors hover:border-cyan-400/30 hover:bg-app-surface-muted">
                                               <MoreHorizontal className="h-3.5 w-3.5" />
                                               More
                                             </summary>
@@ -14744,7 +14851,7 @@ function AuthenticatedApp({
                                                 className={`inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] ${
                                                   isSelectedCountry
                                                     ? "border-cyan-400/30 bg-cyan-500/12 ring-1 ring-inset ring-cyan-300/10"
-                                                    : "border-app-border/60 bg-app-surface-muted/80"
+                                                    : "border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)]"
                                                 }`}
                                               >
                                                 <span className="truncate text-app-text-muted">
@@ -14785,7 +14892,7 @@ function AuthenticatedApp({
                                           return (
                                             <div
                                               key={`${trackedKeyword.trackedKeywordId}:${view.app.appKey}`}
-                                              className={`rounded-xl border px-2 py-2 sm:px-3 sm:py-3 ${view.app.role === "own" ? "border-cyan-400/20 bg-app-surface-muted/75 ring-1 ring-inset ring-cyan-300/10" : "border-app-border/50 bg-app-surface-muted/60"}`}
+                                              className={`rounded-xl border px-2 py-2 sm:px-3 sm:py-3 ${view.app.role === "own" ? "border-cyan-400/20 bg-[color:var(--color-surface-muted)] ring-1 ring-inset ring-cyan-300/10" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                                             >
                                               <div className="flex items-start justify-between gap-3">
                                                 <div className="min-w-0">
@@ -14825,7 +14932,7 @@ function AuthenticatedApp({
                                         })}
                                       </div>
                                       {isExpanded && (
-                                        <div className="competitor-rank-chart mt-4 rounded-2xl border border-app-border/50 bg-app-surface/50 p-3 sm:p-4">
+                                        <div className="competitor-rank-chart mt-4 rounded-2xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)] p-3 sm:p-4">
                                           <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
                                             <div className="min-w-0">
                                               <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
@@ -15001,6 +15108,8 @@ function AuthenticatedApp({
           {viewMode === "reports" && (
             <div ref={reportsExportRef}>
               <ReportsWorkspace
+                isLocked={!planEntitlementsForUi.reportsWorkspace}
+                onUpgrade={() => setViewMode("upgrade")}
                 trackedKeywords={trackedKeywords}
                 trackedHistoryByKey={trackedHistoryByKey}
                 trackedCountryRowsForExport={trackedCountryRowsForReports}
@@ -15035,7 +15144,11 @@ function AuthenticatedApp({
                 weeklyReportSettings={weeklyReportSettings}
                 isWeeklyReportSettingsOpen={isWeeklyReportSettingsOpen}
                 onWeeklyReportSettingsOpenChange={setIsWeeklyReportSettingsOpen}
-                onWeeklyReportSettingsChange={(nextSettings) =>
+                onWeeklyReportSettingsChange={(nextSettings) => {
+                  if (!planEntitlementsForUi.weeklyEmailReports) {
+                    openLockedWeeklyReports();
+                    return;
+                  }
                   setWeeklyReportSettings((current) =>
                     normalizeWeeklyReportEmailSettings(
                       {
@@ -15045,8 +15158,8 @@ function AuthenticatedApp({
                       },
                       getBrowserTimeZone(),
                     ),
-                  )
-                }
+                  );
+                }}
                 onEditCompetitorKeywordCountries={
                   openCompetitorTrackedKeywordCountryPicker
                 }
@@ -15145,8 +15258,7 @@ function AuthenticatedApp({
                       <img
                         src={b.icon}
                         alt={b.title}
-                        className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-                        style={{ border: "1px solid rgba(51,65,85,0.5)" }}
+                        className="h-14 w-14 flex-shrink-0 rounded-xl border workspace-border-default object-cover"
                       />{" "}
                       <div className="flex-1 min-w-0">
                         {" "}
@@ -15202,8 +15314,8 @@ function AuthenticatedApp({
           {/* Tracked Keywords Dashboard */}{" "}
           {viewMode === "tracked" && (
             <div className="space-y-6" ref={trackedExportRef}>
-              <div className="space-y-3">
-                <WorkspacePanel tone="strong" className="workspace-toolbar-panel">
+              <div className="space-y-2.5">
+                <WorkspacePanel tone="strong" className="workspace-summary-panel">
                   <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
                     <div>
                       <div className="workspace-chip-label">Tracking</div>
@@ -15216,140 +15328,113 @@ function AuthenticatedApp({
                     </div>
                     {trackedKeywordGroupCount > 0 ? (
                       <div className="flex flex-wrap items-center gap-1.5 lg:gap-2 text-[10px] lg:text-xs">
-                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-app-text-muted">
+                        <span className="workspace-status-chip workspace-border-subtle">
                           {trackedViewAppCount} tracked app{trackedViewAppCount === 1 ? "" : "s"}
                         </span>
-                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-app-text-muted">
+                        <span className="workspace-status-chip workspace-border-subtle">
                           {trackedDashboardStats.totalGroups} keyword group{trackedDashboardStats.totalGroups === 1 ? "" : "s"}
                         </span>
-                        <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-2 py-1 lg:px-3 lg:py-1.5 text-emerald-300">
+                        <span className="workspace-status-chip workspace-border-subtle text-[color:var(--color-success)]">
                           {trackedDashboardStats.rankedCount} ranking
                         </span>
                       </div>
                     ) : null}
                   </div>
 
-                  {trackedKeywordGroupCount > 0 && (
-                    <>
-                      <div className="workspace-compact-controls mt-3 grid grid-cols-2 gap-2 lg:mt-4 lg:gap-3 lg:grid-cols-[minmax(0,1.5fr)_220px_220px_220px]">
-                        <div className="col-span-2 lg:col-span-1 relative">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 lg:h-4 lg:w-4 -translate-y-1/2 text-app-text-muted" />
-                          <input
-                            type="text"
-                            value={trackSearchTerm}
-                            onChange={(event) => setTrackSearchTerm(event.target.value)}
-                            placeholder="Search app, keyword, or country..."
-                            className="input-field w-full py-2 pl-9 pr-3 text-xs lg:py-2.5 lg:pl-10 lg:pr-4 lg:text-sm"
-                          />
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setIsTrackedControlsOpen((previous) => !previous)}
-                          aria-expanded={isTrackedControlsOpen}
-                          className="workspace-mobile-filter-toggle col-span-2 inline-flex min-h-[2.45rem] items-center justify-between rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 text-xs font-semibold text-app-text-muted md:hidden"
-                        >
-                          Filters & actions
-                          <ChevronDown
-                            className={cn(
-                              "h-4 w-4 transition-transform",
-                              isTrackedControlsOpen && "rotate-180",
-                            )}
-                          />
-                        </button>
-                        <div className={cn(
-                          "col-span-2 sm:col-span-1 lg:col-span-1",
-                          !isTrackedControlsOpen && "hidden md:block",
-                        )}>
-                          <CountrySearchSelect
-                            value={trackFilterCountry}
-                            onChange={setTrackFilterCountry}
-                            options={COUNTRIES}
-                            includeAllOption={{
-                              code: "all",
-                              name: "All Countries",
-                            }}
-                            ariaLabel="Filter tracked keywords by country"
-                            className="w-full text-xs lg:text-sm"
-                          />
-                        </div>
-                        <div className={cn(
-                          "col-span-1 lg:col-span-1",
-                          !isTrackedControlsOpen && "hidden md:block",
-                        )}>
-                          <select
-                            id="tracked-app-filter"
-                            name="trackedAppFilter"
-                            aria-label="Filter tracked keywords by app"
-                            value={trackFilterApp}
-                            onChange={(e) => setTrackFilterApp(e.target.value)}
-                            className="input-field w-full py-2 text-xs lg:py-2.5 lg:text-sm"
-                            style={{ paddingRight: "1.5rem" }}
-                          >
-                            <option value="all">All Apps</option>
-                            {trackedAppTitles.map((title) => (
-                              <option key={title} value={title}>
-                                {title}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className={cn(
-                          "col-span-1 lg:col-span-1",
-                          !isTrackedControlsOpen && "hidden md:block",
-                        )}>
-                          <select
-                            id="tracked-sort"
-                            name="trackedSort"
-                            aria-label="Sort tracked keywords"
-                            value={trackSortBy}
-                            onChange={(e) => setTrackSortBy(e.target.value as any)}
-                            className="input-field w-full py-2 text-xs lg:py-2.5 lg:text-sm"
-                            style={{ paddingRight: "1.5rem" }}
-                          >
-                            <option value="date_added">Newest first</option>
-                            <option value="last_checked">Recently checked</option>
-                            <option value="app">App name</option>
-                            <option value="rank_change">Biggest change</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className={cn(
-                        "workspace-compact-controls mt-2 flex flex-wrap items-center gap-1 text-[10px] lg:mt-3 lg:gap-2 lg:text-xs",
-                        !isTrackedControlsOpen && "hidden md:flex",
-                      )}>
-                        <button
-                          type="button"
-                          onClick={() => setExpandedTrackedGroupIds(visibleTrackedGroupIds)}
-                          className="btn-ghost rounded-lg px-2 py-1.5 lg:rounded-xl lg:px-3 lg:py-2"
-                          disabled={visibleTrackedGroupIds.length === 0}
-                        >
-                          Expand all
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setExpandedTrackedGroupIds([])}
-                          className="btn-ghost rounded-lg px-2 py-1.5 lg:rounded-xl lg:px-3 lg:py-2"
-                          disabled={expandedTrackedGroupIds.length === 0}
-                        >
-                          Collapse all
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTrackSearchTerm("");
-                            setTrackFilterCountry("all");
-                            setTrackFilterApp("all");
-                            setTrackSortBy("date_added");
-                          }}
-                          className="btn-ghost rounded-lg px-2 py-1.5 lg:rounded-xl lg:px-3 lg:py-2"
-                        >
-                          Reset filters
-                        </button>
-                      </div>
-                    </>
-                  )}
                 </WorkspacePanel>
+                {trackedKeywordGroupCount > 0 ? (
+                  <>
+                    <WorkspaceSearchToolbar>
+                      <WorkspaceSearchInput
+                        value={trackSearchTerm}
+                        onChange={setTrackSearchTerm}
+                        placeholder="Search app, keyword, or country..."
+                        ariaLabel="Search tracked keywords"
+                      />
+                      <div className="workspace-desktop-filter min-w-[10rem]">
+                        <CountrySearchSelect
+                          value={trackFilterCountry}
+                          onChange={setTrackFilterCountry}
+                          options={COUNTRIES}
+                          includeAllOption={{ code: "all", name: "All Countries" }}
+                          ariaLabel="Filter tracked keywords by country"
+                          className="w-full"
+                        />
+                      </div>
+                      <WorkspaceFilterSelect
+                        aria-label="Filter tracked keywords by app"
+                        value={trackFilterApp}
+                        onChange={(event) => setTrackFilterApp(event.target.value)}
+                      >
+                        <option value="all">All Apps</option>
+                        {trackedAppTitles.map((title) => (
+                          <option key={title} value={title}>{title}</option>
+                        ))}
+                      </WorkspaceFilterSelect>
+                      <WorkspaceMobileFilterDrawer
+                        open={isTrackedControlsOpen}
+                        onToggle={() => setIsTrackedControlsOpen((current) => !current)}
+                        activeCount={trackedActiveFilterCount}
+                      >
+                        <CountrySearchSelect
+                          value={trackFilterCountry}
+                          onChange={setTrackFilterCountry}
+                          options={COUNTRIES}
+                          includeAllOption={{ code: "all", name: "All Countries" }}
+                          ariaLabel="Filter tracked keywords by country"
+                          className="w-full"
+                        />
+                        <WorkspaceFilterSelect
+                          aria-label="Filter tracked keywords by app"
+                          value={trackFilterApp}
+                          onChange={(event) => setTrackFilterApp(event.target.value)}
+                        >
+                          <option value="all">All Apps</option>
+                          {trackedAppTitles.map((title) => (
+                            <option key={title} value={title}>{title}</option>
+                          ))}
+                        </WorkspaceFilterSelect>
+                      </WorkspaceMobileFilterDrawer>
+                      <WorkspaceFilterSelect
+                        aria-label="Sort tracked keywords"
+                        value={trackSortBy}
+                        onChange={(event) => setTrackSortBy(event.target.value as typeof trackSortBy)}
+                        className="workspace-mobile-sort-select"
+                      >
+                        <option value="date_added">Newest first</option>
+                        <option value="last_checked">Recently checked</option>
+                        <option value="app">App name</option>
+                        <option value="rank_change">Biggest change</option>
+                      </WorkspaceFilterSelect>
+                      <WorkspaceMoreActionsMenu
+                        actions={[
+                          {
+                            id: "expand",
+                            label: "Expand all",
+                            onSelect: () => setExpandedTrackedGroupIds(visibleTrackedGroupIds),
+                            disabled: visibleTrackedGroupIds.length === 0,
+                          },
+                          {
+                            id: "collapse",
+                            label: "Collapse all",
+                            onSelect: () => setExpandedTrackedGroupIds([]),
+                            disabled: expandedTrackedGroupIds.length === 0,
+                          },
+                          {
+                            id: "reset",
+                            label: "Reset filters",
+                            onSelect: resetTrackedFilters,
+                            disabled: !hasTrackedFilterChanges,
+                          },
+                        ]}
+                      />
+                    </WorkspaceSearchToolbar>
+                    <WorkspaceActiveFilterSummary
+                      count={trackedActiveControlCount}
+                      onReset={resetTrackedFilters}
+                    />
+                  </>
+                ) : null}
 
                 {billingStatusForUi?.usage?.pausedTrackedKeywords ? (
                   <div className="workspace-warning-banner workspace-compact-banner rounded-2xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-100">
@@ -15376,7 +15461,7 @@ function AuthenticatedApp({
                     </div>
                   </div>
                 ) : null}
-                <div className="workspace-compact-banner rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-xs text-app-text-muted">
+                <div className="workspace-compact-banner rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-4 py-3 text-xs text-app-text-muted">
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="inline-flex items-center gap-2">
                       <BellRing className="w-4 h-4 text-cyan-400" />
@@ -15449,12 +15534,12 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={appGroup.appKey}
-                            className="workspace-compact-card rounded-3xl border border-app-border/80 bg-app-surface/55 shadow-xl shadow-black/35 ring-1 ring-inset ring-slate-400/10"
+                            className="workspace-compact-card rounded-3xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] shadow-xl shadow-black/35 ring-1 ring-inset ring-slate-400/10"
                           >
-                            <div className="workspace-compact-card-header border-b border-app-border/70 bg-app-surface-muted/35 px-4 py-4 sm:px-5">
+                            <div className="workspace-compact-card-header border-b border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-4 py-4 sm:px-5">
                               <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                                 <div className="flex items-start gap-3">
-                                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-app-border/75 bg-app-surface-muted/90 shadow-[inset_0_1px_0_rgba(148,163,184,0.06)] sm:h-11 sm:w-11">
+                                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] shadow-[inset_0_1px_0_rgba(148,163,184,0.06)] sm:h-11 sm:w-11">
                                     {selectedStoreGroup.store === "ios" ? (
                                       <Apple className="h-4 w-4 text-app-text" />
                                     ) : (
@@ -15466,7 +15551,7 @@ function AuthenticatedApp({
                                       <h3 className="workspace-mobile-clamp-2 text-base font-semibold text-app-text sm:truncate">
                                         {appGroup.appTitle}
                                       </h3>
-                                      <span className="rounded-full border border-app-border/60 bg-app-surface-muted/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                                      <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                                         {selectedStoreGroup.store === "ios"
                                           ? "iOS"
                                           : "Android"}
@@ -15481,7 +15566,7 @@ function AuthenticatedApp({
                                   </div>
                                 </div>
                                 <div className="flex flex-col gap-3 xl:items-end">
-                                  <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/80 p-1">
+                                  <div className="inline-flex rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-1">
                                     {appGroup.storeGroups.map((storeGroup) => {
                                       const isActive =
                                         storeGroup.store === selectedStoreGroup.store;
@@ -15519,13 +15604,13 @@ function AuthenticatedApp({
                                     })}
                                   </div>
                                   <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:gap-2 sm:text-xs">
-                                    <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-cyan-300">
+                                    <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-cyan-300">
                                       {selectedStoreGroup.groups.length} keywords
                                     </span>
-                                    <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-app-text-muted">
+                                    <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-app-text-muted">
                                       {selectedStoreGroup.totalRegions} regions
                                     </span>
-                                    <span className="rounded-full border border-app-border/60 bg-app-surface/55 px-3 py-1.5 text-cyan-300">
+                                    <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-cyan-300">
                                       {selectedStoreGroup.rankedCount} ranking
                                     </span>
                                     {getTrackedStatusPills(
@@ -15546,7 +15631,7 @@ function AuthenticatedApp({
                                 </div>
                               </div>
                             </div>
-                              <div className="workspace-compact-card-body space-y-3 bg-app-surface/20 p-3 sm:p-4">
+                              <div className="workspace-compact-card-body space-y-3 bg-[color:var(--color-surface)] p-3 sm:p-4">
                               {selectedStoreGroup.groups.map((group) => {
                         const groupImprovement = group.improvement;
                         const isExpanded = expandedTrackedGroupIds.includes(
@@ -15624,7 +15709,7 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={group.groupId}
-                            className="workspace-compact-card rounded-2xl border border-app-border/80 border-l-2 border-l-cyan-400/35 bg-app-surface-muted/75 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                            className="workspace-compact-card rounded-2xl border border-[color:var(--color-border-default)] border-l-2 border-l-cyan-400/35 bg-[color:var(--color-surface-muted)] shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                           >
                             <div className="flex flex-col gap-2.5 px-3 py-2.5 sm:px-5 lg:grid lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.95fr)_72px_minmax(280px,1.35fr)_76px_32px] lg:items-center lg:gap-4">
                               {" "}
@@ -15672,7 +15757,7 @@ function AuthenticatedApp({
                                     )
                                   }
                                   onClick={(event) => event.stopPropagation()}
-                                  className="rounded-full border border-app-border/60 bg-app-surface-muted/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-app-text-muted outline-none"
+                                  className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-app-text-muted outline-none"
                                   aria-label={`Select summary country for ${group.keyword}`}
                                 >
                                   {group.countryViews.map((cv) => (
@@ -15692,7 +15777,7 @@ function AuthenticatedApp({
                                   return (
                                     <span
                                       key={cv.trackedKeyword.country}
-                                      className="inline-flex items-center gap-1 rounded-full bg-app-surface-muted/80 border border-app-border/60 px-2 py-0.5 text-[10px]"
+                                      className="inline-flex items-center gap-1 rounded-full bg-[color:var(--color-surface-muted)] border border-[color:var(--color-border-default)] px-2 py-0.5 text-[10px]"
                                     >
                                       {" "}
                                       <span className="text-app-text-muted">
@@ -15722,7 +15807,7 @@ function AuthenticatedApp({
                                   </span>
                                 )}{" "}
                               </div>{" "}
-                              <div className="rounded-xl border border-app-border/50 bg-app-surface/45 px-3 py-2.5 sm:px-4 sm:py-3">
+                              <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)] px-3 py-2.5 sm:px-4 sm:py-3">
                                 <div className="mb-2 flex items-start justify-between gap-3">
                                   <div className="min-w-0">
                                     <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
@@ -15736,7 +15821,7 @@ function AuthenticatedApp({
                                       Updated {summaryLastChecked}
                                     </p>
                                   </div>
-                                  <span className="rounded-full border border-app-border/60 bg-app-surface-muted/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-app-text-muted">
+                                  <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-app-text-muted">
                                     {summaryValidHistory.length} pts
                                   </span>
                                 </div>
@@ -15746,7 +15831,7 @@ function AuthenticatedApp({
                                     stroke={summaryLineColor}
                                   />
                                 </div>
-                                <div className="mt-2 grid grid-cols-3 gap-1.5 border-t border-app-border/40 pt-2">
+                                <div className="mt-2 grid grid-cols-3 gap-1.5 border-t border-[color:var(--color-border-subtle)] pt-2">
                                   {[
                                     {
                                       label: "Best",
@@ -15775,7 +15860,7 @@ function AuthenticatedApp({
                                   ].map(({ label, value, color }) => (
                                     <div
                                       key={label}
-                                      className="rounded-lg bg-app-surface-muted/60 py-1 text-center"
+                                      className="rounded-lg bg-[color:var(--color-surface-muted)] py-1 text-center"
                                     >
                                       <p className="text-[8px] font-semibold uppercase tracking-[0.16em] text-app-text-muted">
                                         {label}
@@ -15841,14 +15926,14 @@ function AuthenticatedApp({
                                       "manual",
                                     )
                                   }
-                                  className="mr-1.5 rounded-lg border border-app-border/60 bg-app-surface-muted/80 px-2.5 py-1.5 text-[11px] font-semibold text-app-text-muted transition-colors hover:border-cyan-400/30 hover:text-cyan-200"
+                                  className="mr-1.5 rounded-lg border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2.5 py-1.5 text-[11px] font-semibold text-app-text-muted transition-colors hover:border-cyan-400/30 hover:text-cyan-200"
                                   title="Edit tracked countries"
                                 >
                                   Edit Countries
                                 </button>{" "}
                                 <button
                                   type="button"
-                                  onClick={() => setActiveAlertGroupId(group.groupId)}
+                                  onClick={() => openTrackedKeywordAlerts(group.groupId)}
                                   className="mr-1.5 p-1.5 text-app-text-muted hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition-colors"
                                   title="Manage alerts"
                                 >
@@ -15872,7 +15957,7 @@ function AuthenticatedApp({
                             </div>{" "}
                             {/* Expanded detail */}{" "}
                             {isExpanded && (
-                              <div className="border-t border-app-border/45 bg-app-surface/40 px-5 pb-5 pt-2">
+                              <div className="border-t border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)] px-5 pb-5 pt-2">
                                 {" "}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                                   {" "}
@@ -15919,7 +16004,7 @@ function AuthenticatedApp({
                                     return (
                                       <div
                                         key={`${group.groupId}:${trackedKeyword.country}`}
-                                        className="rounded-xl border border-app-border/75 bg-app-surface-muted/75 p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
+                                        className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-3 shadow-[inset_0_1px_0_rgba(148,163,184,0.05)]"
                                       >
                                         {" "}
                                         {/* Country header */}{" "}
@@ -15976,7 +16061,7 @@ function AuthenticatedApp({
                                               />
                                             </div>{" "}
                                             {validHistory.length > 0 && (
-                                              <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t border-app-border/40">
+                                              <div className="grid grid-cols-3 gap-1.5 mt-2 pt-2 border-t border-[color:var(--color-border-subtle)]">
                                                 {" "}
                                                 {[
                                                   {
@@ -16007,7 +16092,7 @@ function AuthenticatedApp({
                                                   ({ label, value, color }) => (
                                                     <div
                                                       key={label}
-                                                      className="text-center bg-app-surface-muted/50 rounded-lg py-1"
+                                                      className="text-center bg-[color:var(--color-surface-muted)] rounded-lg py-1"
                                                     >
                                                       {" "}
                                                       <p className="text-[8px] uppercase tracking-wider text-app-text-muted font-semibold">
@@ -16057,8 +16142,8 @@ function AuthenticatedApp({
                     <span
                       className="section-header-icon"
                       style={{
-                        background: "rgba(34, 211, 238,0.1)",
-                        border: "1px solid rgba(34, 211, 238,0.2)",
+                        background: "var(--color-brand-soft)",
+                        border: "1px solid var(--color-brand-border)",
                       }}
                     >
                       <BarChart3 className="w-4 h-4 text-cyan-400" />
@@ -16077,7 +16162,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartType(event.target.value as ChartType)
                     }
-                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
+                    className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text"
                   >
                     {CHART_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -16090,7 +16175,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartCategoryCode(event.target.value)
                     }
-                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2"
+                    className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text sm:col-span-2"
                     disabled={
                       isLoadingChartCategories || chartCategories.length === 0
                     }
@@ -16105,7 +16190,7 @@ function AuthenticatedApp({
               </div>
               {viewMode === "single" && selectedApp ? (
                 <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-                  <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
+                  <div className="rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] p-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       {selectedApp.title}
                     </p>
@@ -16132,7 +16217,7 @@ function AuthenticatedApp({
                         </p>
                       </div>
                     </div>
-                    <div className="mt-4 rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-3 text-sm text-app-text-muted">
+                    <div className="mt-4 rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)] px-3 py-3 text-sm text-app-text-muted">
                       {isLoadingCharts ? (
                         <div className="flex items-center gap-2 text-app-text-muted">
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -16163,7 +16248,7 @@ function AuthenticatedApp({
                       )}
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
+                  <div className="rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                         Current leaders
@@ -16182,7 +16267,7 @@ function AuthenticatedApp({
                           return (
                             <div
                               key={`${entry.chartType}-${entry.appId}`}
-                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-app-border/50 bg-app-surface-muted/50"}`}
+                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                             >
                               <div
                                 className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}
@@ -16192,7 +16277,7 @@ function AuthenticatedApp({
                               <img
                                 src={entry.icon}
                                 alt=""
-                                className="h-10 w-10 rounded-xl border border-app-border/50"
+                                className="h-10 w-10 rounded-xl border border-[color:var(--color-border-subtle)]"
                                 referrerPolicy="no-referrer"
                               />
                               <div className="min-w-0 flex-1">
@@ -16215,7 +16300,7 @@ function AuthenticatedApp({
                       {!isLoadingCharts &&
                         !chartError &&
                         chartEntries.length === 0 && (
-                          <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-6 text-center text-sm text-app-text-muted">
+                          <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)] px-3 py-6 text-center text-sm text-app-text-muted">
                             No chart data available for this store / country /
                             category combination right now.
                           </div>
@@ -16263,7 +16348,7 @@ function AuthenticatedApp({
                           return (
                             <div
                               key={`${entry.chartType}-${entry.appId}-compare`}
-                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface-muted/50"}`}
+                              className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                             >
                               <div
                                 className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-app-text-muted"}`}
@@ -16273,7 +16358,7 @@ function AuthenticatedApp({
                               <img
                                 src={entry.icon}
                                 alt=""
-                                className="h-10 w-10 rounded-xl border border-app-border/50"
+                                className="h-10 w-10 rounded-xl border border-[color:var(--color-border-subtle)]"
                                 referrerPolicy="no-referrer"
                               />
                               <div className="min-w-0 flex-1">
@@ -16408,8 +16493,8 @@ function AuthenticatedApp({
                             rel="noopener noreferrer"
                             className={`flex-shrink-0 transition-all ${isMobileViewport ? "rounded-lg p-1.5" : "rounded-xl p-2"}`}
                             style={{
-                              background: "rgba(34, 211, 238,0.08)",
-                              border: "1px solid rgba(34, 211, 238,0.2)",
+                              background: "var(--color-brand-soft)",
+                              border: "1px solid var(--color-brand-border)",
                               color: "#22d3ee",
                             }}
                             title="Open in Store"
@@ -16432,13 +16517,13 @@ function AuthenticatedApp({
                         style={
                           isSelectedAppBookmarked
                             ? {
-                                background: "rgba(34, 211, 238,0.15)",
-                                border: "1px solid rgba(34, 211, 238,0.3)",
+                                background: "var(--color-brand-soft-hover)",
+                                border: "1px solid var(--color-brand)",
                                 color: "#22d3ee",
                               }
                             : {
-                                background: "rgba(30,41,59,0.7)",
-                                border: "1px solid rgba(51,65,85,0.5)",
+                                background: "var(--color-surface-muted)",
+                                border: "1px solid var(--color-border-default)",
                                 color: "#64748b",
                               }
                         }
@@ -16508,8 +16593,8 @@ function AuthenticatedApp({
                     <span
                       className="section-header-icon"
                       style={{
-                        background: "rgba(16,185,129,0.1)",
-                        border: "1px solid rgba(16,185,129,0.2)",
+                        background: "var(--color-success-soft)",
+                        border: "1px solid var(--color-success-border)",
                       }}
                     >
                       {" "}
@@ -16536,7 +16621,7 @@ function AuthenticatedApp({
                       </p>{" "}
                       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                         {" "}
-                        <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
+                        <div className="inline-flex rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-1">
                           {" "}
                           {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                             <button
@@ -16582,17 +16667,13 @@ function AuthenticatedApp({
                       <div className="flex min-w-0 items-center gap-2 text-sm text-app-text-muted">
                         {isDiscoveringKeywords ? (
                           <Loader2 className="h-4 w-4 shrink-0 animate-spin text-cyan-400" />
-                        ) : discoveryRunMeta.failedLookups ? (
-                          <AlertCircle className="h-4 w-4 shrink-0 text-amber-400" />
                         ) : (
                           <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-400" />
                         )}
                         <span className="truncate">
                           {isDiscoveringKeywords
                             ? `Running ${discoveryMode} discovery. Existing results stay visible while this refreshes.`
-                            : discoveryRunMeta.failedLookups
-                              ? `Partial scan: ${discoveryRunMeta.failedLookups} lookup${discoveryRunMeta.failedLookups === 1 ? "" : "s"} need retry.`
-                              : discoveryRunMeta.checkedKeywords && discoveryRunMeta.candidateCount
+                            : discoveryRunMeta.checkedKeywords && discoveryRunMeta.candidateCount
                                 ? `Checked ${discoveryRunMeta.checkedKeywords}/${discoveryRunMeta.candidateCount} candidates.`
                                 : "Verified rankings for this app."}
                         </span>
@@ -16735,7 +16816,7 @@ function AuthenticatedApp({
                               className={`w-12 h-12 rounded-2xl shadow-xl ${
                                 isLightTheme
                                   ? "border border-sky-200/80"
-                                  : "border border-app-border/50"
+                                  : "border border-[color:var(--color-border-subtle)]"
                               }`}
                               referrerPolicy="no-referrer"
                             />
@@ -17296,8 +17377,8 @@ function AuthenticatedApp({
                     <span
                       className="section-header-icon"
                       style={{
-                        background: "rgba(34, 211, 238,0.1)",
-                        border: "1px solid rgba(34, 211, 238,0.2)",
+                        background: "var(--color-brand-soft)",
+                        border: "1px solid var(--color-brand-border)",
                       }}
                     >
                       <BarChart3 className="w-4 h-4 text-cyan-400" />
@@ -17316,7 +17397,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartType(event.target.value as ChartType)
                     }
-                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
+                    className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text"
                   >
                     {CHART_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -17329,7 +17410,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartCategoryCode(event.target.value)
                     }
-                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2"
+                    className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text sm:col-span-2"
                     disabled={isLoadingChartCategories || chartCategories.length === 0}
                   >
                     {chartCategories.map((option) => (
@@ -17341,7 +17422,7 @@ function AuthenticatedApp({
                 </div>
               </div>
               <div className="grid gap-4 xl:grid-cols-[0.92fr_1.08fr]">
-                <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
+                <div className="rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                     {selectedApp.title}
                   </p>
@@ -17360,7 +17441,7 @@ function AuthenticatedApp({
                       </p>
                     </div>
                   </div>
-                  <div className="mt-4 rounded-xl border border-app-border/50 bg-app-surface-muted/60 px-3 py-3 text-sm text-app-text-muted">
+                  <div className="mt-4 rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)] px-3 py-3 text-sm text-app-text-muted">
                     {isLoadingCharts ? (
                       <div className="flex items-center gap-2 text-app-text-muted">
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -17389,7 +17470,7 @@ function AuthenticatedApp({
                     )}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 p-4">
+                <div className="rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       Current leaders
@@ -17404,7 +17485,7 @@ function AuthenticatedApp({
                       return (
                         <div
                           key={`${entry.chartType}-${entry.appId}`}
-                          className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-app-border/50 bg-app-surface-muted/50"}`}
+                          className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                         >
                           <div className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}>
                             #{entry.position}
@@ -17412,7 +17493,7 @@ function AuthenticatedApp({
                           <img
                             src={entry.icon}
                             alt=""
-                            className="h-10 w-10 rounded-xl border border-app-border/50"
+                            className="h-10 w-10 rounded-xl border border-[color:var(--color-border-subtle)]"
                             referrerPolicy="no-referrer"
                           />
                           <div className="min-w-0 flex-1">
@@ -17432,7 +17513,7 @@ function AuthenticatedApp({
                       );
                     })}
                     {!isLoadingCharts && !chartError && chartEntries.length === 0 && (
-                      <div className="rounded-xl border border-app-border/50 bg-app-surface-muted/50 px-3 py-6 text-center text-sm text-app-text-muted">
+                      <div className="rounded-xl border border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)] px-3 py-6 text-center text-sm text-app-text-muted">
                         No chart data available for this store / country / category combination right now.
                       </div>
                     )}
@@ -17500,7 +17581,7 @@ function AuthenticatedApp({
                  {" "}
                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                   {" "}
-                  <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
+                  <div className="inline-flex rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-1">
                     {" "}
                     {(["fast", "deep"] as DiscoveryMode[]).map((mode) => (
                       <button
@@ -17574,8 +17655,8 @@ function AuthenticatedApp({
                 <div
                   className="rounded-2xl px-4 py-3 text-sm flex items-start gap-3"
                   style={{
-                    background: "rgba(245,158,11,0.08)",
-                    border: "1px solid rgba(245,158,11,0.18)",
+                    background: "var(--color-warning-soft)",
+                    border: "1px solid var(--color-warning-border)",
                     color: "#fbbf24",
                   }}
                 >
@@ -17591,8 +17672,8 @@ function AuthenticatedApp({
                       <span
                         className="section-header-icon"
                         style={{
-                          background: "rgba(34, 211, 238,0.1)",
-                          border: "1px solid rgba(34, 211, 238,0.2)",
+                          background: "var(--color-brand-soft)",
+                          border: "1px solid var(--color-brand-border)",
                         }}
                       >
                         <Globe className="w-4 h-4 text-cyan-400" />
@@ -17609,7 +17690,7 @@ function AuthenticatedApp({
                       onChange={(event) =>
                         setSelectedChartType(event.target.value as ChartType)
                       }
-                      className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
+                      className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text"
                     >
                       {CHART_TYPE_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -17622,7 +17703,7 @@ function AuthenticatedApp({
                       onChange={(event) =>
                         setSelectedChartCategoryCode(event.target.value)
                       }
-                      className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2"
+                      className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text sm:col-span-2"
                       disabled={isLoadingChartCategories || chartCategories.length === 0}
                     >
                       {chartCategories.map((option) => (
@@ -17666,7 +17747,7 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={`${entry.chartType}-${entry.appId}-compare`}
-                            className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface-muted/50"}`}
+                            className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                           >
                             <div className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-app-text-muted"}`}>
                               #{entry.position}
@@ -17674,7 +17755,7 @@ function AuthenticatedApp({
                             <img
                               src={entry.icon}
                               alt=""
-                              className="h-10 w-10 rounded-xl border border-app-border/50"
+                              className="h-10 w-10 rounded-xl border border-[color:var(--color-border-subtle)]"
                               referrerPolicy="no-referrer"
                             />
                             <div className="min-w-0 flex-1">
@@ -17710,7 +17791,7 @@ function AuthenticatedApp({
                       type="button"
                       onClick={() => removeCompareApp(insight.appDetails)}
                       aria-label={`Remove ${insight.appDetails.title} from compare set`}
-                      className="workspace-compare-remove absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-app-surface-muted/80 text-app-text-muted shadow-sm transition-colors hover:bg-red-500 hover:text-white"
+                      className="workspace-compare-remove absolute right-3 top-3 inline-flex min-h-11 min-w-11 items-center justify-center rounded-full bg-[color:var(--color-surface-muted)] text-app-text-muted shadow-sm transition-colors hover:bg-red-500 hover:text-white"
                     >
                       {" "}
                       <X className="w-3.5 h-3.5" />{" "}
@@ -17720,7 +17801,7 @@ function AuthenticatedApp({
                         <img
                           src={insight.appDetails.icon}
                           alt={insight.appDetails.title}
-                          className="h-12 w-12 flex-shrink-0 rounded-2xl border border-app-border/50 shadow-sm"
+                          className="h-12 w-12 flex-shrink-0 rounded-2xl border border-[color:var(--color-border-subtle)] shadow-sm"
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5">
@@ -17757,7 +17838,7 @@ function AuthenticatedApp({
                         <img
                           src={insight.appDetails.icon}
                           alt={insight.appDetails.title}
-                          className="w-16 h-16 rounded-2xl shadow-md mb-4 border border-app-border/50"
+                          className="w-16 h-16 rounded-2xl shadow-md mb-4 border border-[color:var(--color-border-subtle)]"
                         />{" "}
                         <div className="flex items-center gap-1.5 justify-center mb-1">
                           {" "}
@@ -17789,14 +17870,14 @@ function AuthenticatedApp({
                           {" "}
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             {" "}
-                            <div className="rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-app-text-muted">
+                            <div className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-app-text-muted">
                               {" "}
                               Top 10 / 30 / 100{" "}
                               <div className="mt-1 font-semibold text-app-text">
                                 {insight.top10} / {insight.top30} / {insight.top100}
                               </div>{" "}
                             </div>{" "}
-                            <div className="rounded-xl border border-app-border/70 bg-app-surface/70 px-3 py-2 text-app-text-muted">
+                            <div className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-app-text-muted">
                               {" "}
                               Avg Rank{" "}
                               <div className="mt-1 font-semibold text-app-text">
@@ -17829,7 +17910,7 @@ function AuthenticatedApp({
                             </div>{" "}
                           </div>{" "}
                         </div>{" "}
-                        <div className="mt-auto text-xs font-semibold text-app-text bg-app-surface px-3 py-2 rounded-xl w-full border border-app-border/80 shadow-inner flex items-center justify-center gap-1.5">
+                        <div className="mt-auto text-xs font-semibold text-app-text bg-app-surface px-3 py-2 rounded-xl w-full border border-[color:var(--color-border-default)] shadow-inner flex items-center justify-center gap-1.5">
                           {" "}
                           <span className="text-amber-400 text-sm">&#9733;</span>{" "}
                           {insight.appDetails.score
@@ -17853,8 +17934,8 @@ function AuthenticatedApp({
                         <span
                           className="section-header-icon"
                           style={{
-                            background: "rgba(34, 211, 238,0.1)",
-                            border: "1px solid rgba(34, 211, 238,0.2)",
+                            background: "var(--color-brand-soft)",
+                            border: "1px solid var(--color-brand-border)",
                           }}
                         >
                           {" "}
@@ -18190,7 +18271,7 @@ function AuthenticatedApp({
                                 {battle.rankedApps.map((rankedApp) => (
                                   <span
                                     key={`${battle.keyword}-${rankedApp.appKey}`}
-                                    className={`workspace-compare-rank-chip rounded-lg border text-xs font-semibold ${isMobileViewport ? "px-2.5 py-1" : "px-3 py-1.5"} ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-app-surface-muted/80 border-app-border/80 text-app-text-muted"}`}
+                                    className={`workspace-compare-rank-chip rounded-lg border text-xs font-semibold ${isMobileViewport ? "px-2.5 py-1" : "px-3 py-1.5"} ${rankedApp.appKey === battle.leader.appKey ? "bg-cyan-500/15 border-cyan-500/30 text-cyan-300" : "bg-[color:var(--color-surface-muted)] border-[color:var(--color-border-default)] text-app-text-muted"}`}
                                   >
                                     {" "}
                                     {rankedApp.appTitle} #{rankedApp.rank}{rankedApp.appKey === battle.leader.appKey ? " · winner" : ""}{" "}
@@ -18213,8 +18294,8 @@ function AuthenticatedApp({
                         <span
                           className="section-header-icon"
                           style={{
-                            background: "rgba(16,185,129,0.1)",
-                            border: "1px solid rgba(16,185,129,0.2)",
+                            background: "var(--color-success-soft)",
+                            border: "1px solid var(--color-success-border)",
                           }}
                         >
                           {" "}
@@ -18291,8 +18372,8 @@ function AuthenticatedApp({
                       <span
                         className="section-header-icon"
                         style={{
-                          background: "rgba(16,185,129,0.1)",
-                          border: "1px solid rgba(16,185,129,0.2)",
+                          background: "var(--color-success-soft)",
+                          border: "1px solid var(--color-success-border)",
                         }}
                       >
                         {" "}
@@ -18420,8 +18501,8 @@ function AuthenticatedApp({
                       <span
                         className="section-header-icon"
                         style={{
-                          background: "rgba(34, 211, 238,0.1)",
-                          border: "1px solid rgba(34, 211, 238,0.2)",
+                          background: "var(--color-brand-soft)",
+                          border: "1px solid var(--color-brand-border)",
                         }}
                       >
                         <BarChart3 className="w-4 h-4 text-cyan-400" />
@@ -18435,13 +18516,13 @@ function AuthenticatedApp({
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-app-text-muted">
+                    <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-app-text-muted">
                       {findCountryName(country) || country}
                     </span>
-                    <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-cyan-300">
+                    <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-cyan-300">
                       {getChartTypeLabel(selectedChartType)}
                     </span>
-                    <span className="rounded-full border border-app-border/60 bg-app-surface/45 px-3 py-1.5 text-app-text-muted">
+                    <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-1.5 text-app-text-muted">
                       {selectedChartCategory?.label || "Category"}
                     </span>
                   </div>
@@ -18452,7 +18533,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartType(event.target.value as ChartType)
                     }
-                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2.5 text-sm text-app-text"
+                    className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2.5 text-sm text-app-text"
                   >
                     {CHART_TYPE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -18465,7 +18546,7 @@ function AuthenticatedApp({
                     onChange={(event) =>
                       setSelectedChartCategoryCode(event.target.value)
                     }
-                    className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2.5 text-sm text-app-text"
+                    className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2.5 text-sm text-app-text"
                     disabled={
                       isLoadingChartCategories || chartCategories.length === 0
                     }
@@ -18476,7 +18557,7 @@ function AuthenticatedApp({
                       </option>
                     ))}
                   </select>
-                  <div className="rounded-xl border border-app-border/60 bg-app-surface/45 px-4 py-2.5 text-sm text-app-text-muted">
+                  <div className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-4 py-2.5 text-sm text-app-text-muted">
                     {chartLoadedAt
                       ? `Loaded ${formatAlertEventTime(chartLoadedAt)}`
                       : isLoadingCharts
@@ -18526,7 +18607,7 @@ function AuthenticatedApp({
                         return (
                           <div
                             key={`${entry.chartType}-${entry.appId}-page`}
-                            className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : isCompared ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface-muted/50"}`}
+                            className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : isCompared ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface-muted)]"}`}
                           >
                             <div
                               className={`w-10 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : isCompared ? "text-cyan-200" : "text-app-text-muted"}`}
@@ -18536,7 +18617,7 @@ function AuthenticatedApp({
                             <img
                               src={entry.icon}
                               alt=""
-                              className="h-11 w-11 rounded-xl border border-app-border/50"
+                              className="h-11 w-11 rounded-xl border border-[color:var(--color-border-subtle)]"
                               referrerPolicy="no-referrer"
                             />
                             <div className="min-w-0 flex-1">
@@ -18608,7 +18689,7 @@ function AuthenticatedApp({
                           <img
                             src={selectedApp.icon}
                             alt={selectedApp.title}
-                            className="h-14 w-14 rounded-2xl border border-app-border/50"
+                            className="h-14 w-14 rounded-2xl border border-[color:var(--color-border-subtle)]"
                           />
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-app-text">
@@ -18661,7 +18742,7 @@ function AuthenticatedApp({
             (viewMode === "compare" && comparedApps.length > 0)) && (
             <div className="mt-8 flex justify-end">
               <aside className="w-full xl:max-w-md">
-                <div className="rounded-2xl border border-app-border/60 bg-app-surface/50 shadow-lg backdrop-blur-sm">
+                <div className="rounded-2xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] shadow-lg backdrop-blur-sm">
                   <button
                     type="button"
                     onClick={() =>
@@ -18678,8 +18759,8 @@ function AuthenticatedApp({
                         <span
                           className="section-header-icon"
                           style={{
-                            background: "rgba(34, 211, 238,0.1)",
-                            border: "1px solid rgba(34, 211, 238,0.2)",
+                            background: "var(--color-brand-soft)",
+                            border: "1px solid var(--color-brand-border)",
                           }}
                         >
                           <BarChart3 className="w-4 h-4 text-cyan-400" />
@@ -18693,7 +18774,7 @@ function AuthenticatedApp({
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-2">
-                      <span className="rounded-full border border-app-border/70 bg-app-surface-muted/70 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                      <span className="rounded-full border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                         {selectedChartCategory?.label || "Category"}
                       </span>
                       <ChevronDown
@@ -18701,7 +18782,7 @@ function AuthenticatedApp({
                       />
                     </div>
                   </button>
-                  <div className="border-t border-slate-900/70 px-5 py-3 text-xs text-app-text-muted">
+                  <div className="border-t border-[color:var(--color-divider)] px-5 py-3 text-xs text-app-text-muted">
                     <span>{getChartTypeLabel(selectedChartType)}</span>
                     <span className="mx-2 text-slate-700">/</span>
                     <span>{findCountryName(country) || country}</span>
@@ -18715,14 +18796,14 @@ function AuthenticatedApp({
                     </span>
                   </div>
                   {isMarketSnapshotOpen && (
-                    <div className="space-y-4 border-t border-slate-900/70 px-5 py-5">
+                    <div className="space-y-4 border-t border-[color:var(--color-divider)] px-5 py-5">
                       <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
                         <select
                           value={selectedChartType}
                           onChange={(event) =>
                             setSelectedChartType(event.target.value as ChartType)
                           }
-                          className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text"
+                          className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text"
                         >
                           {CHART_TYPE_OPTIONS.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -18735,7 +18816,7 @@ function AuthenticatedApp({
                           onChange={(event) =>
                             setSelectedChartCategoryCode(event.target.value)
                           }
-                          className="rounded-xl border border-app-border/70 bg-app-surface/60 px-3 py-2 text-sm text-app-text sm:col-span-2 xl:col-span-1"
+                          className="rounded-xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface)] px-3 py-2 text-sm text-app-text sm:col-span-2 xl:col-span-1"
                           disabled={
                             isLoadingChartCategories || chartCategories.length === 0
                           }
@@ -18823,7 +18904,7 @@ function AuthenticatedApp({
                                 return (
                                   <div
                                     key={`${entry.chartType}-${entry.appId}-side`}
-                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-app-border/50 bg-app-surface/50"}`}
+                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isSelected ? "border-cyan-500/30 bg-cyan-500/10" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)]"}`}
                                   >
                                     <div
                                       className={`w-9 text-center text-sm font-bold ${isSelected ? "text-cyan-300" : "text-app-text-muted"}`}
@@ -18833,7 +18914,7 @@ function AuthenticatedApp({
                                     <img
                                       src={entry.icon}
                                       alt=""
-                                      className="h-10 w-10 rounded-xl border border-app-border/50"
+                                      className="h-10 w-10 rounded-xl border border-[color:var(--color-border-subtle)]"
                                       referrerPolicy="no-referrer"
                                     />
                                     <div className="min-w-0 flex-1">
@@ -18893,7 +18974,7 @@ function AuthenticatedApp({
                                 return (
                                   <div
                                     key={`${entry.chartType}-${entry.appId}-compare-side`}
-                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-app-border/50 bg-app-surface/50"}`}
+                                    className={`flex items-center gap-3 rounded-xl border px-3 py-2 ${isComparedApp ? "border-cyan-500/20 bg-cyan-500/[0.06]" : "border-[color:var(--color-border-subtle)] bg-[color:var(--color-surface)]"}`}
                                   >
                                     <div
                                       className={`w-10 text-center text-sm font-bold ${isComparedApp ? "text-cyan-200" : "text-app-text-muted"}`}
@@ -18903,7 +18984,7 @@ function AuthenticatedApp({
                                     <img
                                       src={entry.icon}
                                       alt=""
-                                      className="h-10 w-10 rounded-xl border border-app-border/50"
+                                      className="h-10 w-10 rounded-xl border border-[color:var(--color-border-subtle)]"
                                       referrerPolicy="no-referrer"
                                     />
                                     <div className="min-w-0 flex-1">
@@ -18932,6 +19013,8 @@ function AuthenticatedApp({
               </aside>
             </div>
           )}{" "}
+              </motion.div>
+            </AnimatePresence>
         </main>{" "}
         </div>
         <CountryMultiSelectModal
@@ -19021,8 +19104,9 @@ function AuthenticatedApp({
           target={activeKeywordAlertTarget}
           rules={alertRules}
           onClose={() => setActiveAlertGroupId(null)}
-          onChange={setAlertRules}
+          onChange={handleAlertRulesChange}
           notificationPermission={notificationPermission}
+          alertEmailsEnabled={alertEmailsEnabled}
           onRequestPushPermission={requestNotificationPermission}
         />
         <UnifiedAlertRuleManagerModal
@@ -19030,8 +19114,9 @@ function AuthenticatedApp({
           target={activeCompetitorKeywordAlertTarget}
           rules={alertRules}
           onClose={() => setActiveCompetitorKeywordAlertGroupKey(null)}
-          onChange={setAlertRules}
+          onChange={handleAlertRulesChange}
           notificationPermission={notificationPermission}
+          alertEmailsEnabled={alertEmailsEnabled}
           onRequestPushPermission={requestNotificationPermission}
         />
         <UnifiedAlertRuleManagerModal
@@ -19039,8 +19124,9 @@ function AuthenticatedApp({
           target={activeCompetitorAsoAlertTarget}
           rules={alertRules}
           onClose={() => setActiveCompetitorAsoAlertGroupId(null)}
-          onChange={setAlertRules}
+          onChange={handleAlertRulesChange}
           notificationPermission={notificationPermission}
+          alertEmailsEnabled={alertEmailsEnabled}
           onRequestPushPermission={requestNotificationPermission}
         />
         {isPhoneViewport && isPhoneMoreMenuOpen ? (
@@ -19168,8 +19254,9 @@ function AuthenticatedApp({
             </div>
           </div>
         ) : null}
-      </div>
+      </motion.div>
       )}
+      </AnimatePresence>
     </ErrorBoundary>
   );
 }

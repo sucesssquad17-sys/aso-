@@ -29,13 +29,16 @@ import {
   GLOBAL_TRACKING_TIMEZONE,
 } from '../src/lib/trackingTime';
 import {
+  buildCronFailureEmailText,
   buildWeeklyReportEmailHtml,
+  buildWeeklyReportEmailText,
   buildWeeklyReportEmailSummary,
   buildWeeklyReportWorkspaceUrl,
   getSafeAppUrl,
   getResendEmailId,
   sendAlertEmailEvents as sendSharedAlertEmailEvents,
 } from '../src/lib/backendEmail';
+import { resolveCategoryEmailRecipient } from '../src/lib/backendEmailRecipients';
 import {
   DAILY_TRACKING_LEASE_TTL_MINUTES,
   getDailyTrackingFinalStatus,
@@ -60,6 +63,15 @@ import {
   shouldSendWeeklyReportForDate,
   type WeeklyReportSettings,
 } from '../src/lib/weeklyReports';
+import {
+  claimWeeklyReportDelivery,
+  finalizeWeeklyReportDelivery,
+} from '../src/lib/weeklyReportDelivery';
+import { getPlanEntitlements } from '../src/lib/planLimits';
+import {
+  buildAlertEventId as buildSharedAlertEventId,
+  buildCompetitorAsoAlertEventId,
+} from '../src/lib/alertEventIdentity';
 import {
   getGlobalTrackingRunKey as getSharedGlobalTrackingRunKey,
   getZonedDateParts as getSharedZonedDateParts,
@@ -254,6 +266,7 @@ type UserTrackingDocument = {
   weeklyReportSettings?: WeeklyReportSettings;
   alertEmailsEnabled?: boolean;
   billingEmail?: string;
+  subscriptionTier?: string | null;
   accountStatus?: 'active' | 'deleting' | 'deleted';
   updatedAt?: string;
 };
@@ -800,21 +813,28 @@ function buildTrackedAlertCountryKey(
   return `${rule.id}:${rule.groupId}:${appId}:${rule.store}:${rule.keyword.toLowerCase()}:${normalizeCountryCode(country, 'us')}`;
 }
 
-function sanitizeAlertEventId(input: string) {
-  return input.replace(/[^a-zA-Z0-9:_-]/g, '-').slice(0, 200);
-}
-
 function buildAlertEventId(
   runKey: string,
+  groupId: string,
   ruleId: string,
+  keyword: string,
+  store: string,
   country: string,
   eventType: AlertConditionType,
   threshold: number | null,
   appId = '',
 ) {
-  return sanitizeAlertEventId(
-    `${runKey}:${ruleId}:${appId}:${country}:${eventType}:${threshold ?? 0}`,
-  );
+  return buildSharedAlertEventId({
+    runKey,
+    ruleId,
+    groupId,
+    appId,
+    keyword,
+    store,
+    country,
+    eventType,
+    threshold,
+  });
 }
 
 function getComparableTrackedKey({
@@ -1193,58 +1213,47 @@ async function sendEmailAlertEvents(
   userDocRef: DocumentReference<DocumentData>,
   events: AlertEvent[],
 ) {
-  const recipient = await resolveAlertEmailRecipient(userDocRef);
+  const recipientResolution = await resolveAlertEmailRecipient(userDocRef);
   await sendSharedAlertEmailEvents(userDocRef, events, {
     resend,
     fromEmail: RESEND_FROM_EMAIL,
     dashboardUrl: ALERT_EMAIL_APP_URL,
-    preferencesUrl: recipient
+    preferencesUrl:
+      recipientResolution.status === 'ready' && recipientResolution.email
       ? getEmailPreferenceUrl({
           kind: 'alert',
           userId: userDocRef.id,
-          email: recipient,
+          email: recipientResolution.email,
         })
       : ALERT_EMAIL_APP_URL,
-    resolveRecipient: async () => recipient,
+    resolveRecipient: async () => recipientResolution,
     logPrefix: '[email]',
   });
+}
+
+async function resolveAccountAuthEmail(
+  userDocRef: DocumentReference<DocumentData>,
+) {
+  const userRecord = await getAuth().getUser(userDocRef.id);
+  return userRecord.email?.trim().toLowerCase() || null;
 }
 
 async function resolveAlertEmailRecipient(
   userDocRef: DocumentReference<DocumentData>,
 ) {
-  let recipient: string | null = null;
-  try {
-    const userSnapshot = await userDocRef.get();
-    const userData = userSnapshot.data() as UserTrackingDocument | undefined;
-    if (
-      userData?.accountStatus === 'deleted' ||
-      userData?.accountStatus === 'deleting'
-    ) {
-      return null;
-    }
-    if (userData?.alertEmailsEnabled === false) {
-      return null;
-    }
-    const billingEmail = normalizeEmailAddress(userData?.billingEmail);
-    if (billingEmail && isValidEmailAddress(billingEmail)) {
-      recipient = billingEmail;
-    }
-  } catch (error) {
-    console.warn(`[email] Failed to read billing email for user ${userDocRef.id}`, error);
-  }
+  return resolveCategoryEmailRecipient(userDocRef, {
+    category: 'alert',
+    resolveAuthEmail: async () => resolveAccountAuthEmail(userDocRef),
+  });
+}
 
-  if (!recipient) {
-    try {
-      const authUser = await getAuth().getUser(userDocRef.id);
-      const authEmail = normalizeEmailAddress(authUser.email);
-      recipient = authEmail && isValidEmailAddress(authEmail) ? authEmail : null;
-    } catch (error) {
-      console.warn(`[email] Failed to resolve alert email for user ${userDocRef.id}`, error);
-    }
-  }
-
-  return recipient;
+async function resolveWeeklyReportEmailRecipient(
+  userDocRef: DocumentReference<DocumentData>,
+) {
+  return resolveCategoryEmailRecipient(userDocRef, {
+    category: 'weekly',
+    resolveAuthEmail: async () => resolveAccountAuthEmail(userDocRef),
+  });
 }
 
 function buildWeeklyReportSummaryFromState(
@@ -1379,9 +1388,17 @@ async function maybeSendWeeklyReportEmail(
   if (!eligibility.matchesWeekday || eligibility.alreadySent) {
     return null;
   }
+  const deliveryClaim = await claimWeeklyReportDelivery(userDocRef, {
+    deliveryKey: eligibility.deliveryKey,
+    claimOwner: `job:${process.pid}`,
+    now: date,
+  });
+  if (!deliveryClaim.acquired) {
+    return null;
+  }
   const attemptedAt = new Date().toISOString();
   const buildDeliveryUpdate = (
-    status: 'delivered' | 'failed',
+    status: 'accepted' | 'failed' | 'skipped',
     error?: string,
     sentAt?: string,
   ): WeeklyReportSettings => {
@@ -1403,20 +1420,44 @@ async function maybeSendWeeklyReportEmail(
   };
   if (!resend) {
     log('[email] Skipping weekly report email because Resend is not configured.');
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'failed',
+      now: new Date(),
+      error: 'resend-not-configured',
+    });
     return buildDeliveryUpdate('failed', 'resend-not-configured');
   }
 
   const sender = getConfiguredResendSender();
   if (!sender) {
     log('[email] Skipping weekly report email because sender email is not configured.');
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'failed',
+      now: new Date(),
+      error: 'sender-not-configured',
+    });
     return buildDeliveryUpdate('failed', 'sender-not-configured');
   }
 
-  const recipient = await resolveAlertEmailRecipient(userDocRef);
-  if (!recipient) {
-    log(`[email] Skipping weekly report email for user ${userDocRef.id} because no account email is available.`);
-    return buildDeliveryUpdate('failed', 'no-account-email');
+  const recipientResolution = await resolveWeeklyReportEmailRecipient(userDocRef);
+  if (recipientResolution.status !== 'ready' || !recipientResolution.email) {
+    log(
+      `[email] Skipping weekly report email for user ${userDocRef.id} because ${recipientResolution.reason}.`,
+    );
+    const isSkipped =
+      recipientResolution.status === 'opted_out' ||
+      recipientResolution.status === 'account_deleted';
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: isSkipped ? 'skipped' : 'failed',
+      now: new Date(),
+      error: recipientResolution.reason,
+    });
+    return buildDeliveryUpdate(
+      isSkipped ? 'skipped' : 'failed',
+      recipientResolution.reason,
+    );
   }
+  const recipient = recipientResolution.email;
 
   const hydratedState = await hydrateWeeklyReportStateWithArchive(
     userDocRef,
@@ -1439,6 +1480,16 @@ async function maybeSendWeeklyReportEmail(
       from: `Rank Analyzer Pro <${sender}>`,
       to: recipient,
       subject: `Your weekly ASO report - ${summary.rangeLabel}`,
+      text: buildWeeklyReportEmailText({
+        summary,
+        reportUrl,
+        weekday: settings.weekday,
+        preferencesUrl: getEmailPreferenceUrl({
+          kind: 'weekly',
+          userId: userDocRef.id,
+          email: recipient,
+        }),
+      }),
       html: buildWeeklyReportEmailHtml({
         summary,
         reportUrl,
@@ -1452,6 +1503,14 @@ async function maybeSendWeeklyReportEmail(
     });
     if (result.error) {
       console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, result.error);
+      await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+        status: 'failed',
+        now: new Date(),
+        error:
+          typeof result.error.message === 'string' && result.error.message.trim()
+            ? result.error.message.trim()
+            : 'provider-error',
+      });
       return buildDeliveryUpdate(
         'failed',
         typeof result.error.message === 'string' && result.error.message.trim()
@@ -1464,10 +1523,24 @@ async function maybeSendWeeklyReportEmail(
     }
 
     const sentAt = new Date().toISOString();
-    log(`[email] Delivered weekly report email to ${recipient}.`);
-    return buildDeliveryUpdate('delivered', undefined, sentAt);
+    const providerMessageId = getResendEmailId(result);
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'accepted',
+      now: new Date(sentAt),
+      providerMessageId,
+    });
+    log(`[email] Accepted weekly report email to ${recipient}.`);
+    return buildDeliveryUpdate('accepted', undefined, sentAt);
   } catch (error) {
     console.warn(`[email] Failed to deliver weekly report email for user ${userDocRef.id}`, error);
+    await finalizeWeeklyReportDelivery(deliveryClaim.ref, {
+      status: 'failed',
+      now: new Date(),
+      error:
+        error instanceof Error && error.message.trim()
+          ? error.message.trim().slice(0, 500)
+          : 'unknown-delivery-failure',
+    });
     return buildDeliveryUpdate(
       'failed',
       error instanceof Error && error.message.trim()
@@ -1531,6 +1604,7 @@ async function sendCronFailureEmail(input: {
       from: `Rank Analyzer Pro <${sender}>`,
       to: CRON_FAILURE_EMAIL_RECIPIENTS,
       subject: `Cron job failed: ${input.runKey}`,
+      text: buildCronFailureEmailText(input),
       html: buildCronFailureEmailHtml(input),
     });
     if (result.error) {
@@ -1540,7 +1614,7 @@ async function sendCronFailureEmail(input: {
     if (!getResendEmailId(result)) {
       console.warn(`[email] Cron failure email for ${input.runKey} returned no message id.`);
     }
-    log(`[email] Delivered cron failure email for ${input.runKey}.`);
+    log(`[email] Accepted cron failure email for ${input.runKey}.`);
   } catch (error) {
     log(`[email] Failed to deliver cron failure email: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -1738,7 +1812,10 @@ async function evaluateAndDispatchAlertRules(
           const event: AlertEvent = {
             id: buildAlertEventId(
               runKey,
+              rule.groupId,
               rule.id,
+              rule.keyword,
+              rule.store,
               country,
               condition.type,
               condition.value ?? null,
@@ -1849,7 +1926,17 @@ async function evaluateAndDispatchCompetitorAsoAlertRules(
           continue;
         }
         const event: AlertEvent = {
-          id: sanitizeAlertEventId(`${runKey}:${rule.id}:${diff.diffId}:${condition.type}`),
+          id: buildCompetitorAsoAlertEventId({
+            runKey,
+            ruleId: rule.id,
+            groupId: diff.groupId,
+            appId: diff.appId,
+            keyword: diff.appTitle,
+            store: diff.store,
+            country: diff.country,
+            eventType: condition.type,
+            asoDiffId: diff.diffId,
+          }),
           ruleId: rule.id,
           groupId: diff.groupId,
           appId: diff.appId,
@@ -2293,6 +2380,9 @@ async function captureCompetitorAsoState(
     'competitorGroups' | 'competitorTrackedKeywords' | 'competitorAsoLatestSnapshots' | 'alertRules' | 'notificationSettings'
   >,
   runKey: string,
+  options?: {
+    alertsEnabled?: boolean;
+  },
 ) {
   if (!state.competitorGroups.length) {
     return {
@@ -2373,13 +2463,16 @@ async function captureCompetitorAsoState(
     });
   });
 
-  const { createdEvents } = await evaluateAndDispatchCompetitorAsoAlertRules(
-    userDocRef,
-    state.alertRules,
-    state.notificationSettings,
-    createdDiffs,
-    runKey,
-  );
+  const { createdEvents } =
+    options?.alertsEnabled === false
+      ? { createdEvents: [] as AlertEvent[] }
+      : await evaluateAndDispatchCompetitorAsoAlertRules(
+          userDocRef,
+          state.alertRules,
+          state.notificationSettings,
+          createdDiffs,
+          runKey,
+        );
 
   return {
     nextLatestSnapshots: Array.from(latestByKey.values()).sort(
@@ -2575,6 +2668,7 @@ async function main() {
           schedule.timezone || GLOBAL_TRACKING_TIMEZONE,
         ),
       };
+      const planEntitlements = getPlanEntitlements(data?.subscriptionTier);
       const hasTrackedData =
         trackedKeywords.length > 0 ||
         competitorTrackedKeywords.length > 0 ||
@@ -2596,24 +2690,29 @@ async function main() {
         } else {
           log(`  â†’ User ${userDoc.id}: refreshing ${trackedKeywords.length} keyword(s)...`);
           const refreshResult = await refreshUserTrackingDaily(state, runKey);
-          const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
-            userDoc.ref,
-            [
-              ...state.trackedKeywords,
-              ...flattenCompetitorTrackedKeywordsForAlerts(
-                state.competitorTrackedKeywords,
-              ),
-            ],
-            [
-              ...refreshResult.nextState.trackedKeywords,
-              ...flattenCompetitorTrackedKeywordsForAlerts(
-                refreshResult.nextState.competitorTrackedKeywords,
-              ),
-            ],
-            state.alertRules,
-            state.notificationSettings,
-            runKey,
-          );
+          const { updatedRules: updatedAlertRules } =
+            planEntitlements.alertRules || planEntitlements.alertDelivery
+              ? await evaluateAndDispatchAlertRules(
+                  userDoc.ref,
+                  [
+                    ...state.trackedKeywords,
+                    ...flattenCompetitorTrackedKeywordsForAlerts(
+                      state.competitorTrackedKeywords,
+                    ),
+                  ],
+                  [
+                    ...refreshResult.nextState.trackedKeywords,
+                    ...flattenCompetitorTrackedKeywordsForAlerts(
+                      refreshResult.nextState.competitorTrackedKeywords,
+                    ),
+                  ],
+                  state.alertRules,
+                  state.notificationSettings,
+                  runKey,
+                )
+              : {
+                  updatedRules: state.alertRules,
+                };
           const asoResult = await captureCompetitorAsoState(
             userDoc.ref,
             {
@@ -2624,6 +2723,10 @@ async function main() {
               notificationSettings: state.notificationSettings,
             },
             runKey,
+            {
+              alertsEnabled:
+                planEntitlements.alertRules || planEntitlements.alertDelivery,
+            },
           );
           const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
             userDoc.ref,
@@ -2664,11 +2767,13 @@ async function main() {
         }
       }
 
-      const nextWeeklyReportSettings = await maybeSendWeeklyReportEmail(
-        userDoc.ref,
-        weeklyEmailState,
-        new Date(),
-      );
+      const nextWeeklyReportSettings = planEntitlements.weeklyEmailReports
+        ? await maybeSendWeeklyReportEmail(
+            userDoc.ref,
+            weeklyEmailState,
+            new Date(),
+          )
+        : null;
       if (nextWeeklyReportSettings) {
         updatePayload.weeklyReportSettings = nextWeeklyReportSettings;
       }
@@ -2690,24 +2795,29 @@ async function main() {
 
       log(`  → User ${userDoc.id}: refreshing ${trackedKeywords.length} keyword(s)...`);
       const result = await refreshUserTrackingDaily(state, runKey);
-      const { updatedRules: updatedAlertRules } = await evaluateAndDispatchAlertRules(
-        userDoc.ref,
-        [
-          ...state.trackedKeywords,
-          ...flattenCompetitorTrackedKeywordsForAlerts(
-            state.competitorTrackedKeywords,
-          ),
-        ],
-        [
-          ...result.nextState.trackedKeywords,
-          ...flattenCompetitorTrackedKeywordsForAlerts(
-            result.nextState.competitorTrackedKeywords,
-          ),
-        ],
-        state.alertRules,
-        state.notificationSettings,
-        runKey,
-      );
+      const { updatedRules: updatedAlertRules } =
+        planEntitlements.alertRules || planEntitlements.alertDelivery
+          ? await evaluateAndDispatchAlertRules(
+              userDoc.ref,
+              [
+                ...state.trackedKeywords,
+                ...flattenCompetitorTrackedKeywordsForAlerts(
+                  state.competitorTrackedKeywords,
+                ),
+              ],
+              [
+                ...result.nextState.trackedKeywords,
+                ...flattenCompetitorTrackedKeywordsForAlerts(
+                  result.nextState.competitorTrackedKeywords,
+                ),
+              ],
+              state.alertRules,
+              state.notificationSettings,
+              runKey,
+            )
+          : {
+              updatedRules: state.alertRules,
+            };
       const asoResult = await captureCompetitorAsoState(
         userDoc.ref,
         {
@@ -2718,6 +2828,10 @@ async function main() {
           notificationSettings: state.notificationSettings,
         },
         runKey,
+        {
+          alertsEnabled:
+            planEntitlements.alertRules || planEntitlements.alertDelivery,
+        },
       );
       const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
         userDoc.ref,

@@ -8,13 +8,14 @@ import {
   Globe,
   Layers,
   Menu,
-  Search,
   ShieldCheck,
   TrendingUp,
   X,
 } from "lucide-react";
 import {
+  DISPLAY_BILLING_PLANS,
   PUBLIC_BILLING_PLANS,
+  PRICING_COMPARISON_ROWS,
   PRICING_INCLUDED_CAPABILITIES,
   formatBillingAmountFromMinorUnits,
   getAvailableBillingIntervals,
@@ -142,7 +143,7 @@ export default function LandingPage({
   const [selectedInterval, setSelectedInterval] =
     React.useState<BillingInterval>("yearly");
 
-  const pricingCards = PUBLIC_BILLING_PLANS.map((plan) => ({
+  const pricingCards = DISPLAY_BILLING_PLANS.map((plan) => ({
     ...plan,
     badge: plan.badge === "Popular" ? "Most Popular" : plan.badge,
   }));
@@ -199,8 +200,8 @@ export default function LandingPage({
   );
 
   return (
-    <div className="landing-shell min-h-screen overflow-x-hidden bg-app-surface text-app-text selection:bg-cyan-500/30">
-      <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+    <div className="landing-shell relative min-h-screen overflow-x-hidden bg-app-surface text-app-text selection:bg-cyan-500/30">
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <div
           className="absolute left-[-8%] top-[-10%] hidden h-[26rem] w-[26rem] rounded-full opacity-20 blur-[130px] md:block"
           style={{
@@ -225,6 +226,12 @@ export default function LandingPage({
               {link.label}
             </button>
           ))}
+          <a
+            href="/blog/"
+            className="transition-colors hover:text-app-text"
+          >
+            Blog
+          </a>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
@@ -275,6 +282,13 @@ export default function LandingPage({
                 {link.label}
               </button>
             ))}
+            <a
+              href="/blog/"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="rounded-xl px-3 py-2 text-left transition-colors hover:bg-white/[0.04] hover:text-app-text"
+            >
+              Blog
+            </a>
             <button
               onClick={() => {
                 setIsMobileMenuOpen(false);
@@ -383,16 +397,16 @@ export default function LandingPage({
           <div className="mt-10 rounded-[1.5rem] border border-cyan-500/10 bg-cyan-950/10 p-6 sm:p-8 md:mt-12 md:p-10">
             <div className="flex flex-col items-center text-center">
               <h3 className="mb-2 text-xl font-bold text-app-text">
-                Everything included in all plans
+                Core workflow across the product
               </h3>
               <p className="max-w-2xl text-sm text-app-text-muted">
-                All workflow features are available on every plan. Only tracked apps, competitor groups, and tracked keyword capacity scale by tier.
+                Free covers core tracking. Higher tiers add reports, alerts, and deeper monitoring workflows.
               </p>
             </div>
 
-            <div className="mt-8 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-8 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
               {PRICING_INCLUDED_CAPABILITIES.map((cap) => (
-                <div key={cap.label} className="flex flex-col">
+                <div key={cap.label} className="flex min-w-0 flex-col">
                   <div className="flex items-center gap-2">
                      <Check className="h-4 w-4 shrink-0 text-cyan-400" />
                     <span className="text-sm font-semibold text-app-text">{cap.label}</span>
@@ -414,7 +428,7 @@ export default function LandingPage({
               Pick the workflow depth that fits your portfolio
             </h2>
             <p className="mt-3 text-base leading-8 text-app-text-muted">
-              Built for solo builders, growing portfolios, and teams that need a disciplined search-to-tracking workflow.
+              Start free for core tracking, then unlock reports, alerts, and larger monitoring capacity as the portfolio grows.
             </p>
           </div>
 
@@ -442,7 +456,7 @@ export default function LandingPage({
             </div>
           </div>
 
-          <div className="mx-auto mt-8 grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mx-auto mt-8 grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {pricingCards.map((plan) => {
               const priceLabel = getPlanPriceLabel(
                 pricingCatalog,
@@ -527,33 +541,74 @@ export default function LandingPage({
                   </div>
 
                   <div className="mt-6 flex flex-col justify-end">
-                    {plan.contactOnly ? (
-                      <SupportEmailLink
-                        subject="Rank Analyzer Pro Sales"
-                        className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
-                          plan.highlight
-                            ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
-                            : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
-                        }`}
-                      >
-                        {plan.cta}
-                      </SupportEmailLink>
-                    ) : (
-                      <button
-                        onClick={onGetStarted}
-                        className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
-                          plan.highlight
-                            ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
-                            : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
-                        }`}
-                      >
-                        {plan.cta}
-                      </button>
-                    )}
+                    <button
+                      onClick={onGetStarted}
+                      className={`inline-flex w-full items-center justify-center rounded-xl px-3 py-2.5 text-[13px] font-bold transition-colors ${
+                        plan.highlight
+                          ? "bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950"
+                          : "border border-app-border/70 bg-app-surface/78 text-app-text hover:bg-app-surface-muted/90"
+                      }`}
+                    >
+                      {plan.cta}
+                    </button>
                   </div>
                 </div>
               );
             })}
+          </div>
+
+          <div className="mt-5 text-center">
+            <SupportEmailLink
+              subject="Rank Analyzer Pro Custom Terms"
+              className="text-sm font-semibold text-cyan-300 underline-offset-4 transition-colors hover:text-cyan-200 hover:underline"
+            >
+              Contact us for custom terms
+            </SupportEmailLink>
+          </div>
+
+          <div className="mx-auto mt-8 max-w-7xl overflow-hidden rounded-[1.5rem] border border-app-border/80 bg-app-surface-muted/58">
+            <div className="border-b border-app-border/70 px-5 py-4 sm:px-6">
+              <h3 className="text-lg font-bold text-app-text">Plan comparison</h3>
+              <p className="mt-1 text-sm text-app-text-muted">
+                Capacity scales by tier. Reports and alert automation start on paid plans.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-[42rem] w-full text-left">
+                <thead>
+                  <tr className="border-b border-app-border/70">
+                    <th className="px-5 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-app-text-muted sm:px-6">
+                      Capability
+                    </th>
+                    {pricingCards.map((plan) => (
+                      <th
+                        key={`compare-head-${plan.id}`}
+                        className="px-5 py-3 text-[11px] font-black uppercase tracking-[0.18em] text-app-text-muted sm:px-6"
+                      >
+                        {plan.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {PRICING_COMPARISON_ROWS.map((row) => (
+                    <tr key={row.label} className="border-b border-app-border/60 last:border-b-0">
+                      <td className="px-5 py-3 text-sm font-semibold text-app-text sm:px-6">
+                        {row.label}
+                      </td>
+                      {pricingCards.map((plan) => (
+                        <td
+                          key={`${row.label}-${plan.id}`}
+                          className="px-5 py-3 text-sm text-app-text-muted sm:px-6"
+                        >
+                          {row.values[plan.id]}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
@@ -682,6 +737,11 @@ export default function LandingPage({
                       Competitor Tracking
                     </a>
                   </li>
+                  <li>
+                    <a href="/blog/" className="transition-colors hover:text-app-text">
+                      Blog
+                    </a>
+                  </li>
                 </ul>
               </div>
               
@@ -732,8 +792,23 @@ export default function LandingPage({
           </div>
           
           {/* Bottom Copyright */}
-          <div className="flex flex-col items-center justify-between gap-4 border-t border-slate-500/10 pt-8 sm:flex-row text-xs text-app-text-muted">
+          <div className="flex flex-col items-center justify-between gap-6 border-t border-slate-500/10 pt-8 text-xs text-app-text-muted sm:flex-row">
             <p>© {new Date().getFullYear()} Rank Analyzer Pro. All rights reserved.</p>
+            <a
+              href="https://launchbuff.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Featured on LaunchBuff"
+              className="flex max-w-full items-center rounded-lg opacity-90 transition-opacity hover:opacity-100"
+            >
+              <img
+                src="https://launchbuff.com/badge-featured-dark.svg"
+                alt="Featured on LaunchBuff"
+                width="256"
+                height="80"
+                className="h-auto max-w-full"
+              />
+            </a>
           </div>
         </div>
       </footer>

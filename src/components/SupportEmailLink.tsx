@@ -9,15 +9,10 @@ type SupportEmailLinkProps = {
 const SUPPORT_EMAIL = "vantalumstudio@gmail.com";
 
 function buildSupportEmailComposeUrl(subject?: string) {
-  const params = new URLSearchParams({
-    view: "cm",
-    fs: "1",
-    to: SUPPORT_EMAIL,
-  });
-  if (subject?.trim()) {
-    params.set("su", subject.trim());
-  }
-  return `https://mail.google.com/mail/?${params.toString()}`;
+  const normalizedSubject = subject?.trim();
+  return normalizedSubject
+    ? `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(normalizedSubject)}`
+    : `mailto:${SUPPORT_EMAIL}`;
 }
 
 export default function SupportEmailLink({
@@ -28,8 +23,6 @@ export default function SupportEmailLink({
   return (
     <a
       href={buildSupportEmailComposeUrl(subject)}
-      target="_blank"
-      rel="noopener noreferrer"
       className={className}
       title={`Email ${SUPPORT_EMAIL}`}
     >

@@ -50,6 +50,7 @@ import {
   Label,
 } from "recharts";
 import { toast } from "sonner";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   createUserWithEmailAndPassword,
   getRedirectResult,
@@ -271,6 +272,41 @@ class ApiRequestError extends Error {
     this.code = options?.code;
     this.retryable = options?.retryable;
   }
+}
+
+function AppScreenTransition({
+  screenKey,
+  children,
+}: {
+  screenKey: string;
+  children: React.ReactNode;
+}) {
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={screenKey}
+        initial={
+          prefersReducedMotion
+            ? { opacity: 1 }
+            : { opacity: 0, y: 10 }
+        }
+        animate={{ opacity: 1, y: 0 }}
+        exit={
+          prefersReducedMotion
+            ? { opacity: 1 }
+            : { opacity: 0, y: -8 }
+        }
+        transition={{
+          duration: prefersReducedMotion ? 0 : 0.16,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
 }
 const TRACKED_KEYWORD_REFRESH_CONCURRENCY = 1;
 const TRACKED_KEYWORD_RANKING_DEPTH = 100;
@@ -1183,8 +1219,9 @@ function PrivacyPolicyPage({
         Rank Analyzer Pro uses Firebase Authentication, Firestore, and Firebase
         Cloud Messaging; Dodo Payments for subscriptions, checkout, and billing
         portal access; Resend for transactional or announcement email delivery;
-        Google Gemini for keyword refinement during discovery; and cloud-hosted
-        backend infrastructure including Cloud Run and Firebase Hosting.
+        Groq's GPT OSS 120B for keyword refinement, with Google Gemini as a
+        fallback; and cloud-hosted backend infrastructure including Cloud Run
+        and Firebase Hosting.
       </p>
       <p>
         App search, ranking, chart, and metadata features depend on third-party
@@ -2732,10 +2769,6 @@ function AuthenticatedApp({
           );
         } else if (payload.rankings.length === 0) {
           toast.info(`${summary}. No ranked keywords found in this scan.`);
-        } else if ((payload.failedLookups ?? 0) > 0) {
-          toast.info(
-            `${summary}. ${payload.failedLookups} lookup${payload.failedLookups === 1 ? "" : "s"} timed out.`,
-          );
         } else {
           toast.success(summary);
         }
@@ -4013,18 +4046,10 @@ function AuthenticatedApp({
     return (
       <ErrorBoundary>
         <div
-          className="min-h-screen text-app-text font-sans relative flex items-center justify-center"
+          className="min-h-screen flex items-center justify-center"
           style={{ background: "var(--bg-primary)" }}
         >
-          <div className="bg-orb bg-orb-1" />
-          <div className="bg-orb bg-orb-2" />
-          <div className="bg-orb bg-orb-3" />
-          <div className="card-glow relative z-10 px-8 py-10 text-center">
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300 mx-auto mb-4" />
-            <p className="text-sm uppercase tracking-[0.18em] text-app-text-muted">
-              Loading account data
-            </p>
-          </div>
+          <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />
         </div>
       </ErrorBoundary>
     );
@@ -7662,72 +7687,74 @@ export default function App() {
   };
   if (!authReady) {
     return (
-      <div className="auth-shell">
-        <div className="auth-orb auth-orb-cyan" />
-        <div className="auth-orb auth-orb-indigo" />
-        <div className="auth-panel flex items-center justify-center min-h-[320px]">
-          <div className="flex flex-col items-center gap-4 text-app-text-muted">
-            <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />
-            <p className="text-sm tracking-[0.18em] uppercase text-app-text-muted">
-              Checking session
-            </p>
-          </div>
-        </div>
+      <div
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--bg-primary)" }}
+      >
+        <Loader2 className="w-8 h-8 animate-spin text-cyan-300" />
       </div>
     );
   }
   if (!currentUser) {
     if (authView === "landing") {
       return (
-        <LandingPage
-          onGetStarted={() => setAuthView("login")}
+        <AppScreenTransition screenKey="landing">
+          <LandingPage
+            onGetStarted={() => setAuthView("login")}
+            onOpenPrivacy={() => setAuthView("privacy")}
+            onOpenTerms={() => setAuthView("terms")}
+            themeMode={themeMode}
+            onToggleTheme={handleToggleTheme}
+          />
+        </AppScreenTransition>
+      );
+    }
+    if (authView === "privacy") {
+      return (
+        <AppScreenTransition screenKey="privacy">
+          <PrivacyPolicyPage
+            onBack={() => setAuthView("login")}
+            themeMode={themeMode}
+            onToggleTheme={handleToggleTheme}
+          />
+        </AppScreenTransition>
+      );
+    }
+    if (authView === "terms") {
+      return (
+        <AppScreenTransition screenKey="terms">
+          <TermsPage
+            onBack={() => setAuthView("login")}
+            themeMode={themeMode}
+            onToggleTheme={handleToggleTheme}
+          />
+        </AppScreenTransition>
+      );
+    }
+    return (
+      <AppScreenTransition screenKey={`login-${authMode}`}>
+        <LoginScreen
+          authMode={authMode}
+          authError={authError}
+          email={email}
+          password={password}
+          isSubmitting={isAuthSubmitting}
+          legalAccepted={preAuthLegalAccepted}
+          onAuthModeChange={(mode) => {
+            setAuthMode(mode);
+            setAuthError(null);
+          }}
+          onEmailChange={setEmail}
+          onPasswordChange={setPassword}
+          onLegalAcceptedChange={setPreAuthLegalAccepted}
+          onEmailSubmit={handleEmailSubmit}
+          onGoogleSignIn={handleGoogleSignIn}
           onOpenPrivacy={() => setAuthView("privacy")}
           onOpenTerms={() => setAuthView("terms")}
           themeMode={themeMode}
           onToggleTheme={handleToggleTheme}
         />
-      );
-    }
-    if (authView === "privacy") {
-      return (
-        <PrivacyPolicyPage
-          onBack={() => setAuthView("login")}
-          themeMode={themeMode}
-          onToggleTheme={handleToggleTheme}
-        />
-      );
-    }
-    if (authView === "terms") {
-      return (
-        <TermsPage
-          onBack={() => setAuthView("login")}
-          themeMode={themeMode}
-          onToggleTheme={handleToggleTheme}
-        />
-      );
-    }
-    return (
-      <LoginScreen
-        authMode={authMode}
-        authError={authError}
-        email={email}
-        password={password}
-        isSubmitting={isAuthSubmitting}
-        legalAccepted={preAuthLegalAccepted}
-        onAuthModeChange={(mode) => {
-          setAuthMode(mode);
-          setAuthError(null);
-        }}
-        onEmailChange={setEmail}
-        onPasswordChange={setPassword}
-        onLegalAcceptedChange={setPreAuthLegalAccepted}
-        onEmailSubmit={handleEmailSubmit}
-        onGoogleSignIn={handleGoogleSignIn}
-        onOpenPrivacy={() => setAuthView("privacy")}
-        onOpenTerms={() => setAuthView("terms")}
-        themeMode={themeMode}
-        onToggleTheme={handleToggleTheme}
-      />
+      </AppScreenTransition>
     );
   }
   return (

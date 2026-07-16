@@ -11,6 +11,7 @@ import {
   type DocumentReference,
 } from "firebase-admin/firestore";
 import type { Resend } from "resend";
+import type { EmailRecipientResolution } from "./backendEmailRecipients";
 
 type ResendSendResult = Awaited<ReturnType<Resend["emails"]["send"]>>;
 
@@ -385,7 +386,7 @@ export async function sendAlertEmailEvents(
     dashboardUrl: string;
     resolveRecipient: (
       userDocRef: DocumentReference<DocumentData>,
-    ) => Promise<string | null>;
+    ) => Promise<string | null | EmailRecipientResolution>;
     preferencesUrl?: string;
     logPrefix?: string;
   },
@@ -420,15 +421,35 @@ export async function sendAlertEmailEvents(
     return;
   }
 
-  const recipient = await input.resolveRecipient(userDocRef);
+  const recipientResolution = await input.resolveRecipient(userDocRef);
+  const recipient =
+    typeof recipientResolution === "string"
+      ? recipientResolution
+      : recipientResolution?.status === "ready"
+        ? recipientResolution.email || null
+        : null;
   if (!recipient) {
+    const isSkipped =
+      typeof recipientResolution === "object" &&
+      recipientResolution !== null &&
+      (recipientResolution.status === "opted_out" ||
+        recipientResolution.status === "account_deleted");
     await updateAlertEmailStatuses(userDocRef, events, () => ({
-          emailDeliveryStatus: "failed",
+          emailDeliveryStatus: isSkipped ? "skipped" : "failed",
           emailDeliveryAttemptedAt: attemptedAt,
-          emailDeliveryFailedAt: attemptedAt,
-          emailDeliveryLastError: "no-account-email",
+          emailDeliveryFailedAt: isSkipped ? FieldValue.delete() : attemptedAt,
+          emailDeliveryLastError:
+            typeof recipientResolution === "object" && recipientResolution !== null
+              ? recipientResolution.reason
+              : "no-account-email",
         }));
-    console.info(`${logPrefix} Skipping alert email for user ${userDocRef.id} because no account email is available.`);
+    console.info(
+      `${logPrefix} Skipping alert email for user ${userDocRef.id} because ${
+        typeof recipientResolution === "object" && recipientResolution !== null
+          ? recipientResolution.reason
+          : "no account email is available"
+      }.`,
+    );
     return;
   }
 
@@ -481,14 +502,17 @@ export async function sendAlertEmailEvents(
     if (!getResendEmailId(result)) {
       console.warn(`${logPrefix} Alert email batch for user ${userDocRef.id} returned no message id.`);
     }
-    const deliveredAt = new Date().toISOString();
+    const acceptedAt = new Date().toISOString();
+    const providerMessageId = getResendEmailId(result);
     await updateAlertEmailStatuses(userDocRef, events, () => ({
-          emailDeliveryStatus: "delivered",
+          emailDeliveryStatus: "accepted",
           emailDeliveryRecipient: recipient,
           emailDeliveryAttemptedAt: eventAttemptedAt,
-          emailDeliveryDeliveredAt: deliveredAt,
+          emailDeliveryAcceptedAt: acceptedAt,
+          emailDeliveryDeliveredAt: FieldValue.delete(),
           emailDeliveryFailedAt: FieldValue.delete(),
           emailDeliveryLastError: FieldValue.delete(),
+          emailProviderMessageId: providerMessageId || FieldValue.delete(),
         }));
   } catch (error) {
     const message =
@@ -904,4 +928,27 @@ export function buildWeeklyReportEmailText(input: {
   }
 
   return lines.join("\n");
+}
+
+export function buildCronFailureEmailText(input: {
+  runKey: string;
+  trigger: "automatic" | "manual" | "watchdog" | "recovery";
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  errorMessage: string;
+  appUrl?: string;
+}) {
+  return [
+    `Cron job failed: ${input.runKey}`,
+    "",
+    "The daily tracking cron job failed before completing.",
+    `Trigger: ${input.trigger}`,
+    `Started: ${formatEmailTimestamp(input.startedAt)}`,
+    `Finished: ${formatEmailTimestamp(input.finishedAt)}`,
+    `Duration: ${Math.max(0, Math.round(input.durationMs / 1000))}s`,
+    `Error: ${input.errorMessage}`,
+    "",
+    `Open workspace: ${getSafeAppUrl(input.appUrl)}`,
+  ].join("\n");
 }

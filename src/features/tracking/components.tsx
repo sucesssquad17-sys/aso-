@@ -26,6 +26,29 @@ export function CountrySearchSelect({
 }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const menuId = React.useId();
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+        setQuery("");
+      }
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("pointerdown", closeOnPointerDown);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnPointerDown);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isOpen]);
   const fullOptions = React.useMemo(
     () => (includeAllOption ? [includeAllOption, ...options] : options),
     [includeAllOption, options],
@@ -45,11 +68,14 @@ export function CountrySearchSelect({
   }, [fullOptions, value]);
   return (
     <div
+      ref={containerRef}
       className={`${dropdownMode === "overlay" ? "relative " : ""}${className || ""}`}
     >
       <button
         type="button"
         aria-label={ariaLabel}
+        aria-expanded={isOpen}
+        aria-controls={menuId}
         onClick={() => setIsOpen((prev) => !prev)}
         className="workspace-select-trigger input-field w-full text-left flex items-center justify-between gap-2 py-1.5 text-xs sm:py-2 sm:text-sm"
       >
@@ -60,16 +86,19 @@ export function CountrySearchSelect({
       </button>
       {isOpen && (
         <div
+          id={menuId}
+          role="listbox"
           className={
             dropdownMode === "inline"
-              ? "mt-2 w-full rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl"
-              : "absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border border-app-border/70 bg-app-surface/95 p-3 shadow-2xl backdrop-blur-xl"
+              ? "mt-2 w-full rounded-2xl border workspace-border-strong bg-[color:var(--color-surface-elevated)] p-3 shadow-2xl"
+              : "absolute z-40 mt-2 w-full min-w-[16rem] rounded-2xl border workspace-border-strong bg-[color:var(--color-surface-elevated)] p-3 shadow-2xl"
           }
         >
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search countries..."
+            aria-label="Search countries"
             className="input-field py-2 w-full mb-3"
             autoFocus
           />
@@ -78,12 +107,14 @@ export function CountrySearchSelect({
               <button
                 key={option.code}
                 type="button"
+                role="option"
+                aria-selected={value === option.code}
                 onClick={() => {
                   onChange(option.code);
                   setIsOpen(false);
                   setQuery("");
                 }}
-                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-cyan-500/15 text-cyan-200" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
+                className={`w-full rounded-xl px-3 py-2 text-left text-sm transition-colors ${value === option.code ? "bg-[color:var(--color-brand-soft)] text-[color:var(--color-brand)]" : "text-app-text-muted hover:bg-[color:var(--color-surface-hover)]"}`}
               >
                 <div className="font-medium">{option.name}</div>
                 <div className="text-xs text-app-text-muted uppercase">
@@ -163,7 +194,7 @@ export function CountryMultiSelectModal({
               onToggleCountry(option.code);
             }
           }}
-          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-cyan-500/15 text-cyan-200" : isDisabled ? "cursor-not-allowed text-slate-600" : "text-app-text-muted hover:bg-app-surface-muted/80"}`}
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition-colors ${isSelected ? "bg-[color:var(--color-brand-soft)] text-[color:var(--color-brand)]" : isDisabled ? "cursor-not-allowed text-[color:var(--color-text-disabled)]" : "text-app-text-muted hover:bg-[color:var(--color-surface-hover)]"}`}
         >
           <div>
             <div className="font-medium">{option.name}</div>
@@ -183,8 +214,8 @@ export function CountryMultiSelectModal({
   );
   if (!isOpen) return null;
   return (
-    <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
-      <div className="workspace-mobile-dialog w-full max-w-2xl rounded-3xl border border-app-border/70 bg-app-surface/95 p-6 shadow-2xl">
+    <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--color-canvas)]/80 px-4 backdrop-blur-sm">
+      <div className="workspace-mobile-dialog w-full max-w-2xl rounded-3xl border workspace-border-strong bg-[color:var(--color-surface-elevated)] p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h3 className="font-display text-xl font-bold text-app-text">
@@ -208,6 +239,7 @@ export function CountryMultiSelectModal({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search countries..."
+            aria-label="Search countries"
             className="input-field py-3 w-full"
             autoFocus
           />
@@ -216,7 +248,7 @@ export function CountryMultiSelectModal({
           {disabledCountries.map((countryCode) => (
             <span
               key={`tracked-${countryCode}`}
-              className="rounded-full border border-app-border/70 bg-app-surface/60 px-3 py-1 text-xs text-app-text-muted"
+              className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface-muted)] px-3 py-1 text-xs text-app-text-muted"
             >
               {findCountryName(countryCode)} already tracked
             </span>
@@ -235,7 +267,7 @@ export function CountryMultiSelectModal({
             </span>
           )}
         </div>
-        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border border-app-border/60 bg-app-surface-muted/40 p-3">
+        <div className="mt-4 max-h-80 overflow-y-auto space-y-3 rounded-2xl border workspace-border-default bg-[color:var(--color-surface-muted)] p-3">
           {query.trim() ? (
             <>{filteredOptions.map(renderCountryButton)}</>
           ) : (
@@ -248,7 +280,7 @@ export function CountryMultiSelectModal({
                   {priorityOptions.map(renderCountryButton)}
                 </div>
               </div>
-              <div className="border-t border-app-border/50 pt-3">
+              <div className="border-t workspace-divider pt-3">
                 <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                   All Countries
                 </p>

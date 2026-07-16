@@ -451,6 +451,7 @@ export interface UserAppStateDocument {
   competitorRankHistory?: CompetitorRankHistoryEntry[];
   trackingSchedule?: TrackingSchedule;
   weeklyReportSettings?: WeeklyReportSettings;
+  alertEmailsEnabled?: boolean;
   alertRules?: AlertRule[];
   notificationSettings?: NotificationSettings;
   legalAcceptedAt?: string;

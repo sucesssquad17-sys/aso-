@@ -148,8 +148,9 @@ export function PrivacyPolicyPage({
         Rank Analyzer Pro uses Firebase Authentication, Firestore, and Firebase
         Cloud Messaging; Dodo Payments for subscriptions, checkout, and billing
         portal access; Resend for transactional or announcement email delivery;
-        Google Gemini for keyword refinement during discovery; and cloud-hosted
-        backend infrastructure including Cloud Run and Firebase Hosting.
+        Groq's GPT OSS 120B for keyword refinement, with Google Gemini as a
+        fallback; and cloud-hosted backend infrastructure including Cloud Run
+        and Firebase Hosting.
       </p>
       <p>
         App search, ranking, chart, and metadata features depend on third-party

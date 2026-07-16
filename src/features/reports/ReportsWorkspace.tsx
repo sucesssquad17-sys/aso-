@@ -7,6 +7,7 @@ import {
   ChevronUp,
   Globe,
   LineChart,
+  Lock,
   Mail,
   Swords,
   X,
@@ -96,6 +97,13 @@ import {
   WorkspaceEmptyBlock,
   WorkspacePanel,
 } from "../app/workspacePrimitives";
+import {
+  WorkspaceActiveFilterSummary,
+  WorkspaceFilterSelect,
+  WorkspaceMobileFilterDrawer,
+  WorkspaceMoreActionsMenu,
+  WorkspaceSearchToolbar,
+} from "../app/workspaceControls";
 import { cn } from "../../lib/utils";
 
 export type ReportMode = "my" | "competitors";
@@ -279,7 +287,7 @@ function formatDelta(delta: number) {
 function getChangeTone(delta: number) {
   if (delta > 0) return "text-cyan-300 bg-cyan-500/12 border-cyan-500/20";
   if (delta < 0) return "text-rose-300 bg-rose-500/12 border-rose-500/20";
-  return "text-app-text-muted bg-app-surface-muted/80 border-app-border/70";
+  return "text-app-text-muted bg-[color:var(--color-surface-muted)] workspace-border-subtle";
 }
 
 function getRankTone(rank: number) {
@@ -363,7 +371,7 @@ function ChartTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-xl border border-app-border/70 bg-app-surface/95 px-3 py-2 text-xs text-app-text shadow-2xl">
+    <div className="rounded-xl border workspace-border-strong bg-[color:var(--color-surface-elevated)] px-3 py-2 text-xs text-app-text shadow-2xl">
       <p className="font-semibold text-app-text">
         {typeof label === "string" || typeof label === "number" ? label : ""}
       </p>
@@ -406,7 +414,7 @@ function ReportSection({
   return (
     <WorkspacePanel tone="muted" className="workspace-summary-panel">
       <div className="mb-2.5 flex items-start gap-2 sm:mb-3 sm:gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-app-border/70 bg-app-surface-muted/80 sm:h-9 sm:w-9 sm:rounded-2xl">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl border workspace-border-subtle bg-[color:var(--color-surface-muted)] sm:h-9 sm:w-9 sm:rounded-2xl">
           <Icon className="h-4 w-4 text-cyan-300" />
         </div>
         <div>
@@ -430,7 +438,7 @@ function ReportLegendRow({
       {items.map((item) => (
         <span
           key={item.label}
-          className="inline-flex max-w-full items-center gap-2 rounded-full border border-app-border/60 bg-app-surface/45 px-2.5 py-1 text-[10px] font-semibold text-app-text sm:px-3 sm:py-1.5 sm:text-xs"
+          className="inline-flex max-w-full items-center gap-2 rounded-full border workspace-border-subtle bg-[color:var(--color-surface)] px-2.5 py-1 text-[10px] font-semibold text-app-text sm:px-3 sm:py-1.5 sm:text-xs"
         >
           <span
             className="h-2.5 w-2.5 flex-shrink-0 rounded-full"
@@ -459,7 +467,7 @@ function CompactStatGrid({
       {items.map((item) => (
         <div
           key={item.label}
-          className="flex flex-col rounded-xl border border-app-border/60 bg-app-surface/40 p-2.5 sm:rounded-2xl sm:p-3"
+          className="flex flex-col rounded-xl border workspace-border-default bg-[color:var(--color-surface)] p-2.5 sm:rounded-2xl sm:p-3"
         >
           <div className="workspace-chip-label !text-[10px] sm:!text-[11px] mb-1">
             {item.label}
@@ -486,7 +494,7 @@ function MovementRowsList({
   return (
     <>
       {rows.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-app-border/70 bg-app-surface/35 px-4 py-6 text-sm text-app-text-muted">
+        <div className="rounded-2xl border border-dashed workspace-border-subtle bg-[color:var(--color-surface-muted)] px-4 py-6 text-sm text-app-text-muted">
           No movement rows available for this selection.
         </div>
       ) : (
@@ -494,7 +502,7 @@ function MovementRowsList({
           {rows.map((row) => (
             <div
               key={row.id}
-              className="w-full overflow-hidden rounded-xl border border-app-border/70 bg-app-surface/45 px-3 py-3 sm:rounded-2xl sm:px-4 sm:py-4"
+              className="w-full overflow-hidden rounded-xl border workspace-border-default bg-[color:var(--color-surface)] px-3 py-3 sm:rounded-2xl sm:px-4 sm:py-4"
             >
               <div className="flex flex-col gap-2.5 2xl:flex-row 2xl:items-center 2xl:justify-between">
                 <div className="min-w-0">
@@ -502,10 +510,10 @@ function MovementRowsList({
                     <span className="text-sm font-semibold text-app-text">
                       {row.keyword}
                     </span>
-                    <span className="rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-app-text-muted">
+                    <span className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface-muted)] px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-app-text-muted">
                       {row.store === "ios" ? "iOS" : "Play"}
                     </span>
-                    <span className="rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-app-text-muted">
+                    <span className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface-muted)] px-2 py-0.5 text-[10px] uppercase tracking-[0.16em] text-app-text-muted">
                       {row.country.toUpperCase()}
                     </span>
                   </div>
@@ -635,7 +643,7 @@ function TabbedMovementSection({
             {activeTab.panelDescription}
           </p>
         </div>
-        <div className="inline-flex rounded-xl border border-app-border/70 bg-app-surface-muted/60 p-1">
+        <div className="inline-flex rounded-xl border workspace-border-default bg-[color:var(--color-surface-muted)] p-1">
           {tabConfig.map((tab) => (
             <button
               key={tab.key}
@@ -663,6 +671,8 @@ function TabbedMovementSection({
 }
 
 export default function ReportsWorkspace({
+  isLocked = false,
+  onUpgrade,
   trackedKeywords,
   trackedHistoryByKey,
   trackedCountryRowsForExport,
@@ -685,6 +695,8 @@ export default function ReportsWorkspace({
   onEditCompetitorKeywordCountries,
   onExportSnapshotChange,
 }: {
+  isLocked?: boolean;
+  onUpgrade?: () => void;
   trackedKeywords: TrackedKeyword[];
   trackedHistoryByKey: Map<string, ChartRankHistoryEntry[]>;
   trackedCountryRowsForExport: ReportTrackedCountryRow[];
@@ -736,6 +748,19 @@ export default function ReportsWorkspace({
   const [reportAppFilter, setReportAppFilter] = React.useState<string>("all");
   const [reportKeywordFilter, setReportKeywordFilter] =
     React.useState<string>("all");
+  const reportActiveFilterCount =
+    reportMode === "my"
+      ? Number(reportStoreFilter !== "all") +
+        Number(reportCountryFilter !== "all") +
+        Number(reportAppFilter !== "all") +
+        Number(reportKeywordFilter !== "all")
+      : Number(reportKeywordFilter !== "all");
+  const resetReportFilters = React.useCallback(() => {
+    setReportStoreFilter("all");
+    setReportCountryFilter("all");
+    setReportAppFilter("all");
+    setReportKeywordFilter("all");
+  }, []);
   const [weeklyReportSettingsDraft, setWeeklyReportSettingsDraft] =
     React.useState<WeeklyReportSettings>(weeklyReportSettings);
   const [isConfirmingWeeklyReportSave, setIsConfirmingWeeklyReportSave] =
@@ -1932,10 +1957,77 @@ export default function ReportsWorkspace({
     weeklyReportSettingsDraft,
   ]);
 
+  if (isLocked) {
+    return (
+      <div className="space-y-6">
+        <div className="workspace-panel workspace-panel-strong rounded-3xl p-5 sm:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl">
+              <div className="workspace-chip-label">Reports preview</div>
+              <h2 className="mt-1 text-base font-semibold text-app-text lg:text-lg">
+                Reporting stays visible, but unlocks on paid plans
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-app-text-muted">
+                Free covers core tracking. Upgrade to open movement reports,
+                weekly email summaries, and alert-driven review workflows.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onUpgrade}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-4 py-3 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-500/15"
+            >
+              <Lock className="h-4 w-4" />
+              Upgrade for reports
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {[
+            {
+              icon: BarChart3,
+              title: "Movement reports",
+              copy: "Track top movers, losses, and pressure points without rebuilding filters every time.",
+            },
+            {
+              icon: Mail,
+              title: "Weekly email summaries",
+              copy: "Send a polished recap to your inbox with the latest movement context already assembled.",
+            },
+            {
+              icon: Swords,
+              title: "Competitor reporting",
+              copy: "Review overlap, rank pressure, and competitor changes from the same reporting workspace.",
+            },
+          ].map((item) => {
+            const Icon = item.icon;
+            return (
+              <div
+                key={item.title}
+                className="workspace-panel rounded-3xl border border-[color:var(--color-border-default)] bg-[color:var(--color-surface-muted)] p-5"
+              >
+                <div className="inline-flex rounded-2xl border border-cyan-400/20 bg-cyan-500/10 p-3 text-cyan-200">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-4 text-sm font-semibold text-app-text">
+                  {item.title}
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-app-text-muted">
+                  {item.copy}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      <WorkspacePanel tone="strong" className="workspace-toolbar-panel">
-        <div className="flex flex-col gap-3 lg:gap-5 xl:flex-row xl:items-end xl:justify-between">
+      <WorkspacePanel tone="strong" className="workspace-report-controls workspace-summary-panel">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <div className="workspace-chip-label">Report controls</div>
             <h2 className="mt-1 text-base lg:text-lg font-semibold text-app-text">
@@ -1945,16 +2037,16 @@ export default function ReportsWorkspace({
               Review movement trends, drill into keywords, and compare competitor groups from one workspace.
             </p>
           </div>
-          <div className="flex flex-wrap gap-1.5 lg:gap-2">
+          <div className="workspace-view-tabs" aria-label="Report type">
             {REPORT_MODE_OPTIONS.map((option) => (
               <button
                 key={option.key}
                 type="button"
                 onClick={() => setReportMode(option.key)}
-                className={`rounded-lg lg:rounded-xl px-3 py-1.5 lg:px-4 lg:py-2 text-xs lg:text-sm font-semibold transition-colors ${
+                className={`workspace-view-tab ${
                   reportMode === option.key
-                    ? "bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
-                    : "bg-app-surface/45 text-app-text-muted border border-app-border/70 hover:text-app-text"
+                    ? "workspace-view-tab-active"
+                    : ""
                 }`}
               >
                 {option.label}
@@ -1962,16 +2054,16 @@ export default function ReportsWorkspace({
             ))}
           </div>
         </div>
-        <div className="mt-3 lg:mt-5 flex flex-wrap gap-1.5 lg:gap-2">
+        <div className="workspace-period-tabs" aria-label="Report period">
           {REPORT_PERIOD_OPTIONS.map((option) => (
             <button
               key={option.key}
               type="button"
               onClick={() => setPeriod(option.key)}
-              className={`rounded-full px-2 py-1 lg:px-3 lg:py-1.5 text-[10px] lg:text-xs font-semibold uppercase tracking-[0.18em] transition-colors ${
+              className={`workspace-period-tab ${
                 period === option.key
-                  ? "bg-cyan-500/15 text-cyan-200 border border-cyan-500/30"
-                  : "bg-app-surface/45 text-app-text-muted border border-app-border/70 hover:text-app-text"
+                  ? "workspace-period-tab-active"
+                  : ""
               }`}
             >
               {option.label}
@@ -1982,71 +2074,107 @@ export default function ReportsWorkspace({
 
       {reportMode === "my" ? (
         <>
-          <WorkspacePanel tone="muted" className="workspace-toolbar-panel">
-            <button
-              type="button"
-              onClick={() => setIsReportFiltersOpen((current) => !current)}
-              aria-expanded={isReportFiltersOpen}
-              className="workspace-mobile-filter-toggle mb-3 inline-flex min-h-[2.45rem] items-center justify-between rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 text-xs font-semibold text-app-text-muted md:hidden"
-            >
-              Filters
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 transition-transform",
-                  isReportFiltersOpen && "rotate-180",
-                )}
-              />
-            </button>
-            <div className={cn(
-              "grid grid-cols-2 gap-2 lg:gap-3 xl:grid-cols-[240px_220px_280px_minmax(0,1fr)]",
-              !isReportFiltersOpen && "hidden md:grid",
-            )}>
-              <select
+          <div className="space-y-2">
+            <WorkspaceSearchToolbar>
+              <WorkspaceFilterSelect
+                value={reportKeywordFilter}
+                onChange={(event) => setReportKeywordFilter(event.target.value)}
+                aria-label="Filter report by keyword"
+                className="min-w-[12rem]"
+              >
+                <option value="all">All Keywords</option>
+                {myKeywordOptions.map((keyword) => (
+                  <option key={keyword} value={keyword}>{keyword}</option>
+                ))}
+              </WorkspaceFilterSelect>
+              <WorkspaceFilterSelect
                 value={reportStoreFilter}
-                onChange={(event) =>
-                  setReportStoreFilter(event.target.value as StoreType | "all")
-                }
-                className="input-field py-2 text-xs lg:py-2.5 lg:text-sm col-span-1"
+                onChange={(event) => setReportStoreFilter(event.target.value as StoreType | "all")}
+                aria-label="Filter report by store"
               >
                 <option value="all">All Stores</option>
                 <option value="android">Google Play</option>
                 <option value="ios">iOS</option>
-              </select>
-              <div className="col-span-1">
+              </WorkspaceFilterSelect>
+              <div className="workspace-desktop-filter min-w-[10rem]">
                 <CountrySearchSelect
                   value={reportCountryFilter}
                   onChange={setReportCountryFilter}
                   options={COUNTRIES}
                   includeAllOption={{ code: "all", name: "All Countries" }}
                   ariaLabel="Filter report by country"
-                  className="w-full text-xs lg:text-sm"
+                  className="w-full"
                 />
               </div>
-              <select
+              <WorkspaceFilterSelect
                 value={reportAppFilter}
                 onChange={(event) => setReportAppFilter(event.target.value)}
-                className="input-field py-2 text-xs lg:py-2.5 lg:text-sm col-span-2 sm:col-span-1 xl:col-span-1"
+                aria-label="Filter report by app"
+                className="min-w-[11rem]"
               >
                 <option value="all">All Apps</option>
                 {trackedAppOptions.map((appTitle) => (
-                  <option key={appTitle} value={appTitle}>
-                    {appTitle}
-                  </option>
+                  <option key={appTitle} value={appTitle}>{appTitle}</option>
                 ))}
-              </select>
-              <select
-                value={reportKeywordFilter}
-                onChange={(event) => setReportKeywordFilter(event.target.value)}
-                className="input-field py-2 text-xs lg:py-2.5 lg:text-sm col-span-2 sm:col-span-1 xl:col-span-1"
+              </WorkspaceFilterSelect>
+              <WorkspaceMobileFilterDrawer
+                open={isReportFiltersOpen}
+                onToggle={() => setIsReportFiltersOpen((current) => !current)}
+                activeCount={reportActiveFilterCount}
               >
-                <option value="all">All Keywords</option>
-                {myKeywordOptions.map((keyword) => (
-                  <option key={keyword} value={keyword}>
-                    {keyword}
-                  </option>
-                ))}
-              </select>
-            </div>
+                <WorkspaceFilterSelect
+                  value={reportKeywordFilter}
+                  onChange={(event) => setReportKeywordFilter(event.target.value)}
+                  aria-label="Filter report by keyword"
+                >
+                  <option value="all">All Keywords</option>
+                  {myKeywordOptions.map((keyword) => (
+                    <option key={keyword} value={keyword}>{keyword}</option>
+                  ))}
+                </WorkspaceFilterSelect>
+                <WorkspaceFilterSelect
+                  value={reportStoreFilter}
+                  onChange={(event) => setReportStoreFilter(event.target.value as StoreType | "all")}
+                  aria-label="Filter report by store"
+                >
+                  <option value="all">All Stores</option>
+                  <option value="android">Google Play</option>
+                  <option value="ios">iOS</option>
+                </WorkspaceFilterSelect>
+                <CountrySearchSelect
+                  value={reportCountryFilter}
+                  onChange={setReportCountryFilter}
+                  options={COUNTRIES}
+                  includeAllOption={{ code: "all", name: "All Countries" }}
+                  ariaLabel="Filter report by country"
+                  className="w-full"
+                />
+                <WorkspaceFilterSelect
+                  value={reportAppFilter}
+                  onChange={(event) => setReportAppFilter(event.target.value)}
+                  aria-label="Filter report by app"
+                >
+                  <option value="all">All Apps</option>
+                  {trackedAppOptions.map((appTitle) => (
+                    <option key={appTitle} value={appTitle}>{appTitle}</option>
+                  ))}
+                </WorkspaceFilterSelect>
+              </WorkspaceMobileFilterDrawer>
+              <WorkspaceMoreActionsMenu
+                actions={[
+                  {
+                    id: "reset",
+                    label: "Reset filters",
+                    onSelect: resetReportFilters,
+                    disabled: reportActiveFilterCount === 0,
+                  },
+                ]}
+              />
+            </WorkspaceSearchToolbar>
+            <WorkspaceActiveFilterSummary
+              count={reportActiveFilterCount}
+              onReset={resetReportFilters}
+            />
             {hasKeywordDrilldown ? (
               <div className="workspace-compact-banner mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-500/8 px-3 py-2 lg:mt-4 lg:gap-3 lg:rounded-2xl lg:px-4 lg:py-3">
                 <span className="text-xs text-app-text-muted lg:text-sm">
@@ -2058,14 +2186,14 @@ export default function ReportsWorkspace({
                 <button
                   type="button"
                   onClick={() => setReportKeywordFilter("all")}
-                  className="inline-flex items-center gap-1.5 lg:gap-2 rounded-lg lg:rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 py-1.5 lg:px-3 lg:py-2 text-[10px] lg:text-xs font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200"
+                  className="inline-flex items-center gap-1.5 lg:gap-2 rounded-lg lg:rounded-xl border workspace-border-default bg-[color:var(--color-surface)] px-2.5 py-1.5 lg:px-3 lg:py-2 text-[10px] lg:text-xs font-semibold text-app-text transition-colors hover:border-[color:var(--color-border-strong)]"
                 >
                   <ArrowLeft className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
                   Back to all keywords
                 </button>
               </div>
             ) : null}
-          </WorkspacePanel>
+          </div>
 
           <WorkspacePanel tone="muted" className="workspace-summary-panel">
             <div className="mb-3 lg:mb-4">
@@ -2141,7 +2269,7 @@ export default function ReportsWorkspace({
                   Expand for the fuller tracked distribution and monitoring snapshot.
                 </p>
               </div>
-              <span className="inline-flex items-center gap-2 rounded-xl border border-app-border/70 bg-app-surface/60 px-2.5 py-1.5 text-[10px] font-semibold text-app-text sm:px-3 sm:py-2 sm:text-xs">
+              <span className="inline-flex items-center gap-2 rounded-xl border workspace-border-subtle bg-[color:var(--color-surface)] px-2.5 py-1.5 text-[10px] font-semibold text-app-text sm:px-3 sm:py-2 sm:text-xs">
                 {isTrackedOverviewOpen ? "Hide overview" : "Show overview"}
                 {isTrackedOverviewOpen ? (
                   <ChevronUp className="h-4 w-4" />
@@ -2259,7 +2387,7 @@ export default function ReportsWorkspace({
                       {trackedDistributionItems.map((item) => (
                         <div
                           key={item.label}
-                           className="flex items-center justify-between rounded-xl border border-app-border/60 bg-app-surface/45 px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3"
+                           className="flex items-center justify-between rounded-xl border workspace-border-default bg-[color:var(--color-surface)] px-3 py-2.5 sm:rounded-2xl sm:px-4 sm:py-3"
                         >
                           <div className="inline-flex items-center gap-2 text-sm font-semibold text-app-text">
                             <span
@@ -2293,29 +2421,13 @@ export default function ReportsWorkspace({
         </>
       ) : (
         <>
-          <WorkspacePanel tone="muted">
-            <button
-              type="button"
-              onClick={() => setIsReportFiltersOpen((current) => !current)}
-              aria-expanded={isReportFiltersOpen}
-              className="workspace-mobile-filter-toggle mb-3 inline-flex min-h-[2.45rem] items-center justify-between rounded-xl border border-app-border/60 bg-app-surface-muted/70 px-3 text-xs font-semibold text-app-text-muted md:hidden"
-            >
-              Filters
-              <ChevronDown
-                className={cn(
-                  "h-4 w-4 transition-transform",
-                  isReportFiltersOpen && "rotate-180",
-                )}
-              />
-            </button>
-            <div className={cn(
-              "workspace-compact-controls grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]",
-              !isReportFiltersOpen && "hidden md:grid",
-            )}>
-              <select
+          <div className="space-y-2">
+            <WorkspaceSearchToolbar>
+              <WorkspaceFilterSelect
                 value={competitorGroupFilter}
                 onChange={(event) => setCompetitorGroupFilter(event.target.value)}
-                className="input-field py-2.5"
+                aria-label="Select competitor group"
+                className="min-w-[16rem]"
               >
                 {competitorGroups.length === 0 ? (
                   <option value="">No saved competitor groups</option>
@@ -2325,12 +2437,13 @@ export default function ReportsWorkspace({
                     {group.ownApp.title} vs {group.competitors.map((app) => app.title).join(", ")}
                   </option>
                 ))}
-              </select>
-              <select
+              </WorkspaceFilterSelect>
+              <WorkspaceFilterSelect
                 value={reportKeywordFilter}
                 onChange={(event) => setReportKeywordFilter(event.target.value)}
-                className="input-field py-2.5"
                 disabled={!selectedCompetitorGroup}
+                aria-label="Filter competitor report by keyword"
+                className="min-w-[13rem]"
               >
                 <option value="all">All Group Keywords</option>
                 {competitorKeywordOptions.map((keyword) => (
@@ -2338,8 +2451,53 @@ export default function ReportsWorkspace({
                     {keyword}
                   </option>
                 ))}
-              </select>
-            </div>
+              </WorkspaceFilterSelect>
+              <WorkspaceMobileFilterDrawer
+                open={isReportFiltersOpen}
+                onToggle={() => setIsReportFiltersOpen((current) => !current)}
+                activeCount={reportActiveFilterCount}
+              >
+                <WorkspaceFilterSelect
+                  value={competitorGroupFilter}
+                  onChange={(event) => setCompetitorGroupFilter(event.target.value)}
+                  aria-label="Select competitor group"
+                >
+                  {competitorGroups.length === 0 ? (
+                    <option value="">No saved competitor groups</option>
+                  ) : null}
+                  {competitorGroups.map((group) => (
+                    <option key={group.groupId} value={group.groupId}>
+                      {group.ownApp.title} vs {group.competitors.map((app) => app.title).join(", ")}
+                    </option>
+                  ))}
+                </WorkspaceFilterSelect>
+                <WorkspaceFilterSelect
+                  value={reportKeywordFilter}
+                  onChange={(event) => setReportKeywordFilter(event.target.value)}
+                  disabled={!selectedCompetitorGroup}
+                  aria-label="Filter competitor report by keyword"
+                >
+                  <option value="all">All Group Keywords</option>
+                  {competitorKeywordOptions.map((keyword) => (
+                    <option key={keyword} value={keyword}>{keyword}</option>
+                  ))}
+                </WorkspaceFilterSelect>
+              </WorkspaceMobileFilterDrawer>
+              <WorkspaceMoreActionsMenu
+                actions={[
+                  {
+                    id: "reset",
+                    label: "Reset filters",
+                    onSelect: resetReportFilters,
+                    disabled: reportActiveFilterCount === 0,
+                  },
+                ]}
+              />
+            </WorkspaceSearchToolbar>
+            <WorkspaceActiveFilterSummary
+              count={reportActiveFilterCount}
+              onReset={resetReportFilters}
+            />
             {hasKeywordDrilldown ? (
               <div className="workspace-compact-banner mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-cyan-500/20 bg-cyan-500/8 px-4 py-3">
                 <span className="text-xs text-app-text-muted sm:text-sm">
@@ -2351,7 +2509,7 @@ export default function ReportsWorkspace({
                 <button
                   type="button"
                   onClick={() => setReportKeywordFilter("all")}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 py-1.5 text-[10px] font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
+                  className="inline-flex items-center gap-1.5 rounded-xl border workspace-border-default bg-[color:var(--color-surface)] px-2.5 py-1.5 text-[10px] font-semibold text-app-text transition-colors hover:border-[color:var(--color-border-strong)] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
                 >
                   <ArrowLeft className="h-3.5 w-3.5" />
                   Back to all keywords
@@ -2365,7 +2523,7 @@ export default function ReportsWorkspace({
                         keyword: reportKeywordFilter,
                       })
                     }
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-app-border/70 bg-app-surface/70 px-2.5 py-1.5 text-[10px] font-semibold text-app-text transition-colors hover:border-cyan-500/30 hover:text-cyan-200 sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
+                    className="inline-flex items-center gap-1.5 rounded-xl border workspace-border-default bg-[color:var(--color-surface)] px-2.5 py-1.5 text-[10px] font-semibold text-app-text transition-colors hover:border-[color:var(--color-border-strong)] sm:gap-2 sm:px-3 sm:py-2 sm:text-xs"
                   >
                     <Globe className="h-3.5 w-3.5" />
                     Edit Countries
@@ -2373,7 +2531,7 @@ export default function ReportsWorkspace({
                 ) : null}
               </div>
             ) : null}
-          </WorkspacePanel>
+          </div>
 
           {!selectedCompetitorGroup ? (
             <WorkspaceEmptyBlock
@@ -2418,12 +2576,12 @@ export default function ReportsWorkspace({
                   columnsClassName="xl:grid-cols-4"
                 />
                 {recentCompetitorAsoDiffs.length === 0 ? (
-                  <div className="mt-4 rounded-2xl border border-dashed border-app-border/60 bg-app-surface/45 px-4 py-6 text-sm text-app-text-muted">
+                  <div className="mt-4 rounded-2xl border border-dashed workspace-border-subtle bg-[color:var(--color-surface-muted)] px-4 py-6 text-sm text-app-text-muted">
                     {selectedCompetitorAsoStatus.emptyMessage}
                   </div>
                 ) : (
-                  <div className="mt-4 overflow-hidden rounded-2xl border border-app-border/60 bg-app-surface/45 sm:mt-5">
-                    <div className="hidden lg:grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b border-app-border/60 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
+                  <div className="mt-4 overflow-hidden rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] sm:mt-5">
+                    <div className="hidden lg:grid grid-cols-[150px_180px_110px_minmax(0,1fr)] gap-3 border-b workspace-divider px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                       <div>Detected</div>
                       <div>App</div>
                       <div>Country</div>
@@ -2450,7 +2608,7 @@ export default function ReportsWorkspace({
                             {diff.changedFields.map((field) => (
                               <span
                                 key={`${diff.diffId}:${field}`}
-                                className="rounded-full border border-app-border/60 bg-app-surface-muted/70 px-2 py-1 text-[10px] font-semibold text-app-text"
+                                className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface-muted)] px-2 py-1 text-[10px] font-semibold text-app-text"
                               >
                                 {field}
                               </span>
@@ -2539,7 +2697,7 @@ export default function ReportsWorkspace({
                 icon={Swords}
               >
                 {competitorKeywordBattles.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-app-border/70 bg-app-surface/35 px-4 py-6 text-sm text-app-text-muted">
+                  <div className="rounded-2xl border border-dashed workspace-border-subtle bg-[color:var(--color-surface-muted)] px-4 py-6 text-sm text-app-text-muted">
                     No overlapping ranked keywords surfaced for this group and period.
                   </div>
                 ) : (
@@ -2547,7 +2705,7 @@ export default function ReportsWorkspace({
                     {competitorKeywordBattles.map((battle) => (
                       <div
                         key={battle.keyword}
-                        className="rounded-2xl border border-app-border/70 bg-app-surface/45 px-4 py-4"
+                        className="rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] px-4 py-4"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -2570,7 +2728,7 @@ export default function ReportsWorkspace({
                           {battle.rankedApps.map((app) => (
                             <span
                               key={`${battle.keyword}-${app.appKey}`}
-                              className="rounded-full border border-app-border/70 bg-app-surface-muted/80 px-2.5 py-1 text-xs text-app-text-muted"
+                              className="rounded-full border workspace-border-subtle bg-[color:var(--color-surface-muted)] px-2.5 py-1 text-xs text-app-text-muted"
                             >
                               {app.title} #{app.lastRank}
                             </span>
@@ -2586,9 +2744,10 @@ export default function ReportsWorkspace({
         </>
       )}
       {isWeeklyReportSettingsOpen ? (
-        <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-app-surface/80 px-4 backdrop-blur-sm">
-          <div className="workspace-mobile-dialog app-modal w-full max-w-md rounded-3xl p-5 shadow-2xl sm:p-6">
-            <div className="flex items-start justify-between gap-4">
+        <div className="workspace-mobile-overlay fixed inset-0 z-50 flex items-center justify-center bg-[color:var(--color-canvas)]/80 px-4 backdrop-blur-sm">
+          <div className="workspace-mobile-dialog workspace-weekly-report-dialog app-modal w-full max-w-md rounded-3xl p-5 shadow-2xl sm:p-6">
+            <div className="workspace-mobile-dialog-handle" aria-hidden="true" />
+            <div className="workspace-weekly-report-header flex items-start justify-between gap-4">
               <div>
                 <div className="workspace-chip-label">Weekly Email</div>
                 <h3 className="mt-1 text-base font-semibold text-app-text sm:text-lg">
@@ -2607,8 +2766,8 @@ export default function ReportsWorkspace({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="mt-5 space-y-3">
-              <label className="flex items-center justify-between gap-3 rounded-2xl border border-app-border/60 bg-app-surface/40 px-4 py-3 text-sm text-app-text">
+            <div className="workspace-weekly-report-fields mt-5 space-y-3">
+              <label className="workspace-weekly-report-toggle flex items-center justify-between gap-3 rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] px-4 py-3 text-sm text-app-text">
                 <span className="flex items-center gap-2 font-medium">
                   <Mail className="h-4 w-4 text-cyan-300" />
                   Weekly email
@@ -2625,7 +2784,7 @@ export default function ReportsWorkspace({
                   className="h-4 w-4 rounded border-app-border bg-app-surface-muted text-cyan-400"
                 />
               </label>
-              <div className="rounded-2xl border border-app-border/60 bg-app-surface/40 p-4">
+              <div className="workspace-weekly-report-day rounded-2xl border workspace-border-default bg-[color:var(--color-surface)] p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-app-text-muted">
                   Delivery day
                 </div>
@@ -2662,7 +2821,7 @@ export default function ReportsWorkspace({
                 </p>
               </div>
             ) : null}
-            <div className="mt-5 flex items-center justify-end gap-2">
+            <div className="workspace-weekly-report-actions mt-5 flex items-center justify-end gap-2">
               <button
                 type="button"
                 onClick={closeWeeklyReportSettings}
