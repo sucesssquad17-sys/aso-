@@ -113,3 +113,40 @@ test("feature entitlements keep export and alerts paid-only on free", () => {
   assert.equal(hasPlanFeature(paidEntitlements, "alerts"), true);
   assert.equal(hasPlanFeature(paidEntitlements, "dataExport"), true);
 });
+
+test("legacy paid records keep paid access when isPremium is true and provider status is missing", () => {
+  const resolved = resolveBillingAccess({
+    isPremium: true,
+    subscriptionTier: "indie",
+  });
+
+  assert.equal(resolved.entitlementState, "paid_active");
+  assert.equal(resolved.effectivePlanId, "indie");
+  assert.equal(resolved.hasPaidAccess, true);
+});
+
+test("legacy paid records can recover the plan from dodoProductId fallback", () => {
+  const resolved = resolveBillingAccess(
+    {
+      isPremium: true,
+    },
+    {
+      fallbackProductPlanId: "starter",
+    },
+  );
+
+  assert.equal(resolved.entitlementState, "paid_active");
+  assert.equal(resolved.effectivePlanId, "starter");
+  assert.equal(resolved.hasPaidAccess, true);
+});
+
+test("legacy free records do not gain paid access from a paid tier string alone", () => {
+  const resolved = resolveBillingAccess({
+    isPremium: false,
+    subscriptionTier: "pro",
+  });
+
+  assert.equal(resolved.entitlementState, "free_active");
+  assert.equal(resolved.effectivePlanId, "free");
+  assert.equal(resolved.hasPaidAccess, false);
+});

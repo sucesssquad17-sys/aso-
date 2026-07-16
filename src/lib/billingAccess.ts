@@ -33,6 +33,7 @@ export type BillingAccessState = "selection_required" | "activating" | "active";
 
 export type BillingResolutionInput = {
   accountStatus?: "active" | "deleting" | "deleted" | null;
+  isPremium?: boolean | null;
   subscriptionTier?: string | null;
   subscribedPlanId?: string | null;
   dodoProductId?: string | null;
@@ -167,6 +168,11 @@ export function resolveBillingAccess(
       currentPeriodEndMs &&
       currentPeriodEndMs > nowMs,
   );
+  const hasLegacyPaidFallback = Boolean(
+    !providerStatus &&
+      input?.isPremium === true &&
+      subscribedPlanId !== "free",
+  );
 
   let entitlementState: BillingEntitlementState;
   let hasPaidAccess = false;
@@ -175,6 +181,9 @@ export function resolveBillingAccess(
     entitlementState = "account_deleted";
   } else if (billingReviewRequired) {
     entitlementState = "billing_review";
+  } else if (hasLegacyPaidFallback) {
+    entitlementState = "paid_active";
+    hasPaidAccess = true;
   } else if (providerStatus === "active" && subscribedPlanId !== "free") {
     entitlementState = "paid_active";
     hasPaidAccess = true;

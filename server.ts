@@ -111,6 +111,10 @@ import {
   type BillingEntitlementState,
   type BillingFeature,
 } from './src/lib/billingAccess';
+import {
+  resolveBillingWebhookOccurredAt,
+  shouldSkipIncomingBillingTransition,
+} from './src/lib/billingWebhookOrdering';
 import { COUNTRY_CODE_SET, normalizeCountryCode } from './src/lib/countries';
 import {
   ALERT_CONDITION_LABELS,
@@ -626,6 +630,7 @@ type DodoSubscriptionPayload = {
 };
 type DodoSubscriptionWebhookEvent = {
   type: DodoSubscriptionEventType;
+  timestamp?: string | null;
   data: DodoSubscriptionPayload;
 };
 
@@ -1563,27 +1568,6 @@ function resolveSubscriptionStatusFromWebhook(
   }
 }
 
-function getDodoWebhookOccurredAt(
-  webhookTimestamp?: string,
-): string {
-  if (!webhookTimestamp) {
-    return new Date().toISOString();
-  }
-
-  const numericTimestamp = Number(webhookTimestamp);
-  if (Number.isFinite(numericTimestamp)) {
-    const millis = numericTimestamp > 1_000_000_000_000
-      ? numericTimestamp
-      : numericTimestamp * 1000;
-    return new Date(millis).toISOString();
-  }
-
-  const parsed = Date.parse(webhookTimestamp);
-  return Number.isFinite(parsed)
-    ? new Date(parsed).toISOString()
-    : new Date().toISOString();
-}
-
 async function applyDodoSubscriptionEvent(
   event: DodoSubscriptionWebhookEvent,
   options?: {
@@ -1605,23 +1589,10 @@ async function applyDodoSubscriptionEvent(
   const existingSnapshot = await userDocRef.get();
   const existingUserData = existingSnapshot.data() as UserTrackingDocument | undefined;
   const deletedAccount = isDeletedUserTrackingDocument(existingUserData);
-  const eventOccurredAt = getDodoWebhookOccurredAt(options?.webhookTimestamp);
-  const eventOccurredAtMs = Date.parse(eventOccurredAt);
-  const existingUpdatedAtMs =
-    typeof existingUserData?.subscriptionUpdatedAt === 'string'
-      ? Date.parse(existingUserData.subscriptionUpdatedAt)
-      : Number.NaN;
-
-  if (
-    Number.isFinite(existingUpdatedAtMs) &&
-    Number.isFinite(eventOccurredAtMs) &&
-    existingUpdatedAtMs > eventOccurredAtMs
-  ) {
-    console.warn(
-      `[dodo] Skipping stale webhook ${event.type} for user ${userDocRef.id}. existing=${existingUserData?.subscriptionUpdatedAt} incoming=${eventOccurredAt}`,
-    );
-    return;
-  }
+  const eventOccurred = resolveBillingWebhookOccurredAt(
+    event.timestamp,
+    options?.webhookTimestamp,
+  );
 
   const productId = event.data.product_id?.trim() || '';
   const resolvedProductSelection = resolveBillingProductSelection(productId);
@@ -1690,6 +1661,7 @@ async function applyDodoSubscriptionEvent(
   const resolvedBillingAccess = resolveBillingAccess(
     {
       accountStatus: existingUserData?.accountStatus,
+      isPremium: existingUserData?.isPremium,
       subscribedPlanId,
       subscriptionTier: subscribedPlanId,
       providerSubscriptionStatus: subscriptionStatus,
@@ -1697,14 +1669,33 @@ async function applyDodoSubscriptionEvent(
       pendingInterval: existingUserData?.pendingInterval,
       subscriptionCurrentPeriodEnd: event.data.next_billing_date || null,
       subscriptionCancelAtPeriodEnd: Boolean(event.data.cancel_at_next_billing_date),
-      subscriptionUpdatedAt: eventOccurredAt,
+      subscriptionUpdatedAt: eventOccurred.iso,
       billingReviewRequired,
       billingReviewReason,
     },
     {
-      now: new Date(eventOccurredAt),
+      now: new Date(eventOccurred.iso),
     },
   );
+  const existingResolvedBilling = resolveBillingAccess(existingUserData, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(existingUserData?.dodoProductId),
+  });
+  if (shouldSkipIncomingBillingTransition({
+    existingUpdatedAt: existingUserData?.subscriptionUpdatedAt,
+    existingWebhookId: existingUserData?.lastBillingWebhookId,
+    incomingWebhookId: options?.webhookId,
+    incomingOccurredAtMs: eventOccurred.ms,
+    incomingTimeSource: eventOccurred.source,
+    existingHasPaidAccess: existingResolvedBilling.hasPaidAccess,
+    incomingHasPaidAccess: resolvedBillingAccess.hasPaidAccess,
+    existingCurrentPeriodEnd: existingUserData?.subscriptionCurrentPeriodEnd,
+    incomingCurrentPeriodEnd: event.data.next_billing_date || null,
+  })) {
+    console.warn(
+      `[dodo] Skipping stale or destructive webhook ${event.type} for user ${userDocRef.id}. existing=${existingUserData?.subscriptionUpdatedAt || 'none'} incoming=${eventOccurred.iso} source=${eventOccurred.source}`,
+    );
+    return;
+  }
 
   const billingUpdate: Record<string, unknown> = {
     billingProvider: 'dodo',
@@ -1730,8 +1721,8 @@ async function applyDodoSubscriptionEvent(
     billingReviewReason: billingReviewReason || FieldValue.delete(),
     lastBillingEventType: event.type,
     lastBillingWebhookId: options?.webhookId || FieldValue.delete(),
-    subscriptionUpdatedAt: eventOccurredAt,
-    updatedAt: eventOccurredAt,
+    subscriptionUpdatedAt: eventOccurred.iso,
+    updatedAt: eventOccurred.iso,
   };
 
   await userDocRef.set(billingUpdate, { merge: true });
@@ -2967,6 +2958,7 @@ function getResolvedPlanLimits(
         | 'billingReviewReason'
         | 'billingReviewRequired'
         | 'dodoProductId'
+        | 'isPremium'
         | 'pendingInterval'
         | 'pendingPlanId'
         | 'providerSubscriptionStatus'
@@ -2994,6 +2986,7 @@ function getResolvedPlanEntitlements(
         | 'billingReviewReason'
         | 'billingReviewRequired'
         | 'dodoProductId'
+        | 'isPremium'
         | 'pendingInterval'
         | 'pendingPlanId'
         | 'providerSubscriptionStatus'
@@ -3030,6 +3023,7 @@ function deriveBillingAccessState(
         | 'billingReviewReason'
         | 'billingReviewRequired'
         | 'dodoProductId'
+        | 'isPremium'
         | 'pendingInterval'
         | 'pendingPlanId'
         | 'providerSubscriptionStatus'
@@ -3056,6 +3050,7 @@ function hasActiveBillingEntitlement(
         | 'billingReviewReason'
         | 'billingReviewRequired'
         | 'dodoProductId'
+        | 'isPremium'
         | 'pendingInterval'
         | 'pendingPlanId'
         | 'providerSubscriptionStatus'
@@ -3082,6 +3077,7 @@ function hasBillingFeature(
         | 'billingReviewReason'
         | 'billingReviewRequired'
         | 'dodoProductId'
+        | 'isPremium'
         | 'pendingInterval'
         | 'pendingPlanId'
         | 'providerSubscriptionStatus'
@@ -3125,6 +3121,7 @@ function requireBillingFeature(
         | 'billingReviewReason'
         | 'billingReviewRequired'
         | 'dodoProductId'
+        | 'isPremium'
         | 'pendingInterval'
         | 'pendingPlanId'
         | 'providerSubscriptionStatus'
