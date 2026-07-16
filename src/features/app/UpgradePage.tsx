@@ -82,7 +82,15 @@ function formatDate(value?: string | null) {
 }
 
 function getCurrentPlanId(billingStatus: BillingStatus | null): BillingPlanId {
-  const id = billingStatus?.subscriptionTier;
+  const id = billingStatus?.effectivePlanId || billingStatus?.subscriptionTier;
+  if (id === "free" || id === "indie" || id === "starter" || id === "pro" || id === "agency") {
+    return id;
+  }
+  return "free";
+}
+
+function getSubscribedPlanId(billingStatus: BillingStatus | null): BillingPlanId {
+  const id = billingStatus?.subscribedPlanId || billingStatus?.subscriptionTier;
   if (id === "free" || id === "indie" || id === "starter" || id === "pro" || id === "agency") {
     return id;
   }
@@ -210,7 +218,9 @@ export function UpgradePage({
   const billingConnected = Boolean(
     billingStatus?.configured && billingStatus?.productConfigured,
   );
+  const entitlementState = billingStatus?.entitlementState || "free_active";
   const currentPlanId = getCurrentPlanId(billingStatus);
+  const subscribedPlanId = getSubscribedPlanId(billingStatus);
   const currentPlanRank = getBillingPlanRank(currentPlanId);
   const isPremium = billingStatus?.isPremium;
   const pendingPlan =
@@ -223,6 +233,65 @@ export function UpgradePage({
   const canReturnToWorkspace = Boolean(onReturn) && accessState === "active";
   const prioritizePlanAction = isSelectionRequired || isActivating;
   const signedInAccount = currentUserEmail || currentUserLabel;
+  const currentPlanName =
+    PUBLIC_BILLING_PLANS.find((plan) => plan.id === currentPlanId)?.name || "Free";
+  const subscribedPlanName =
+    PUBLIC_BILLING_PLANS.find((plan) => plan.id === subscribedPlanId)?.name || currentPlanName;
+  const membershipHeading = isActivating
+    ? "Activating plan"
+    : isSelectionRequired
+      ? "Choose a plan"
+      : entitlementState === "payment_issue"
+        ? `${subscribedPlanName} payment issue`
+        : entitlementState === "billing_review"
+          ? "Billing review"
+          : currentPlanName;
+  const membershipMessage = isSelectionRequired
+    ? "Start on free, or choose a paid plan to unlock reports, alerts, and larger capacity."
+    : entitlementState === "checkout_pending"
+      ? "Free workspace stays available while billing activation finishes."
+      : entitlementState === "paid_canceling"
+        ? `Your ${subscribedPlanName} plan remains active until ${currentPeriodEnd || "period end"}, then your account moves to Free.`
+        : entitlementState === "payment_issue"
+          ? "There is a problem with your subscription payment. Update your payment method to restore paid features."
+          : entitlementState === "billing_review"
+            ? "We need to review this billing state before granting paid access. Core tracking stays available in the meantime."
+            : entitlementState === "expired_to_free"
+              ? "Your subscription ended. Your account is now on Free."
+              : currentPlanId === "free"
+                ? "Free covers core tracking. Upgrade when you need reports, alerts, and more capacity."
+                : null;
+  const statusBadgeLabel = isSelectionRequired
+    ? "Selection required"
+    : entitlementState === "checkout_pending"
+      ? isPollingActivation && !activationTimedOut
+        ? "Activating"
+        : activationTimedOut
+          ? "Retry available"
+          : "Pending"
+      : entitlementState === "paid_canceling"
+        ? "Cancels at period end"
+        : entitlementState === "payment_issue"
+          ? "Payment issue"
+          : entitlementState === "billing_review"
+            ? "Billing review"
+            : entitlementState === "expired_to_free" || currentPlanId === "free"
+              ? "Free"
+              : billingStatus?.providerStatus?.replace(/_/g, " ") || "Active";
+  const currentPeriodLabel =
+    entitlementState === "paid_canceling"
+      ? currentPeriodEnd
+        ? `Ends ${currentPeriodEnd}`
+        : null
+      : entitlementState === "paid_active"
+        ? currentPeriodEnd
+          ? `Renews ${currentPeriodEnd}`
+          : null
+        : entitlementState === "expired_to_free"
+          ? currentPeriodEnd
+            ? `Ended ${currentPeriodEnd}`
+            : null
+          : null;
   const capacityPreviewPlans = DISPLAY_BILLING_PLANS;
   const [selectedCapacityPlanId, setSelectedCapacityPlanId] =
     React.useState<BillingPlanId>(() => {
@@ -371,7 +440,7 @@ export function UpgradePage({
           ) : (
             <div className="workspace-billing-pending-pill inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm">
               <Lock className="h-3.5 w-3.5" />
-              {isActivating ? "Trial activation pending" : "Plan selection required"}
+              {isActivating ? "Billing activation pending" : "Plan selection required"}
             </div>
           )}
           {signedInAccount ? (
@@ -440,25 +509,18 @@ export function UpgradePage({
             <p className="text-[10px] font-bold uppercase tracking-widest text-app-text-muted dark:text-app-text-muted">
               Your membership
             </p>
-              <p className="mt-3 text-[1.45rem] font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-4 sm:text-[1.75rem]">
-              {isActivating
-                ? "Activating plan"
-                : isSelectionRequired
-                ? "Choose a plan"
-                : currentPlanId === "free"
-                ? "Free"
-                : PUBLIC_BILLING_PLANS.find((p) => p.id === currentPlanId)?.name ||
-                  "Premium"}
+            <p className="mt-3 text-[1.45rem] font-black tracking-tight text-slate-900 dark:text-app-text sm:mt-4 sm:text-[1.75rem]">
+              {membershipHeading}
             </p>
-            {isSelectionRequired ? (
+            {membershipMessage ? (
               <p className="mt-2 text-xs font-medium text-app-text-muted dark:text-app-text-muted">
-                Start on free, or choose a paid plan to unlock reports, alerts, and larger capacity.
+                {membershipMessage}
               </p>
             ) : null}
             {isActivating ? (
               <div className="mt-3 space-y-3">
                 <p className="text-xs font-medium text-app-text-muted dark:text-app-text-muted">
-                  We&apos;re waiting for billing to activate your workspace access.
+                  We&apos;re waiting for billing to activate your selected plan.
                 </p>
                 {pendingPlan ? (
                   <div className="workspace-billing-neutral-pill inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold">
@@ -485,8 +547,10 @@ export function UpgradePage({
                 ) : null}
               </div>
             ) : null}
-            {currentPeriodEnd && (
-              <p className="mt-1 text-xs font-medium text-app-text-muted dark:text-app-text-muted">Renews {currentPeriodEnd}</p>
+            {currentPeriodLabel && (
+              <p className="mt-1 text-xs font-medium text-app-text-muted dark:text-app-text-muted">
+                {currentPeriodLabel}
+              </p>
             )}
             <div className="mt-4 self-start sm:mt-5">
               <div
@@ -499,17 +563,7 @@ export function UpgradePage({
                 }`}
               >
                 <Check className="h-3 w-3" />
-                {isSelectionRequired
-                  ? "Selection required"
-                  : isActivating
-                    ? isPollingActivation
-                      ? "Activating"
-                      : activationTimedOut
-                        ? "Retry available"
-                        : "Pending"
-                  : isPremium
-                  ? billingStatus?.subscriptionStatus?.replace(/_/g, " ") || "Active"
-                  : "Trial"}
+                {statusBadgeLabel}
               </div>
             </div>
 

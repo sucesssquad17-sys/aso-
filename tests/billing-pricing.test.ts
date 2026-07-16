@@ -95,6 +95,11 @@ test("free plan entitlements disable reports and alerts", () => {
     weeklyEmailReports: false,
     alertRules: false,
     alertDelivery: false,
+    competitorTracking: false,
+    automatedTracking: false,
+    alerts: false,
+    browserPush: false,
+    dataExport: false,
   });
 });
 
@@ -105,5 +110,10 @@ test("paid plan entitlements keep reports and alerts enabled", () => {
     weeklyEmailReports: true,
     alertRules: true,
     alertDelivery: true,
+    competitorTracking: true,
+    automatedTracking: true,
+    alerts: true,
+    browserPush: true,
+    dataExport: true,
   });
 });

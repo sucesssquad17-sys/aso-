@@ -19,6 +19,11 @@ export type PlanEntitlements = {
   weeklyEmailReports: boolean;
   alertRules: boolean;
   alertDelivery: boolean;
+  competitorTracking: boolean;
+  automatedTracking: boolean;
+  alerts: boolean;
+  browserPush: boolean;
+  dataExport: boolean;
 };
 
 export type PlanUsage = {
@@ -120,30 +125,55 @@ export const BILLING_PLAN_ENTITLEMENTS: Record<
     weeklyEmailReports: false,
     alertRules: false,
     alertDelivery: false,
+    competitorTracking: false,
+    automatedTracking: false,
+    alerts: false,
+    browserPush: false,
+    dataExport: false,
   },
   indie: {
     reportsWorkspace: true,
     weeklyEmailReports: true,
     alertRules: true,
     alertDelivery: true,
+    competitorTracking: true,
+    automatedTracking: true,
+    alerts: true,
+    browserPush: true,
+    dataExport: true,
   },
   starter: {
     reportsWorkspace: true,
     weeklyEmailReports: true,
     alertRules: true,
     alertDelivery: true,
+    competitorTracking: true,
+    automatedTracking: true,
+    alerts: true,
+    browserPush: true,
+    dataExport: true,
   },
   pro: {
     reportsWorkspace: true,
     weeklyEmailReports: true,
     alertRules: true,
     alertDelivery: true,
+    competitorTracking: true,
+    automatedTracking: true,
+    alerts: true,
+    browserPush: true,
+    dataExport: true,
   },
   agency: {
     reportsWorkspace: true,
     weeklyEmailReports: true,
     alertRules: true,
     alertDelivery: true,
+    competitorTracking: true,
+    automatedTracking: true,
+    alerts: true,
+    browserPush: true,
+    dataExport: true,
   },
 };
 

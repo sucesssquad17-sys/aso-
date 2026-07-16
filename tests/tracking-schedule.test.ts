@@ -1026,10 +1026,10 @@ test('discovery mode cache trimming reflects updated candidate breadth and visib
   const fastPayload = trimDiscoveryPayloadForMode(deepPayload, 'fast');
   const normalizedDeepPayload = trimDiscoveryPayloadForMode(deepPayload, 'deep');
 
-  assert.equal(fastPayload.rankings.length, 15);
-  assert.equal(fastPayload.suggestions.length, 15);
+  assert.equal(fastPayload.rankings.length, 18);
+  assert.equal(fastPayload.suggestions.length, 18);
   assert.equal(fastPayload.checkedKeywords, 44);
-  assert.equal(fastPayload.candidateCount, 80);
+  assert.equal(fastPayload.candidateCount, 100);
   assert.equal(fastPayload.searchDepth, 100);
 
   assert.equal(normalizedDeepPayload.rankings.length, 36);
@@ -1069,9 +1069,9 @@ test('fast discovery can reuse a cached deep payload as a trimmed subset', () =>
   const fastPayload = trimDiscoveryPayloadForMode(deepPayload, 'fast');
 
   assert.equal(fastPayload.mode, 'fast');
-  assert.equal(fastPayload.rankings.length, 15);
-  assert.equal(fastPayload.suggestions.length, 15);
-  assert.equal(fastPayload.candidateCount, 80);
+  assert.equal(fastPayload.rankings.length, 18);
+  assert.equal(fastPayload.suggestions.length, 18);
+  assert.equal(fastPayload.candidateCount, 100);
   assert.equal(fastPayload.searchDepth, 100);
 });
 

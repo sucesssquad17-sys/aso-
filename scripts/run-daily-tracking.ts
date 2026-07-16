@@ -67,7 +67,7 @@ import {
   claimWeeklyReportDelivery,
   finalizeWeeklyReportDelivery,
 } from '../src/lib/weeklyReportDelivery';
-import { getPlanEntitlements } from '../src/lib/planLimits';
+import { getBillingFeatureEntitlements, resolveBillingAccess } from '../src/lib/billingAccess';
 import {
   buildAlertEventId as buildSharedAlertEventId,
   buildCompetitorAsoAlertEventId,
@@ -2668,7 +2668,22 @@ async function main() {
           schedule.timezone || GLOBAL_TRACKING_TIMEZONE,
         ),
       };
-      const planEntitlements = getPlanEntitlements(data?.subscriptionTier);
+      const resolvedBilling = resolveBillingAccess(data, {
+        fallbackProductPlanId: null,
+      });
+      const planEntitlements = getBillingFeatureEntitlements(
+        resolvedBilling.effectivePlanId,
+      );
+      const competitorTrackingEnabled = planEntitlements.competitorTracking;
+      const executionState: TrackingState = competitorTrackingEnabled
+        ? state
+        : {
+            ...state,
+            competitorGroups: [],
+            competitorTrackedKeywords: [],
+            competitorRankHistory: [],
+            competitorAsoLatestSnapshots: [],
+          };
       const hasTrackedData =
         trackedKeywords.length > 0 ||
         competitorTrackedKeywords.length > 0 ||
@@ -2689,7 +2704,7 @@ async function main() {
           log(`  â†’ User ${userDoc.id}: tracking already ran for ${runKey}, skipping refresh`);
         } else {
           log(`  â†’ User ${userDoc.id}: refreshing ${trackedKeywords.length} keyword(s)...`);
-          const refreshResult = await refreshUserTrackingDaily(state, runKey);
+          const refreshResult = await refreshUserTrackingDaily(executionState, runKey);
           const { updatedRules: updatedAlertRules } =
             planEntitlements.alertRules || planEntitlements.alertDelivery
               ? await evaluateAndDispatchAlertRules(
@@ -2713,38 +2728,49 @@ async function main() {
               : {
                   updatedRules: state.alertRules,
                 };
-          const asoResult = await captureCompetitorAsoState(
-            userDoc.ref,
-            {
-              competitorGroups: state.competitorGroups,
-              competitorTrackedKeywords: refreshResult.nextState.competitorTrackedKeywords,
-              competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
-              alertRules: updatedAlertRules,
-              notificationSettings: state.notificationSettings,
-            },
-            runKey,
-            {
-              alertsEnabled:
-                planEntitlements.alertRules || planEntitlements.alertDelivery,
-            },
-          );
+          const asoResult = competitorTrackingEnabled
+            ? await captureCompetitorAsoState(
+                userDoc.ref,
+                {
+                  competitorGroups: state.competitorGroups,
+                  competitorTrackedKeywords: refreshResult.nextState.competitorTrackedKeywords,
+                  competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
+                  alertRules: updatedAlertRules,
+                  notificationSettings: state.notificationSettings,
+                },
+                runKey,
+                {
+                  alertsEnabled:
+                    planEntitlements.alertRules || planEntitlements.alertDelivery,
+                },
+              )
+            : {
+                nextLatestSnapshots: state.competitorAsoLatestSnapshots,
+                checked: 0,
+                changed: 0,
+                failed: 0,
+              };
           const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
             userDoc.ref,
             refreshResult.nextState.rankHistory,
           );
-          const retainedCompetitorRankHistory = await archiveAndTrimCompetitorRankHistory(
-            userDoc.ref,
-            refreshResult.nextState.competitorRankHistory,
-          );
+          const retainedCompetitorRankHistory = competitorTrackingEnabled
+            ? await archiveAndTrimCompetitorRankHistory(
+                userDoc.ref,
+                refreshResult.nextState.competitorRankHistory,
+              )
+            : state.competitorRankHistory;
 
           updatePayload.trackedKeywords = refreshResult.nextState.trackedKeywords;
           updatePayload.rankHistory = retainedRankHistory;
-          updatePayload.competitorTrackedKeywords = refreshResult.nextState.competitorTrackedKeywords;
-          updatePayload.competitorRankHistory = retainedCompetitorRankHistory;
-          updatePayload.competitorGroups = state.competitorGroups;
-          updatePayload.competitorAsoLatestSnapshots = asoResult.nextLatestSnapshots;
           updatePayload.alertRules = updatedAlertRules;
           updatePayload.trackingSchedule = refreshResult.nextState.schedule;
+          if (competitorTrackingEnabled) {
+            updatePayload.competitorTrackedKeywords = refreshResult.nextState.competitorTrackedKeywords;
+            updatePayload.competitorRankHistory = retainedCompetitorRankHistory;
+            updatePayload.competitorGroups = state.competitorGroups;
+            updatePayload.competitorAsoLatestSnapshots = asoResult.nextLatestSnapshots;
+          }
 
           weeklyEmailState = {
             trackedKeywords: refreshResult.nextState.trackedKeywords,
@@ -2794,7 +2820,7 @@ async function main() {
       }
 
       log(`  → User ${userDoc.id}: refreshing ${trackedKeywords.length} keyword(s)...`);
-      const result = await refreshUserTrackingDaily(state, runKey);
+      const result = await refreshUserTrackingDaily(executionState, runKey);
       const { updatedRules: updatedAlertRules } =
         planEntitlements.alertRules || planEntitlements.alertDelivery
           ? await evaluateAndDispatchAlertRules(
@@ -2818,41 +2844,52 @@ async function main() {
           : {
               updatedRules: state.alertRules,
             };
-      const asoResult = await captureCompetitorAsoState(
-        userDoc.ref,
-        {
-          competitorGroups: state.competitorGroups,
-          competitorTrackedKeywords: result.nextState.competitorTrackedKeywords,
-          competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
-          alertRules: updatedAlertRules,
-          notificationSettings: state.notificationSettings,
-        },
-        runKey,
-        {
-          alertsEnabled:
-            planEntitlements.alertRules || planEntitlements.alertDelivery,
-        },
-      );
+      const asoResult = competitorTrackingEnabled
+        ? await captureCompetitorAsoState(
+            userDoc.ref,
+            {
+              competitorGroups: state.competitorGroups,
+              competitorTrackedKeywords: result.nextState.competitorTrackedKeywords,
+              competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
+              alertRules: updatedAlertRules,
+              notificationSettings: state.notificationSettings,
+            },
+            runKey,
+            {
+              alertsEnabled:
+                planEntitlements.alertRules || planEntitlements.alertDelivery,
+            },
+          )
+        : {
+            nextLatestSnapshots: state.competitorAsoLatestSnapshots,
+            checked: 0,
+            changed: 0,
+            failed: 0,
+          };
       const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
         userDoc.ref,
         result.nextState.rankHistory,
       );
-      const retainedCompetitorRankHistory = await archiveAndTrimCompetitorRankHistory(
-        userDoc.ref,
-        result.nextState.competitorRankHistory,
-      );
+      const retainedCompetitorRankHistory = competitorTrackingEnabled
+        ? await archiveAndTrimCompetitorRankHistory(
+            userDoc.ref,
+            result.nextState.competitorRankHistory,
+          )
+        : state.competitorRankHistory;
 
       const updatePayload: UserTrackingDocument = {
         trackedKeywords: result.nextState.trackedKeywords,
         rankHistory: retainedRankHistory,
-        competitorTrackedKeywords: result.nextState.competitorTrackedKeywords,
-        competitorRankHistory: retainedCompetitorRankHistory,
-        competitorGroups: state.competitorGroups,
-        competitorAsoLatestSnapshots: asoResult.nextLatestSnapshots,
         alertRules: updatedAlertRules,
         trackingSchedule: result.nextState.schedule,
         updatedAt: new Date().toISOString(),
       };
+      if (competitorTrackingEnabled) {
+        updatePayload.competitorTrackedKeywords = result.nextState.competitorTrackedKeywords;
+        updatePayload.competitorRankHistory = retainedCompetitorRankHistory;
+        updatePayload.competitorGroups = state.competitorGroups;
+        updatePayload.competitorAsoLatestSnapshots = asoResult.nextLatestSnapshots;
+      }
 
       await userDoc.ref.set(updatePayload, { merge: true });
 

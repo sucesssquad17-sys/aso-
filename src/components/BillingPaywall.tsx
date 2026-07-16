@@ -138,7 +138,7 @@ export function BillingPaywall({
   const availablePlans = new Set(
     billingStatus?.availablePlans || DEFAULT_PUBLIC_BILLING_PLAN_IDS,
   );
-  const currentPlanId = billingStatus?.subscriptionTier || "free";
+  const currentPlanId = billingStatus?.effectivePlanId || billingStatus?.subscriptionTier || "free";
   const currentPeriodEnd = formatDate(billingStatus?.currentPeriodEnd);
   const billingConnected = Boolean(
     billingStatus?.configured && billingStatus?.productConfigured,

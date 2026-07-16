@@ -95,7 +95,6 @@ import {
   countPlanUsage,
   getBillingPlanRank,
   getCompetitorTrackedKeywordIdentityKey,
-  getPlanEntitlements,
   getPlanLimits,
   getTrackedAppIdentityKeysForPlanUsage,
   getTrackedKeywordActivity,
@@ -104,6 +103,14 @@ import {
   type PlanEntitlements,
   type PlanLimits,
 } from './src/lib/planLimits';
+import {
+  getBillingFeatureEntitlements,
+  hasPlanFeature,
+  resolveBillingAccess,
+  type BillingAccessState,
+  type BillingEntitlementState,
+  type BillingFeature,
+} from './src/lib/billingAccess';
 import { COUNTRY_CODE_SET, normalizeCountryCode } from './src/lib/countries';
 import {
   ALERT_CONDITION_LABELS,
@@ -319,7 +326,6 @@ type BillingProvider = 'dodo';
 type BillingPlanId = 'free' | 'indie' | 'starter' | 'pro' | 'agency';
 type BillingInterval = 'monthly' | 'yearly';
 type BillingSubscriptionStatus = 'pending' | 'active' | 'on_hold' | 'cancelled' | 'failed' | 'expired';
-type BillingAccessState = 'selection_required' | 'activating' | 'active';
 type PaidBillingPlanId = Exclude<BillingPlanId, 'free' | 'agency'>;
 type BillingPlanPrice = {
   productId: string;
@@ -490,16 +496,20 @@ type UserTrackingDocument = {
   dodoSubscriptionId?: string;
   dodoProductId?: string;
   subscriptionTier?: string;
+  subscribedPlanId?: string;
   subscriptionInterval?: BillingInterval;
   isPremium?: boolean;
   paypalSubscriptionId?: string;
   paypalPlanId?: string;
   subscriptionStatus?: BillingSubscriptionStatus;
+  providerSubscriptionStatus?: BillingSubscriptionStatus;
   pendingPlanId?: BillingPlanId;
   pendingInterval?: BillingInterval;
   subscriptionCurrentPeriodEnd?: string;
   subscriptionCancelAtPeriodEnd?: boolean;
   subscriptionUpdatedAt?: string;
+  lastBillingEventType?: string;
+  lastBillingWebhookId?: string;
   billingReviewRequired?: boolean;
   billingReviewReason?: string;
   accountStatus?: 'active' | 'deleting' | 'deleted';
@@ -772,6 +782,8 @@ type ApiErrorCode =
   | 'BAD_REQUEST'
   | 'UNAUTHORIZED'
   | 'FORBIDDEN'
+  | 'FEATURE_NOT_AVAILABLE'
+  | 'BILLING_TRANSITION'
   | 'RATE_LIMITED'
   | 'STALE_USER_STATE'
   | 'CONFIGURATION_ERROR'
@@ -789,6 +801,7 @@ class ApiError extends Error {
   status: number;
   code: ApiErrorCode;
   retryable: boolean;
+  meta?: Record<string, unknown>;
 
   constructor(
     message: string,
@@ -796,6 +809,7 @@ class ApiError extends Error {
       status: number;
       code: ApiErrorCode;
       retryable: boolean;
+      meta?: Record<string, unknown>;
     },
   ) {
     super(message);
@@ -803,6 +817,7 @@ class ApiError extends Error {
     this.status = options.status;
     this.code = options.code;
     this.retryable = options.retryable;
+    this.meta = options.meta;
   }
 }
 
@@ -1548,7 +1563,34 @@ function resolveSubscriptionStatusFromWebhook(
   }
 }
 
-async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
+function getDodoWebhookOccurredAt(
+  webhookTimestamp?: string,
+): string {
+  if (!webhookTimestamp) {
+    return new Date().toISOString();
+  }
+
+  const numericTimestamp = Number(webhookTimestamp);
+  if (Number.isFinite(numericTimestamp)) {
+    const millis = numericTimestamp > 1_000_000_000_000
+      ? numericTimestamp
+      : numericTimestamp * 1000;
+    return new Date(millis).toISOString();
+  }
+
+  const parsed = Date.parse(webhookTimestamp);
+  return Number.isFinite(parsed)
+    ? new Date(parsed).toISOString()
+    : new Date().toISOString();
+}
+
+async function applyDodoSubscriptionEvent(
+  event: DodoSubscriptionWebhookEvent,
+  options?: {
+    webhookId?: string;
+    webhookTimestamp?: string;
+  },
+) {
   const adminDb = getFirebaseAdminDb();
   if (!adminDb) {
     throw createConfigurationError('Firebase Admin is not configured on the server.');
@@ -1563,6 +1605,23 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
   const existingSnapshot = await userDocRef.get();
   const existingUserData = existingSnapshot.data() as UserTrackingDocument | undefined;
   const deletedAccount = isDeletedUserTrackingDocument(existingUserData);
+  const eventOccurredAt = getDodoWebhookOccurredAt(options?.webhookTimestamp);
+  const eventOccurredAtMs = Date.parse(eventOccurredAt);
+  const existingUpdatedAtMs =
+    typeof existingUserData?.subscriptionUpdatedAt === 'string'
+      ? Date.parse(existingUserData.subscriptionUpdatedAt)
+      : Number.NaN;
+
+  if (
+    Number.isFinite(existingUpdatedAtMs) &&
+    Number.isFinite(eventOccurredAtMs) &&
+    existingUpdatedAtMs > eventOccurredAtMs
+  ) {
+    console.warn(
+      `[dodo] Skipping stale webhook ${event.type} for user ${userDocRef.id}. existing=${existingUserData?.subscriptionUpdatedAt} incoming=${eventOccurredAt}`,
+    );
+    return;
+  }
 
   const productId = event.data.product_id?.trim() || '';
   const resolvedProductSelection = resolveBillingProductSelection(productId);
@@ -1574,25 +1633,30 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     (!metadata.hasIntervalMetadata ||
       resolvedProductSelection?.interval === metadata.interval);
   const canGrantPaidPlan =
-    subscriptionStatus === 'active' &&
+    (subscriptionStatus === 'active' || subscriptionStatus === 'cancelled') &&
     Boolean(resolvedProductSelection) &&
     metadataMatchesProductSelection &&
     matchedBy !== 'billing_email' &&
     !deletedAccount;
   const billingEmail = event.data.customer?.email?.trim().toLowerCase();
-  const resolvedPlanId = canGrantPaidPlan
-    ? resolvedProductSelection!.planId
-    : 'free';
+  const subscribedPlanId =
+    canGrantPaidPlan && resolvedProductSelection
+      ? resolvedProductSelection.planId
+      : resolveBillingPlanId(
+          existingUserData?.subscribedPlanId ||
+            existingUserData?.subscriptionTier ||
+            'free',
+        );
   const billingReviewReason =
     deletedAccount
       ? 'account_deleted'
-      : subscriptionStatus === 'active' && !resolvedProductSelection
+      : (subscriptionStatus === 'active' || subscriptionStatus === 'cancelled') && !resolvedProductSelection
         ? 'unmatched_product_id'
-        : subscriptionStatus === 'active' &&
+        : (subscriptionStatus === 'active' || subscriptionStatus === 'cancelled') &&
             resolvedProductSelection &&
             !metadataMatchesProductSelection
           ? 'metadata_mismatch'
-          : subscriptionStatus === 'active' && matchedBy === 'billing_email'
+          : (subscriptionStatus === 'active' || subscriptionStatus === 'cancelled') && matchedBy === 'billing_email'
             ? 'email_only_webhook_match'
           : null;
   const billingReviewRequired = Boolean(billingReviewReason);
@@ -1623,19 +1687,40 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     );
   }
 
+  const resolvedBillingAccess = resolveBillingAccess(
+    {
+      accountStatus: existingUserData?.accountStatus,
+      subscribedPlanId,
+      subscriptionTier: subscribedPlanId,
+      providerSubscriptionStatus: subscriptionStatus,
+      pendingPlanId: existingUserData?.pendingPlanId,
+      pendingInterval: existingUserData?.pendingInterval,
+      subscriptionCurrentPeriodEnd: event.data.next_billing_date || null,
+      subscriptionCancelAtPeriodEnd: Boolean(event.data.cancel_at_next_billing_date),
+      subscriptionUpdatedAt: eventOccurredAt,
+      billingReviewRequired,
+      billingReviewReason,
+    },
+    {
+      now: new Date(eventOccurredAt),
+    },
+  );
+
   const billingUpdate: Record<string, unknown> = {
     billingProvider: 'dodo',
     ...(billingEmail ? { billingEmail } : {}),
     dodoCustomerId: event.data.customer?.customer_id?.trim() || FieldValue.delete(),
     dodoSubscriptionId: event.data.subscription_id?.trim() || FieldValue.delete(),
     dodoProductId: productId || FieldValue.delete(),
-    subscriptionTier: resolvedPlanId,
+    subscriptionTier: resolvedBillingAccess.subscribedPlanId,
+    subscribedPlanId: resolvedBillingAccess.subscribedPlanId,
     subscriptionInterval:
-      canGrantPaidPlan && resolvedProductSelection
+      resolvedProductSelection
         ? resolvedProductSelection.interval
-        : FieldValue.delete(),
-    isPremium: canGrantPaidPlan,
+        : existingUserData?.subscriptionInterval || FieldValue.delete(),
+    isPremium: resolvedBillingAccess.hasPaidAccess,
     subscriptionStatus,
+    providerSubscriptionStatus: subscriptionStatus,
     pendingPlanId: FieldValue.delete(),
     pendingInterval: FieldValue.delete(),
     subscriptionCurrentPeriodEnd:
@@ -1643,8 +1728,10 @@ async function applyDodoSubscriptionEvent(event: DodoSubscriptionWebhookEvent) {
     subscriptionCancelAtPeriodEnd: Boolean(event.data.cancel_at_next_billing_date),
     billingReviewRequired,
     billingReviewReason: billingReviewReason || FieldValue.delete(),
-    subscriptionUpdatedAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    lastBillingEventType: event.type,
+    lastBillingWebhookId: options?.webhookId || FieldValue.delete(),
+    subscriptionUpdatedAt: eventOccurredAt,
+    updatedAt: eventOccurredAt,
   };
 
   await userDocRef.set(billingUpdate, { merge: true });
@@ -2873,15 +2960,57 @@ function normalizeUserTrackingDocument(data: any): NormalizedUserTrackingDocumen
 }
 
 function getResolvedPlanLimits(
-  data: Pick<UserTrackingDocument, 'dodoProductId' | 'subscriptionTier'> | null | undefined,
+  data:
+    | Pick<
+        UserTrackingDocument,
+        | 'accountStatus'
+        | 'billingReviewReason'
+        | 'billingReviewRequired'
+        | 'dodoProductId'
+        | 'pendingInterval'
+        | 'pendingPlanId'
+        | 'providerSubscriptionStatus'
+        | 'subscribedPlanId'
+        | 'subscriptionCancelAtPeriodEnd'
+        | 'subscriptionCurrentPeriodEnd'
+        | 'subscriptionStatus'
+        | 'subscriptionTier'
+        | 'subscriptionUpdatedAt'
+      >
+    | null
+    | undefined,
 ) {
-  return getPlanLimits(getEffectiveBillingPlanId(data));
+  const resolved = resolveBillingAccess(data, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(data?.dodoProductId),
+  });
+  return getPlanLimits(resolved.effectivePlanId);
 }
 
 function getResolvedPlanEntitlements(
-  data: Pick<UserTrackingDocument, 'dodoProductId' | 'subscriptionTier'> | null | undefined,
+  data:
+    | Pick<
+        UserTrackingDocument,
+        | 'accountStatus'
+        | 'billingReviewReason'
+        | 'billingReviewRequired'
+        | 'dodoProductId'
+        | 'pendingInterval'
+        | 'pendingPlanId'
+        | 'providerSubscriptionStatus'
+        | 'subscribedPlanId'
+        | 'subscriptionCancelAtPeriodEnd'
+        | 'subscriptionCurrentPeriodEnd'
+        | 'subscriptionStatus'
+        | 'subscriptionTier'
+        | 'subscriptionUpdatedAt'
+      >
+    | null
+    | undefined,
 ) {
-  return getPlanEntitlements(getEffectiveBillingPlanId(data));
+  const resolved = resolveBillingAccess(data, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(data?.dodoProductId),
+  });
+  return getBillingFeatureEntitlements(resolved.effectivePlanId);
 }
 
 function readPendingPlanId(planId?: string | null): BillingPlanId | null {
@@ -2893,88 +3022,130 @@ function readPendingPlanId(planId?: string | null): BillingPlanId | null {
     : null;
 }
 
-function getEffectiveBillingPlanId(
+function deriveBillingAccessState(
   data:
-    | Pick<UserTrackingDocument, 'subscriptionTier' | 'dodoProductId'>
+    | Pick<
+        UserTrackingDocument,
+        | 'accountStatus'
+        | 'billingReviewReason'
+        | 'billingReviewRequired'
+        | 'dodoProductId'
+        | 'pendingInterval'
+        | 'pendingPlanId'
+        | 'providerSubscriptionStatus'
+        | 'subscribedPlanId'
+        | 'subscriptionCancelAtPeriodEnd'
+        | 'subscriptionCurrentPeriodEnd'
+        | 'subscriptionStatus'
+        | 'subscriptionTier'
+        | 'subscriptionUpdatedAt'
+      >
     | null
     | undefined,
-): BillingPlanId {
-  const storedPlanId = resolveBillingPlanId(data?.subscriptionTier);
-  if (storedPlanId !== 'free') {
-    return storedPlanId;
-  }
-
-  // Legacy billing rows may have an active paid Dodo product ID even if the
-  // older webhook write failed to persist the paid tier. Only trust configured
-  // product-ID mappings here; never fall back to a default paid plan.
-  return resolvePlanIdFromProductId(data?.dodoProductId) || 'free';
-}
-
-const BILLING_ACTIVATION_STALE_AFTER_MS = 10 * 60 * 1000;
-
-function hasPendingBillingActivation(
-  data: Pick<
-    UserTrackingDocument,
-    'accountStatus' | 'pendingPlanId' | 'subscriptionStatus' | 'subscriptionUpdatedAt'
-  > | null | undefined,
-) {
-  if (isDeletedUserTrackingDocument(data)) {
-    return false;
-  }
-
-  if (!readPendingPlanId(data?.pendingPlanId)) {
-    return false;
-  }
-
-  const updatedAtMs =
-    typeof data?.subscriptionUpdatedAt === 'string'
-      ? Date.parse(data.subscriptionUpdatedAt)
-      : Number.NaN;
-  if (!Number.isFinite(updatedAtMs)) {
-    return false;
-  }
-
-  return Date.now() - updatedAtMs < BILLING_ACTIVATION_STALE_AFTER_MS;
-}
-
-function deriveBillingAccessState(
-  data: Pick<
-    UserTrackingDocument,
-    | 'accountStatus'
-    | 'dodoProductId'
-    | 'isPremium'
-    | 'pendingPlanId'
-    | 'subscriptionStatus'
-    | 'subscriptionTier'
-    | 'subscriptionUpdatedAt'
-  > | null | undefined,
 ): BillingAccessState {
-  if (hasPendingBillingActivation(data)) {
-    return 'activating';
-  }
-  if (isDeletedUserTrackingDocument(data)) {
-    return 'selection_required';
-  }
-  return 'active';
+  return resolveBillingAccess(data, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(data?.dodoProductId),
+  }).accessState;
 }
 
 function hasActiveBillingEntitlement(
-  data: Pick<
-    UserTrackingDocument,
-    'accountStatus' | 'dodoProductId' | 'isPremium' | 'subscriptionStatus' | 'subscriptionTier'
-  > | null | undefined,
+  data:
+    | Pick<
+        UserTrackingDocument,
+        | 'accountStatus'
+        | 'billingReviewReason'
+        | 'billingReviewRequired'
+        | 'dodoProductId'
+        | 'pendingInterval'
+        | 'pendingPlanId'
+        | 'providerSubscriptionStatus'
+        | 'subscribedPlanId'
+        | 'subscriptionCancelAtPeriodEnd'
+        | 'subscriptionCurrentPeriodEnd'
+        | 'subscriptionStatus'
+        | 'subscriptionTier'
+        | 'subscriptionUpdatedAt'
+      >
+    | null
+    | undefined,
 ): boolean {
-  if (isDeletedUserTrackingDocument(data)) {
-    return false;
+  return resolveBillingAccess(data, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(data?.dodoProductId),
+  }).hasPaidAccess;
+}
+
+function hasBillingFeature(
+  data:
+    | Pick<
+        UserTrackingDocument,
+        | 'accountStatus'
+        | 'billingReviewReason'
+        | 'billingReviewRequired'
+        | 'dodoProductId'
+        | 'pendingInterval'
+        | 'pendingPlanId'
+        | 'providerSubscriptionStatus'
+        | 'subscribedPlanId'
+        | 'subscriptionCancelAtPeriodEnd'
+        | 'subscriptionCurrentPeriodEnd'
+        | 'subscriptionStatus'
+        | 'subscriptionTier'
+        | 'subscriptionUpdatedAt'
+      >
+    | null
+    | undefined,
+  feature: BillingFeature,
+) {
+  const resolved = resolveBillingAccess(data, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(data?.dodoProductId),
+  });
+  return hasPlanFeature(getBillingFeatureEntitlements(resolved.effectivePlanId), feature);
+}
+
+function createFeatureUnavailableError(
+  feature: BillingFeature,
+  effectivePlanId: BillingPlanId,
+) {
+  return new ApiError('Upgrade to use this feature.', {
+    status: 403,
+    code: 'FEATURE_NOT_AVAILABLE',
+    retryable: false,
+    meta: {
+      feature,
+      effectivePlanId,
+    },
+  });
+}
+
+function requireBillingFeature(
+  data:
+    | Pick<
+        UserTrackingDocument,
+        | 'accountStatus'
+        | 'billingReviewReason'
+        | 'billingReviewRequired'
+        | 'dodoProductId'
+        | 'pendingInterval'
+        | 'pendingPlanId'
+        | 'providerSubscriptionStatus'
+        | 'subscribedPlanId'
+        | 'subscriptionCancelAtPeriodEnd'
+        | 'subscriptionCurrentPeriodEnd'
+        | 'subscriptionStatus'
+        | 'subscriptionTier'
+        | 'subscriptionUpdatedAt'
+      >
+    | null
+    | undefined,
+  feature: BillingFeature,
+) {
+  const resolved = resolveBillingAccess(data, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(data?.dodoProductId),
+  });
+  if (!hasPlanFeature(getBillingFeatureEntitlements(resolved.effectivePlanId), feature)) {
+    throw createFeatureUnavailableError(feature, resolved.effectivePlanId);
   }
-  const effectivePlanId = getEffectiveBillingPlanId(data);
-  if (data?.subscriptionStatus) {
-    return data.subscriptionStatus === 'active' && effectivePlanId !== 'free';
-  }
-  if (data?.isPremium) {
-    return effectivePlanId !== 'free';
-  }
-  return effectivePlanId !== 'free';
+  return resolved;
 }
 
 async function requireAuthenticatedBillingAccess(req: express.Request) {
@@ -2987,8 +3158,11 @@ async function requireAuthenticatedBillingAccess(req: express.Request) {
   const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
   const userSnapshot = await userDocRef.get();
   const userData = userSnapshot.data() as UserTrackingDocument | undefined;
-  if (!hasActiveBillingEntitlement(userData)) {
-    throw createForbiddenError('An active billing plan is required for this request.');
+  const resolvedBilling = resolveBillingAccess(userData, {
+    fallbackProductPlanId: resolvePlanIdFromProductId(userData?.dodoProductId),
+  });
+  if (resolvedBilling.entitlementState === 'account_deleted') {
+    throw createForbiddenError('This account is no longer available.');
   }
 
   return {
@@ -2996,6 +3170,7 @@ async function requireAuthenticatedBillingAccess(req: express.Request) {
     adminDb,
     userDocRef,
     userData,
+    resolvedBilling,
   };
 }
 
@@ -7353,6 +7528,16 @@ async function runAllUserTrackingSchedules(
       }
       const state = normalizeUserTrackingDocument(userData);
       const planEntitlements = getResolvedPlanEntitlements(userData);
+      const competitorTrackingEnabled = planEntitlements.competitorTracking;
+      const executionState = competitorTrackingEnabled
+        ? state
+        : {
+            ...state,
+            competitorGroups: [],
+            competitorTrackedKeywords: [],
+            competitorRankHistory: [],
+            competitorAsoLatestSnapshots: [],
+          };
       const hasTrackedData =
         state.trackedKeywords.length > 0 ||
         state.competitorTrackedKeywords.length > 0 ||
@@ -7376,7 +7561,7 @@ async function runAllUserTrackingSchedules(
           force: options?.force,
         })) {
           const planLimits = getResolvedPlanLimits(userData);
-          const { scopedState } = getTrackedKeywordScopedState(state, planLimits);
+          const { scopedState } = getTrackedKeywordScopedState(executionState, planLimits);
           const recoveryScope =
             options?.mode === 'unresolved_only'
               ? getTrackingRecoveryScope(scopedState, runKey)
@@ -7435,38 +7620,49 @@ async function runAllUserTrackingSchedules(
                 : {
                     updatedRules: state.alertRules,
                   };
-            const asoResult = await captureCompetitorAsoState(
-              userDoc.ref,
-              {
-                competitorGroups: state.competitorGroups,
-                competitorTrackedKeywords: nextCompetitorTrackedKeywords,
-                competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
-                alertRules: updatedAlertRules,
-                notificationSettings: state.notificationSettings,
-              },
-              runKey,
-              {
-                mode: options?.mode,
-                alertsEnabled:
-                  planEntitlements.alertRules || planEntitlements.alertDelivery,
-              },
-            );
+            const asoResult = competitorTrackingEnabled
+              ? await captureCompetitorAsoState(
+                  userDoc.ref,
+                  {
+                    competitorGroups: state.competitorGroups,
+                    competitorTrackedKeywords: nextCompetitorTrackedKeywords,
+                    competitorAsoLatestSnapshots: state.competitorAsoLatestSnapshots,
+                    alertRules: updatedAlertRules,
+                    notificationSettings: state.notificationSettings,
+                  },
+                  runKey,
+                  {
+                    mode: options?.mode,
+                    alertsEnabled:
+                      planEntitlements.alertRules || planEntitlements.alertDelivery,
+                  },
+                )
+              : {
+                  nextLatestSnapshots: state.competitorAsoLatestSnapshots,
+                  checked: 0,
+                  changed: 0,
+                  failed: 0,
+                };
             const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
               userDoc.ref,
               refreshed.nextState.rankHistory,
             );
-            const retainedCompetitorRankHistory = await archiveAndTrimCompetitorRankHistory(
-              userDoc.ref,
-              refreshed.nextState.competitorRankHistory,
-            );
+            const retainedCompetitorRankHistory = competitorTrackingEnabled
+              ? await archiveAndTrimCompetitorRankHistory(
+                  userDoc.ref,
+                  refreshed.nextState.competitorRankHistory,
+                )
+              : state.competitorRankHistory;
 
             updatePayload.trackedKeywords = nextTrackedKeywords;
             updatePayload.rankHistory = retainedRankHistory;
-            updatePayload.competitorTrackedKeywords = nextCompetitorTrackedKeywords;
-            updatePayload.competitorRankHistory = retainedCompetitorRankHistory;
-            updatePayload.competitorAsoLatestSnapshots = asoResult.nextLatestSnapshots;
             updatePayload.trackingSchedule = refreshed.nextState.schedule;
             updatePayload.alertRules = updatedAlertRules;
+            if (competitorTrackingEnabled) {
+              updatePayload.competitorTrackedKeywords = nextCompetitorTrackedKeywords;
+              updatePayload.competitorRankHistory = retainedCompetitorRankHistory;
+              updatePayload.competitorAsoLatestSnapshots = asoResult.nextLatestSnapshots;
+            }
 
             weeklyEmailState = {
               trackedKeywords: nextTrackedKeywords,
@@ -7658,6 +7854,7 @@ function sendApiError(
     error: apiError.message,
     code: apiError.code,
     retryable: apiError.retryable,
+    ...(apiError.meta || {}),
   });
 }
 
@@ -9658,7 +9855,10 @@ async function startServer() {
 
       try {
         if (isDodoSubscriptionWebhookEvent(event)) {
-          await applyDodoSubscriptionEvent(event);
+          await applyDodoSubscriptionEvent(event, {
+            webhookId: headers['webhook-id'],
+            webhookTimestamp: headers['webhook-timestamp'],
+          });
         }
 
         await finalizeDodoWebhookEvent(
@@ -9725,24 +9925,19 @@ async function startServer() {
       let userData = snapshot.data() as UserTrackingDocument | undefined;
       const pricingCatalog = await loadBillingPricingCatalog();
       const normalizedUserState = normalizeUserTrackingDocument(userData);
-      const effectiveSubscriptionTier = getEffectiveBillingPlanId(userData);
-      let accessState = deriveBillingAccessState(userData);
-      const isPremium = hasActiveBillingEntitlement(userData);
-      let pendingPlanId = readPendingPlanId(userData?.pendingPlanId);
-      let pendingInterval =
-        userData?.pendingInterval === 'yearly' ? 'yearly' : userData?.pendingInterval === 'monthly' ? 'monthly' : null;
+      let resolvedBilling = resolveBillingAccess(userData, {
+        fallbackProductPlanId: resolvePlanIdFromProductId(userData?.dodoProductId),
+      });
+      let pendingPlanId = resolvedBilling.pendingPlanId;
+      let pendingInterval = resolvedBilling.pendingInterval;
       if (
         pendingPlanId &&
-        accessState !== 'activating' &&
-        !isPremium
+        resolvedBilling.entitlementState !== 'checkout_pending'
       ) {
         const clearedAt = new Date().toISOString();
         const stalePendingCleanup: DocumentData = {
           pendingPlanId: FieldValue.delete(),
           pendingInterval: FieldValue.delete(),
-          ...(userData?.subscriptionStatus === 'pending'
-            ? { subscriptionStatus: FieldValue.delete() }
-            : {}),
           updatedAt: clearedAt,
         };
         await adminDb.collection('users').doc(decodedToken.uid).set(
@@ -9755,44 +9950,59 @@ async function startServer() {
               ...userData,
               pendingPlanId: undefined,
               pendingInterval: undefined,
-              subscriptionStatus:
-                userData.subscriptionStatus === 'pending'
-                  ? undefined
-                  : userData.subscriptionStatus,
               updatedAt: clearedAt,
             }
           : userData;
-        pendingPlanId = null;
-        pendingInterval = null;
-        accessState = deriveBillingAccessState(userData);
+        resolvedBilling = resolveBillingAccess(userData, {
+          fallbackProductPlanId: resolvePlanIdFromProductId(userData?.dodoProductId),
+        });
+        pendingPlanId = resolvedBilling.pendingPlanId;
+        pendingInterval = resolvedBilling.pendingInterval;
       }
-      const planLimits =
-        accessState === 'active' ? getResolvedPlanLimits(userData) : null;
-      const planEntitlements =
-        accessState === 'active' ? getResolvedPlanEntitlements(userData) : null;
-      const usage =
-        accessState === 'active' && planLimits
-          ? getNormalizedPlanUsage(normalizedUserState, planLimits)
-          : null;
+      const planLimits = getResolvedPlanLimits(userData);
+      const planEntitlements = getResolvedPlanEntitlements(userData);
+      const usage = getNormalizedPlanUsage(normalizedUserState, planLimits);
 
       res.json({
         ...pricingCatalog,
         customerPortalAvailable: Boolean(pricingCatalog.configured && userData?.dodoCustomerId),
-        accessState,
-        isPremium,
+        accessState: resolvedBilling.accessState,
+        isPremium: resolvedBilling.hasPaidAccess,
+        effectivePlanId: resolvedBilling.effectivePlanId,
+        entitlementState: resolvedBilling.entitlementState,
+        providerStatus: resolvedBilling.providerStatus,
         billingReviewRequired: Boolean(userData?.billingReviewRequired),
         billingReviewReason: userData?.billingReviewReason || null,
         accountStatus: userData?.accountStatus || 'active',
-        subscriptionTier: effectiveSubscriptionTier,
+        subscriptionTier: resolvedBilling.subscribedPlanId,
+        subscribedPlanId: resolvedBilling.subscribedPlanId,
         subscriptionInterval: userData?.subscriptionInterval || null,
-        subscriptionStatus: userData?.subscriptionStatus || null,
+        subscriptionStatus: resolvedBilling.providerStatus,
         pendingPlanId,
         pendingInterval,
-        currentPeriodEnd: userData?.subscriptionCurrentPeriodEnd || null,
-        cancelAtPeriodEnd: Boolean(userData?.subscriptionCancelAtPeriodEnd),
+        currentPeriodEnd: resolvedBilling.currentPeriodEnd,
+        cancelAtPeriodEnd: resolvedBilling.cancelAtPeriodEnd,
         planLimits,
         planEntitlements,
         usage,
+        transition:
+          resolvedBilling.entitlementState === 'checkout_pending' && pendingPlanId
+            ? {
+                type: 'checkout_pending',
+                fromPlanId: resolvedBilling.effectivePlanId,
+                toPlanId: pendingPlanId,
+                effectiveAt: null,
+                pending: true,
+              }
+            : resolvedBilling.entitlementState === 'paid_canceling'
+              ? {
+                  type: 'cancel_at_period_end',
+                  fromPlanId: resolvedBilling.subscribedPlanId,
+                  toPlanId: 'free',
+                  effectiveAt: resolvedBilling.currentPeriodEnd,
+                  pending: true,
+                }
+              : null,
       });
     } catch (error) {
       return sendApiError(res, error, 'Failed to load billing status.');
@@ -9822,13 +10032,54 @@ async function startServer() {
       const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
       const userSnapshot = await userDocRef.get();
       const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+      const resolvedBilling = resolveBillingAccess(userData, {
+        fallbackProductPlanId: resolvePlanIdFromProductId(userData?.dodoProductId),
+      });
       const isDowngradeAttempt =
-        hasActiveBillingEntitlement(userData) &&
-        getBillingPlanRank(planId) < getBillingPlanRank(getEffectiveBillingPlanId(userData));
+        resolvedBilling.hasPaidAccess &&
+        getBillingPlanRank(planId) < getBillingPlanRank(resolvedBilling.subscribedPlanId);
       if (isDowngradeAttempt) {
         throw createBadRequestError(
           'Downgrades are not available from checkout. Use the billing portal or contact vantalumstudio@gmail.com.',
         );
+      }
+      if (resolvedBilling.entitlementState === 'checkout_pending') {
+        throw new ApiError(
+          'Billing activation is already pending for this account.',
+          {
+            status: 409,
+            code: 'BILLING_TRANSITION',
+            retryable: false,
+            meta: {
+              pendingPlanId: resolvedBilling.pendingPlanId,
+              pendingInterval: resolvedBilling.pendingInterval,
+            },
+          },
+        );
+      }
+      if (resolvedBilling.hasPaidAccess) {
+        if (!client) {
+          throw createConfigurationError('Dodo customer portal is not configured on the server.');
+        }
+        const customerId = userData?.dodoCustomerId?.trim();
+        if (!customerId) {
+          throw new ApiError(
+            'Manage plan changes from the billing portal for this account.',
+            {
+              status: 409,
+              code: 'BILLING_TRANSITION',
+              retryable: false,
+            },
+          );
+        }
+        const portalSession = await client.customers.customerPortal.create(customerId, {
+          return_url: getBillingReturnUrl(req),
+        });
+        res.json({
+          action: 'open_portal',
+          portalUrl: portalSession.link,
+        });
+        return;
       }
       const email = decodedToken.email?.trim().toLowerCase();
       if (!email && !userData?.dodoCustomerId) {
@@ -9859,14 +10110,14 @@ async function startServer() {
         ...(email ? { billingEmail: email } : {}),
         pendingPlanId: planId,
         pendingInterval: interval,
-        ...(hasActiveBillingEntitlement(userData)
-          ? {}
-          : { subscriptionStatus: 'pending' as const }),
+        providerSubscriptionStatus: 'pending' as const,
+        subscriptionStatus: 'pending' as const,
         subscriptionUpdatedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       } satisfies UserTrackingDocument, { merge: true });
 
       res.json({
+        action: 'checkout',
         checkoutUrl: checkoutSession.checkout_url,
         sessionId: checkoutSession.session_id,
       });
@@ -10064,6 +10315,8 @@ async function startServer() {
       }
 
       const updatedAt = new Date().toISOString();
+      const userSnapshot = await adminDb.collection('users').doc(decodedToken.uid).get();
+      const userData = userSnapshot.data() as UserTrackingDocument | undefined;
       const updates: DocumentData = {
         updatedAt,
       };
@@ -10073,10 +10326,16 @@ async function startServer() {
         updates.announcementEmailsUpdatedAt = updatedAt;
       }
       if (hasAlertPreference) {
+        if (alertEmailsEnabled && !hasBillingFeature(userData, 'alerts')) {
+          requireBillingFeature(userData, 'alerts');
+        }
         updates.alertEmailsEnabled = alertEmailsEnabled;
         updates.alertEmailsUpdatedAt = updatedAt;
       }
       if (hasWeeklyPreference) {
+        if (weeklyReportEnabled && !hasBillingFeature(userData, 'weeklyReports')) {
+          requireBillingFeature(userData, 'weeklyReports');
+        }
         updates['weeklyReportSettings.enabled'] = weeklyReportEnabled;
         updates['weeklyReportSettings.lastAttemptedAt'] = updatedAt;
       }
@@ -10137,6 +10396,33 @@ async function startServer() {
       const serverUpdatedAt = new Date().toISOString();
       const nextStateVersion = currentState.stateVersion + 1;
 
+      const competitorStateChanged =
+        JSON.stringify(currentState.competitorGroups) !== JSON.stringify(mergedState.competitorGroups) ||
+        JSON.stringify(currentState.competitorTrackedKeywords) !== JSON.stringify(mergedState.competitorTrackedKeywords) ||
+        JSON.stringify(currentState.competitorGroupSnapshots) !== JSON.stringify(mergedState.competitorGroupSnapshots) ||
+        JSON.stringify(currentState.competitorAsoLatestSnapshots) !== JSON.stringify(mergedState.competitorAsoLatestSnapshots);
+      const alertRulesChanged =
+        JSON.stringify(currentState.alertRules) !== JSON.stringify(mergedState.alertRules);
+      const pushNotificationSettingEnabled =
+        mergedState.notificationSettings.pushEnabled &&
+        !currentState.notificationSettings.pushEnabled;
+      const weeklyReportsEnabled =
+        mergedState.weeklyReportSettings.enabled &&
+        !currentState.weeklyReportSettings.enabled;
+
+      if (competitorStateChanged) {
+        requireBillingFeature(currentUserData, 'competitorTracking');
+      }
+      if (alertRulesChanged) {
+        requireBillingFeature(currentUserData, 'alerts');
+      }
+      if (pushNotificationSettingEnabled) {
+        requireBillingFeature(currentUserData, 'browserPush');
+      }
+      if (weeklyReportsEnabled) {
+        requireBillingFeature(currentUserData, 'weeklyReports');
+      }
+
       assertPlanLimitTransition(currentState, mergedState, planLimits);
       const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
         userDocRef,
@@ -10147,8 +10433,6 @@ async function startServer() {
         mergedState.competitorRankHistory,
       );
       const planEntitlements = getResolvedPlanEntitlements(currentUserData);
-      const alertRulesChanged =
-        JSON.stringify(currentState.alertRules) !== JSON.stringify(mergedState.alertRules);
       const shouldRestoreAlertEmails =
         planEntitlements.alertDelivery &&
         currentUserData?.alertEmailsEnabled === false &&
@@ -10215,6 +10499,7 @@ async function startServer() {
 
       const currentUserSnapshot = await userDocRef.get();
       const currentUserData = currentUserSnapshot.data() as UserTrackingDocument | undefined;
+      requireBillingFeature(currentUserData, 'browserPush');
       const currentNotificationSettings = normalizeNotificationSettings(
         currentUserData?.notificationSettings,
       );
@@ -10258,6 +10543,9 @@ async function startServer() {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
       const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
+      const userSnapshot = await userDocRef.get();
+      const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+      requireBillingFeature(userData, 'browserPush');
       const tokens = await loadUserPushTokens(userDocRef);
       const lastTokenUpdatedAt = tokens.reduce<string | null>((latest, entry) => {
         if (!entry.lastSeenAt) {
@@ -10289,6 +10577,9 @@ async function startServer() {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
       const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
+      const userSnapshot = await userDocRef.get();
+      const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+      requireBillingFeature(userData, 'browserPush');
       const tokens = await loadUserPushTokens(userDocRef);
       if (!Boolean(getFirebaseAdminMessagingClient())) {
         throw createConfigurationError('Firebase Cloud Messaging is not configured on the server.');
@@ -10994,6 +11285,9 @@ async function startServer() {
       if (!adminDb) {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
+      const userSnapshot = await adminDb.collection('users').doc(decodedToken.uid).get();
+      const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+      requireBillingFeature(userData, 'alerts');
       const rawLimit = Number(req.query.limit);
       const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.round(rawLimit), 1), 100) : 30;
       const snapshot = await adminDb
@@ -11025,6 +11319,7 @@ async function startServer() {
       const userDocRef = adminDb.collection('users').doc(decodedToken.uid);
       const userSnapshot = await userDocRef.get();
       const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+      requireBillingFeature(userData, 'competitorTracking');
       const activeGroupIds = new Set(
         normalizeUserTrackingDocument(userData).competitorGroups.map((group) => group.groupId),
       );
@@ -11056,6 +11351,9 @@ async function startServer() {
       if (!adminDb) {
         throw createConfigurationError('Firebase Admin is not configured on the server.');
       }
+      const userSnapshot = await adminDb.collection('users').doc(decodedToken.uid).get();
+      const userData = userSnapshot.data() as UserTrackingDocument | undefined;
+      requireBillingFeature(userData, 'alerts');
       const markAll = readOptionalBoolean(req.body?.markAll);
       const nowIso = new Date().toISOString();
       const userEventsRef = adminDb.collection('users').doc(decodedToken.uid).collection('alert_events');

@@ -16,6 +16,23 @@ export type {
 export type BillingInterval = "monthly" | "yearly";
 export type PaidBillingPlanId = Exclude<BillingPlanId, "free" | "agency">;
 export type BillingAccessState = "selection_required" | "activating" | "active";
+export type BillingEntitlementState =
+  | "free_active"
+  | "checkout_pending"
+  | "paid_active"
+  | "paid_canceling"
+  | "payment_issue"
+  | "billing_review"
+  | "expired_to_free"
+  | "account_deleted";
+
+export type BillingTransition = {
+  type: "checkout_pending" | "cancel_at_period_end";
+  fromPlanId: BillingPlanId | null;
+  toPlanId: BillingPlanId | null;
+  effectiveAt: string | null;
+  pending: boolean;
+};
 
 export type BillingPlanPrice = {
   productId: string;
@@ -42,8 +59,12 @@ export type BillingStatus = {
   billingReviewReason?: string | null;
   accountStatus?: "active" | "deleted" | null;
   subscriptionTier?: string | null;
+  effectivePlanId?: BillingPlanId | null;
+  subscribedPlanId?: BillingPlanId | null;
   subscriptionInterval?: BillingInterval | null;
   subscriptionStatus?: string | null;
+  providerStatus?: string | null;
+  entitlementState?: BillingEntitlementState | null;
   pendingPlanId?: BillingPlanId | null;
   pendingInterval?: BillingInterval | null;
   currentPeriodEnd?: string | null;
@@ -51,6 +72,7 @@ export type BillingStatus = {
   planLimits?: PlanLimits | null;
   planEntitlements?: PlanEntitlements | null;
   usage?: PlanUsage | null;
+  transition?: BillingTransition | null;
 };
 
 export type BillingPricingCatalog = Pick<
@@ -93,10 +115,14 @@ export const PRICING_INCLUDED_COPY =
 export const PRICING_INCLUDED_CAPABILITIES: PricingIncludedCapability[] = [
   { label: "App Store & Google Play tracking", sub: "iOS + Android in one workspace" },
   { label: "Keyword rank tracking", sub: "Per country, per store" },
-  { label: "Fast keyword discovery", sub: "Discover relevant opportunities quickly" },
-  { label: "Manual rank refresh", sub: "Check live visibility when you need it" },
-  { label: "Bookmarks and saved apps", sub: "Keep important listings ready to reopen" },
+  { label: "AI-Powered Keyword Discovery", sub: "Intelligent keyword recommendations" },
+  { label: "Competitor ASO change alerts", sub: "Rival ASO change alerts" },
+  { label: "Competitor analysis", sub: "Track rivals side by side" },
+  { label: "Daily automated monitoring", sub: "Runs every day, hands-free" },
+  { label: "Rank change alerts", sub: "Notified when positions shift" },
   { label: "Trend charts & history", sub: "See rank movement over time" },
+  { label: "Weekly Email Reports", sub: "Movement summaries delivered to your inbox" },
+  { label: "PDF reports & data export", sub: "Share or archive at any time" },
 ];
 
 const PLAN_SHARED_FEATURES = PRICING_INCLUDED_CAPABILITIES.map(
@@ -324,7 +350,7 @@ export function formatBillingAmountFromMinorUnits(
       maximumFractionDigits: options?.maximumFractionDigits,
     });
     const fractionDigits =
-      formatter.resolvedOptions().maximumFractionDigits;
+      formatter.resolvedOptions().maximumFractionDigits ?? 2;
     return formatter.format(amount / 10 ** fractionDigits);
   } catch {
     return null;
@@ -358,7 +384,7 @@ export function getYearlyMonthlyEquivalentLabel(
       maximumFractionDigits: 0,
     });
     const fractionDigits =
-      currencyFormatter.resolvedOptions().maximumFractionDigits;
+      currencyFormatter.resolvedOptions().maximumFractionDigits ?? 2;
     const yearlyMajorUnits = yearlyPrice.amount / 10 ** fractionDigits;
     return roundingFormatter.format(Math.round(yearlyMajorUnits / 12));
   } catch {

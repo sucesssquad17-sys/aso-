@@ -4527,6 +4527,11 @@ function AuthenticatedApp({
     return null;
   }, [comparedApps.length, country, selectedApp, storeType, viewMode]);
   const exportToPDF = async () => {
+    if (!planEntitlementsForUi.dataExport) {
+      toast.error("Upgrade to export PDF, CSV, and JSON data.");
+      setViewMode("upgrade");
+      return;
+    }
     const exportConfig = currentPagePdfExport;
     if (!exportConfig) {
       toast.error("This page is not ready to export yet.");
@@ -5182,7 +5187,9 @@ function AuthenticatedApp({
   const currentPlanEntitlements = React.useMemo<PlanEntitlements>(
     () =>
       billingStatus?.planEntitlements ||
-      getPlanEntitlements(billingStatus?.subscriptionTier),
+      getPlanEntitlements(
+        billingStatus?.effectivePlanId || billingStatus?.subscriptionTier,
+      ),
     [billingStatus],
   );
   const loadChartCategories = React.useCallback(async () => {
@@ -5524,7 +5531,10 @@ function AuthenticatedApp({
   ) => {
     setIsStartingBillingCheckout(true);
     try {
-      const data = await fetchAuthedJson<{ checkoutUrl: string }>(
+      const data = await fetchAuthedJson<
+        | { action: "checkout"; checkoutUrl: string; sessionId?: string }
+        | { action: "open_portal"; portalUrl: string }
+      >(
         "/api/billing/checkout",
         {
           method: "POST",
@@ -5534,6 +5544,13 @@ function AuthenticatedApp({
           body: JSON.stringify({ plan: planId, interval }),
         },
       );
+      if (data.action === "open_portal") {
+        if (!data.portalUrl) {
+          throw new Error("Billing portal URL was not returned by the server.");
+        }
+        window.location.assign(data.portalUrl);
+        return;
+      }
       if (!data.checkoutUrl) {
         throw new Error("Checkout URL was not returned by the server.");
       }
@@ -5829,7 +5846,9 @@ function AuthenticatedApp({
   const planEntitlementsForUi = React.useMemo<PlanEntitlements>(
     () =>
       billingStatusForUi?.planEntitlements ||
-      getPlanEntitlements(billingStatusForUi?.subscriptionTier),
+      getPlanEntitlements(
+        billingStatusForUi?.effectivePlanId || billingStatusForUi?.subscriptionTier,
+      ),
     [billingStatusForUi],
   );
   const showUpgradePage = viewMode === "upgrade" || !hasActiveBillingAccess;
@@ -9674,6 +9693,11 @@ function AuthenticatedApp({
     return rows;
   };
   const exportDataAsJson = React.useCallback(() => {
+    if (!planEntitlementsForUi.dataExport) {
+      toast.error("Upgrade to export PDF, CSV, and JSON data.");
+      setViewMode("upgrade");
+      return;
+    }
     setIsExporting(true);
     try {
       const payload = buildExportPayload();
@@ -9693,8 +9717,19 @@ function AuthenticatedApp({
     } finally {
       setIsExporting(false);
     }
-  }, [buildExportPayload, getExportFilenameBase, selectedApp?.appId, viewMode]);
+  }, [
+    buildExportPayload,
+    getExportFilenameBase,
+    planEntitlementsForUi.dataExport,
+    selectedApp?.appId,
+    viewMode,
+  ]);
   const exportDataAsCsv = React.useCallback(() => {
+    if (!planEntitlementsForUi.dataExport) {
+      toast.error("Upgrade to export PDF, CSV, and JSON data.");
+      setViewMode("upgrade");
+      return;
+    }
     setIsExporting(true);
     try {
       const csv = rowsToCsv(buildExportRows());
@@ -9714,7 +9749,13 @@ function AuthenticatedApp({
     } finally {
       setIsExporting(false);
     }
-  }, [buildExportRows, getExportFilenameBase, selectedApp?.appId, viewMode]);
+  }, [
+    buildExportRows,
+    getExportFilenameBase,
+    planEntitlementsForUi.dataExport,
+    selectedApp?.appId,
+    viewMode,
+  ]);
   const handleExportAction = React.useCallback(
     async (format: "pdf" | "csv" | "json") => {
       setIsExportMenuOpen(false);
