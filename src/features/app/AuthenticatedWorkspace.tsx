@@ -59,6 +59,7 @@ import { getToken, onMessage } from "firebase/messaging";
 import ErrorBoundary from "../../components/ErrorBoundary";
 import RankSparkline from "../../components/RankSparkline";
 import { UpgradePage } from "./UpgradePage";
+import { LockedFeatureModal, type LockedFeature } from "./LockedFeatureModal";
 import ThemeToggle from "../../components/ThemeToggle";
 import { PrivacyPolicyPage, TermsPage } from "../auth/components";
 import { db, getFirebaseWebPushVapidKey, messaging } from "../../firebase";
@@ -187,6 +188,8 @@ import {
   normalizeWeeklyReportSettingsState,
   reconcileCompetitorTrackedKeywordCountryEdit,
   serializeEditableUserStateForApi,
+  getLatestTrackedHistoryEntriesByIdentity,
+  getTrackedKeywordStateFromHistoryEntry,
 } from "../tracking/model";
 import {
   WorkspaceEmptyBlock,
@@ -3923,6 +3926,7 @@ function AuthenticatedApp({
     useState<string | null>(null);
   const [activeCompetitorKeywordAlertGroupKey, setActiveCompetitorKeywordAlertGroupKey] =
     useState<string | null>(null);
+  const [lockedFeature, setLockedFeature] = useState<LockedFeature | null>(null);
   const [competitorAsoDiffs, setCompetitorAsoDiffs] = useState<
     CompetitorAsoDiffRecord[]
   >([]);
@@ -4528,8 +4532,7 @@ function AuthenticatedApp({
   }, [comparedApps.length, country, selectedApp, storeType, viewMode]);
   const exportToPDF = async () => {
     if (!planEntitlementsForUi.dataExport) {
-      toast.error("Upgrade to export PDF, CSV, and JSON data.");
-      setViewMode("upgrade");
+      openLockedDataExport();
       return;
     }
     const exportConfig = currentPagePdfExport;
@@ -4696,6 +4699,10 @@ function AuthenticatedApp({
       ]),
     );
   }, [allRankHistory]);
+  const latestTrackedHistoryEntryByIdentity = React.useMemo(
+    () => getLatestTrackedHistoryEntriesByIdentity(allRankHistory),
+    [allRankHistory],
+  );
   const [bookmarks, setBookmarks] = useState<AppBookmark[]>([]);
   const [trackedKeywords, setTrackedKeywords] = useState<TrackedKeyword[]>([]);
   const [trackingSchedule, setTrackingSchedule] = useState<TrackingSchedule>(
@@ -5885,15 +5892,20 @@ function AuthenticatedApp({
     },
     [hasActiveBillingAccess, openUpgradeForBillingAccess],
   );
-  const openUpgradeForFeature = React.useCallback((message: string) => {
-    toast.error(message);
-    setViewMode("upgrade");
+  const openLockedFeature = React.useCallback((feature: LockedFeature) => {
+    setLockedFeature(feature);
   }, []);
   const openLockedWeeklyReports = React.useCallback(() => {
-    openUpgradeForFeature(
-      "Weekly email reports are available on paid plans. Upgrade to turn on automated summaries.",
-    );
-  }, [openUpgradeForFeature]);
+    openLockedFeature({
+      title: "Weekly email reports",
+      description: "Free keeps core tracking open. Upgrade when you want a recurring movement summary delivered to your inbox.",
+      benefits: [
+        "Scheduled weekly movement summaries",
+        "Country and store context in every recap",
+        "A review-ready view of gains, losses, and competitor pressure",
+      ],
+    });
+  }, [openLockedFeature]);
   const openLockedAlerts = React.useCallback(
     (scope: "keyword" | "competitor_keyword" | "competitor_aso") => {
       const label =
@@ -5902,12 +5914,29 @@ function AuthenticatedApp({
           : scope === "competitor_keyword"
             ? "Competitor keyword alerts"
             : "Rank alerts";
-      openUpgradeForFeature(
-        `${label} are available on paid plans. Upgrade to unlock alert rules, email delivery, and push notifications.`,
-      );
+      openLockedFeature({
+        title: label,
+        description: "Alerts are ready when you need them. Paid plans unlock rules that watch meaningful movement without requiring manual checks.",
+        benefits: [
+          "Rules for rank movement, new visibility, and losses",
+          "In-app, email, and browser push delivery options",
+          "Competitor context attached to the change",
+        ],
+      });
     },
-    [openUpgradeForFeature],
+    [openLockedFeature],
   );
+  const openLockedDataExport = React.useCallback(() => {
+    openLockedFeature({
+      title: "Exports and shareable reports",
+      description: "Free users can explore core tracking in the workspace. Paid plans add downloadable reports for sharing and review.",
+      benefits: [
+        "PDF snapshots for stakeholders",
+        "CSV and JSON exports for deeper analysis",
+        "Country and store scopes included in each export",
+      ],
+    });
+  }, [openLockedFeature]);
   const openTrackedKeywordAlerts = React.useCallback(
     (groupId: string) => {
       if (!planEntitlementsForUi.alertRules) {
@@ -6586,6 +6615,7 @@ function AuthenticatedApp({
       options: {
         notifyOnSignificantChange: boolean;
         markCheckedOnError?: boolean;
+        keepPendingOnInitialError?: boolean;
         errorContext: string;
       },
     ) => {
@@ -6623,6 +6653,8 @@ function AuthenticatedApp({
               store: trackedKeyword.store,
               country: trackedKeyword.country,
               depth: TRACKED_KEYWORD_RANKING_DEPTH,
+              keepPendingOnInitialError:
+                options.keepPendingOnInitialError === true,
             }),
           },
         );
@@ -6697,7 +6729,11 @@ function AuthenticatedApp({
           country: trackedKeyword.country,
         });
         return {
-          updatedTrackedKeyword: options.markCheckedOnError
+          updatedTrackedKeyword:
+            options.keepPendingOnInitialError === true &&
+            trackedKeyword.lastCheckStatus === "pending"
+              ? trackedKeyword
+              : options.markCheckedOnError
             ? {
                 ...trackedKeyword,
                 lastChecked: new Date().toISOString(),
@@ -6727,6 +6763,7 @@ function AuthenticatedApp({
       options: {
         notifyOnSignificantChange: boolean;
         markCheckedOnError?: boolean;
+        keepPendingOnInitialError?: boolean;
         errorContext: string;
       },
     ) =>
@@ -7188,6 +7225,25 @@ function AuthenticatedApp({
           countryCode === trackCountryPickerState.currentCountry;
         const hasKnownRank =
           isCurrentCountry && trackCountryPickerState.currentRankKnown;
+        const latestHistoryEntry = latestTrackedHistoryEntryByIdentity.get(
+          getPlanTrackedKeywordIdentityKey({
+            appId: targetAppId,
+            keyword: trackCountryPickerState.keyword,
+            store: trackCountryPickerState.store,
+            country: countryCode,
+          }),
+        );
+        const seededState = hasKnownRank
+          ? {
+              lastRank: trackCountryPickerState.currentRank,
+              lastChecked: nowIso,
+              lastCheckStatus:
+                trackCountryPickerState.currentRank === -1
+                  ? ("not_ranked" as const)
+                  : ("ok" as const),
+              lastError: undefined,
+            }
+          : getTrackedKeywordStateFromHistoryEntry(latestHistoryEntry);
         return {
           groupId,
           keyword: trackCountryPickerState.keyword,
@@ -7196,14 +7252,10 @@ function AuthenticatedApp({
           store: trackCountryPickerState.store,
           country: countryCode,
           createdAt: nowIso,
-          lastRank: hasKnownRank ? trackCountryPickerState.currentRank : -1,
-          lastChecked: hasKnownRank ? nowIso : new Date(0).toISOString(),
-          lastCheckStatus: hasKnownRank
-            ? trackCountryPickerState.currentRank === -1
-              ? "not_ranked"
-              : "ok"
-            : "pending",
-          lastError: undefined,
+          lastRank: seededState?.lastRank ?? -1,
+          lastChecked: seededState?.lastChecked ?? new Date(0).toISOString(),
+          lastCheckStatus: seededState?.lastCheckStatus ?? "pending",
+          lastError: seededState?.lastError,
         };
       },
     );
@@ -7344,15 +7396,23 @@ function AuthenticatedApp({
         ? `Updated "${trackCountryPickerState.keyword}" to ${normalizedCountries.length} ${normalizedCountries.length === 1 ? "country" : "countries"}.`
         : `Tracking updated for "${trackCountryPickerState.keyword}" in ${newCountries.length} ${newCountries.length === 1 ? "country" : "countries"}`,
     );
+    const bootstrapEntries = trackedEntries.filter(
+      (trackedKeyword) => trackedKeyword.lastCheckStatus === "pending",
+    );
     try {
-      const refreshResults = await refreshTrackedKeywordBatch(trackedEntries, {
-        notifyOnSignificantChange: false,
-        markCheckedOnError: true,
-        errorContext: "submitTrackCountrySelection_batch",
-      });
-      mergeTrackedKeywordUpdates(
-        refreshResults.map((result) => result.updatedTrackedKeyword),
-      );
+      if (bootstrapEntries.length > 0) {
+        const refreshResults = await refreshTrackedKeywordBatch(
+          bootstrapEntries,
+          {
+            notifyOnSignificantChange: false,
+            keepPendingOnInitialError: true,
+            errorContext: "submitTrackCountrySelection_batch",
+          },
+        );
+        mergeTrackedKeywordUpdates(
+          refreshResults.map((result) => result.updatedTrackedKeyword),
+        );
+      }
       setTrackCountryPickerState(null);
     } catch (err) {
       logError(err, {
@@ -7372,6 +7432,7 @@ function AuthenticatedApp({
     currentTrackedKeywordLimitKeys,
     getAppStoreId,
     guardGovernedAddition,
+    latestTrackedHistoryEntryByIdentity,
     trackedApps,
     trackedKeywords,
     mergeTrackedKeywordUpdates,
@@ -9694,8 +9755,7 @@ function AuthenticatedApp({
   };
   const exportDataAsJson = React.useCallback(() => {
     if (!planEntitlementsForUi.dataExport) {
-      toast.error("Upgrade to export PDF, CSV, and JSON data.");
-      setViewMode("upgrade");
+      openLockedDataExport();
       return;
     }
     setIsExporting(true);
@@ -9720,14 +9780,14 @@ function AuthenticatedApp({
   }, [
     buildExportPayload,
     getExportFilenameBase,
+    openLockedDataExport,
     planEntitlementsForUi.dataExport,
     selectedApp?.appId,
     viewMode,
   ]);
   const exportDataAsCsv = React.useCallback(() => {
     if (!planEntitlementsForUi.dataExport) {
-      toast.error("Upgrade to export PDF, CSV, and JSON data.");
-      setViewMode("upgrade");
+      openLockedDataExport();
       return;
     }
     setIsExporting(true);
@@ -9752,6 +9812,7 @@ function AuthenticatedApp({
   }, [
     buildExportRows,
     getExportFilenameBase,
+    openLockedDataExport,
     planEntitlementsForUi.dataExport,
     selectedApp?.appId,
     viewMode,
@@ -19229,6 +19290,14 @@ function AuthenticatedApp({
           notificationPermission={notificationPermission}
           alertEmailsEnabled={alertEmailsEnabled}
           onRequestPushPermission={requestNotificationPermission}
+        />
+        <LockedFeatureModal
+          feature={lockedFeature}
+          onClose={() => setLockedFeature(null)}
+          onViewPlans={() => {
+            setLockedFeature(null);
+            setViewMode("upgrade");
+          }}
         />
         {isPhoneViewport && isPhoneMoreMenuOpen ? (
           <div

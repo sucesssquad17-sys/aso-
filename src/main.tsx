@@ -12,16 +12,6 @@ import {
 import { initErrorTracking } from "./lib/errorHandler";
 import { applyTheme, getInitialTheme } from "./lib/theme";
 
-if (
-  import.meta.env.DEV &&
-  typeof window !== "undefined" &&
-  window.location.hostname === "127.0.0.1"
-) {
-  const redirectUrl = new URL(window.location.href);
-  redirectUrl.hostname = "localhost";
-  window.location.replace(redirectUrl.toString());
-}
-
 applyTheme(getInitialTheme());
 initErrorTracking();
 
@@ -53,37 +43,48 @@ function MissingFirebaseConfigScreen({
   loadError: string | null;
   missingKeys: string[];
 }) {
+  const isDevelopment = import.meta.env.DEV;
+
   return (
     <div className="min-h-screen bg-app-surface text-app-text flex items-center justify-center p-6">
-      <div className="w-full max-w-2xl rounded-3xl border border-amber-400/30 bg-app-surface-muted/90 p-8 shadow-2xl">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">
-          Local setup required
+      <div className="w-full max-w-2xl rounded-3xl border border-app-border bg-app-surface-muted/90 p-8 shadow-2xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
+          Connection unavailable
         </p>
         <h1 className="mt-3 text-3xl font-semibold text-app-text">
-          Firebase client config is unavailable
+          We could not load your workspace right now
         </h1>
         <p className="mt-3 text-sm leading-6 text-app-text-muted">
-          The frontend now loads Firebase config from the running service at{" "}
-          <code>/api/public-config</code>. Set the Firebase client env vars on the
-          server runtime and reload.
+          Rank Analyzer Pro needs a network connection to start your secure session. Check your connection, then retry.
         </p>
-        <div className="mt-6 rounded-2xl border border-app-border bg-app-surface/70 p-4">
-          <p className="text-sm text-amber-200">
-            {loadError ||
-              `Missing required Firebase client config: ${missingKeys.join(", ")}.`}
-          </p>
-          <ul className="mt-3 space-y-2 text-sm text-app-text-muted">
-            {(missingKeys.length > 0 ? missingKeys : RUNTIME_FIREBASE_ENV_KEYS).map((key) => (
-              <li key={key}>
-                <code>{key}</code>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="mt-6 text-xs text-app-text-muted">
-          Reference: <code>.env.example</code> lists the required runtime variables
-          for local, Docker, and Cloud Run service builds.
-        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-6 inline-flex rounded-full bg-cyan-400 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition hover:bg-cyan-300"
+        >
+          Retry
+        </button>
+        {isDevelopment ? (
+          <>
+            <div className="mt-6 rounded-2xl border border-amber-400/30 bg-app-surface/70 p-4">
+              <p className="text-sm text-amber-200">
+                {loadError ||
+                  `Missing required Firebase client config: ${missingKeys.join(", ")}.`}
+              </p>
+              <ul className="mt-3 space-y-2 text-sm text-app-text-muted">
+                {(missingKeys.length > 0 ? missingKeys : RUNTIME_FIREBASE_ENV_KEYS).map((key) => (
+                  <li key={key}>
+                    <code>{key}</code>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p className="mt-6 text-xs text-app-text-muted">
+              Development reference: <code>.env.example</code> lists the required runtime variables
+              for local, Docker, and Cloud Run service builds.
+            </p>
+          </>
+        ) : null}
       </div>
     </div>
   );

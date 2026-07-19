@@ -4,7 +4,10 @@ import {
   DISCOVERY_CACHE_TTL,
   DISCOVERY_CACHE_VERSION,
 } from "../../lib/discoveryCache";
-import { TRACKED_KEYWORD_LEGACY_CREATED_AT } from "../../lib/planLimits";
+import {
+  TRACKED_KEYWORD_LEGACY_CREATED_AT,
+  getTrackedKeywordIdentityKey,
+} from "../../lib/planLimits";
 import { safeStorage } from "../../lib/storage";
 import {
   DEFAULT_GLOBAL_TRACKING_TIME,
@@ -582,6 +585,46 @@ export function getTrackedKeywordKey({
   country: string;
 }) {
   return `${resolveTrackingGroupId({ groupId, appId, keyword, store })}:${store}:${country}:${String(appId)}:${keyword.toLowerCase()}`;
+}
+
+export function getLatestTrackedHistoryEntriesByIdentity(
+  entries: RankHistoryEntry[],
+) {
+  const latestByIdentity = new Map<string, RankHistoryEntry>();
+
+  entries.forEach((entry) => {
+    if (entry.isSimulated) {
+      return;
+    }
+
+    const identityKey = getTrackedKeywordIdentityKey(entry);
+    const current = latestByIdentity.get(identityKey);
+    if (
+      !current ||
+      new Date(entry.timestamp).getTime() >=
+        new Date(current.timestamp).getTime()
+    ) {
+      latestByIdentity.set(identityKey, entry);
+    }
+  });
+
+  return latestByIdentity;
+}
+
+export function getTrackedKeywordStateFromHistoryEntry(
+  entry?: Pick<RankHistoryEntry, "rank" | "timestamp">,
+) {
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    lastRank: entry.rank,
+    lastChecked: entry.timestamp,
+    lastCheckStatus:
+      entry.rank === -1 ? ("not_ranked" as const) : ("ok" as const),
+    lastError: undefined,
+  };
 }
 
 export function getBookmarkKey(

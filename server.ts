@@ -170,11 +170,15 @@ import {
 } from './src/lib/discoveryKeywordGating';
 import {
   buildDiscoveryContextCandidateKeywords,
+  buildDiscoveryGenerationPrompt as buildSharedDiscoveryGenerationPrompt,
   buildDiscoveryPromptSections as buildSharedDiscoveryPromptSections,
-  buildDiscoveryRefinementPrompt as buildSharedDiscoveryRefinementPrompt,
-  compactDiscoveryPromptCandidates as compactSharedDiscoveryPromptCandidates,
   type DiscoveryPromptLimits,
 } from './src/lib/discoveryPromptContext';
+import {
+  finalizeDiscoveryKeywordPool,
+  isUsableDiscoveryKeywordOutput,
+  type DiscoveryGenerationMode,
+} from './src/lib/discoveryGeneration';
 import {
   buildDiscoveryWarnings,
   resolveDiscoveryResponseStatus,
@@ -657,7 +661,7 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     batchSize: 2,
     searchDepth: 100,
     initialSearchDepth: 100,
-    rankingCheckLimit: 25,
+    rankingCheckLimit: 30,
     proxyVerificationLimit: 3,
     extendedDepthCandidateLimit: 0,
     competitorSeedLimit: 3,
@@ -673,7 +677,7 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
     batchSize: 3,
     searchDepth: 150,
     initialSearchDepth: 100,
-    rankingCheckLimit: 60,
+    rankingCheckLimit: 80,
     proxyVerificationLimit: 10,
     extendedDepthCandidateLimit: 4,
     competitorSeedLimit: 6,
@@ -8607,6 +8611,7 @@ type DiscoveryCandidateCacheEntry = {
   modelCount: number;
   sanitizedModelCount: number;
   candidateCount: number;
+  generationMode: DiscoveryGenerationMode;
   providerUsed?: 'groq' | 'gemini' | null;
   modelUsed?: string | null;
   promptCandidateCount?: number;
@@ -8665,7 +8670,8 @@ type DiscoveryRefinementCacheEntry = {
   rawCount: number;
   modelCount: number;
   sanitizedModelCount: number;
-  fallbackAddedCount: number;
+  localFallbackCount: number;
+  generationMode: DiscoveryGenerationMode;
   providerUsed: DiscoveryProviderName | null;
   modelUsed: string | null;
   promptCandidateCount: number;
@@ -8906,7 +8912,7 @@ async function runDiscoveryProviderAttempt(input: {
   }
 }
 
-async function refineKeywordsWithModel(
+async function generateDiscoveryKeywordsWithModel(
   context: DiscoveryRefinementContext,
   rawKeywords: string[],
   mode: DiscoveryMode,
@@ -8914,13 +8920,10 @@ async function refineKeywordsWithModel(
   excludedBrandTokens?: string[],
   options?: { force?: boolean },
 ): Promise<DiscoveryRefinementCacheEntry> {
-  const refinementPoolLimit = DISCOVERY_PROFILES[mode].keywordLimit;
+  const poolLimit = DISCOVERY_PROFILES[mode].keywordLimit;
   const normalizedExcludedBrandTokens = (excludedBrandTokens || []).slice().sort((a, b) => a.localeCompare(b));
   let activeLimits: DiscoveryPromptLimits = { ...DISCOVERY_REFINEMENT_LIMITS[mode] };
-  let promptKeywords = compactSharedDiscoveryPromptCandidates(
-    rawKeywords,
-    activeLimits.promptCandidateLimit,
-  );
+  let promptKeywords: string[] = [];
   let { sections, counts } = buildSharedDiscoveryPromptSections({
     context,
     limits: activeLimits,
@@ -8928,7 +8931,7 @@ async function refineKeywordsWithModel(
     competitorRepeatedTerms,
     excludedBrandTokens: normalizedExcludedBrandTokens,
   });
-  let prompt = buildSharedDiscoveryRefinementPrompt({
+  let prompt = buildSharedDiscoveryGenerationPrompt({
     context,
     mode,
     limits: activeLimits,
@@ -8943,10 +8946,6 @@ async function refineKeywordsWithModel(
       ...activeLimits,
       ...DISCOVERY_PROMPT_FLOOR_LIMITS[mode],
     };
-    promptKeywords = compactSharedDiscoveryPromptCandidates(
-      rawKeywords,
-      activeLimits.promptCandidateLimit,
-    );
     ({ sections, counts } = buildSharedDiscoveryPromptSections({
       context,
       limits: activeLimits,
@@ -8954,7 +8953,7 @@ async function refineKeywordsWithModel(
       competitorRepeatedTerms,
       excludedBrandTokens: normalizedExcludedBrandTokens,
     }));
-    prompt = buildSharedDiscoveryRefinementPrompt({
+    prompt = buildSharedDiscoveryGenerationPrompt({
       context,
       mode,
       limits: activeLimits,
@@ -8975,25 +8974,26 @@ async function refineKeywordsWithModel(
   };
   const cacheKey = JSON.stringify({
     cacheVersion: DISCOVERY_CACHE_VERSION,
-    type: 'keyword-refinement-v2',
+    type: 'keyword-generation-v3',
     ...normalizedContext,
   });
   const cached = keywordRefinementCache.get<DiscoveryRefinementCacheEntry>(cacheKey);
   if (!options?.force && cached) {
     console.log(
-      `[keyword-refine] cache=hit mode=${mode} provider=${cached.providerUsed || 'local'} model=${cached.modelUsed || 'none'} raw=${cached.rawCount} prompt=${cached.promptCandidateCount} sections=${cached.promptSectionCount} purpose=${cached.appPurposeCount} users=${cached.targetUsersCount} features=${cached.featureLineCount} core=${cached.coreFeatureCount} useCases=${cached.useCaseCount} pain=${cached.painPointCount} competitorTerms=${cached.competitorRepeatedTermCount} rawExcerpt=${cached.rawDescriptionExcerptLength} promptChars=${cached.promptCharCount} promptTokens=${cached.promptApproxTokenCount} modelOut=${cached.modelCount} sanitized=${cached.sanitizedModelCount} fallbackReason=${cached.fallbackReason || 'none'} fallbackAdded=${cached.fallbackAddedCount}`,
+      `[keyword-generate] cache=hit mode=${mode} generation=${cached.generationMode} provider=${cached.providerUsed || 'local'} model=${cached.modelUsed || 'none'} raw=${cached.rawCount} prompt=${cached.promptCandidateCount} sections=${cached.promptSectionCount} purpose=${cached.appPurposeCount} users=${cached.targetUsersCount} features=${cached.featureLineCount} core=${cached.coreFeatureCount} useCases=${cached.useCaseCount} pain=${cached.painPointCount} competitorTerms=${cached.competitorRepeatedTermCount} rawExcerpt=${cached.rawDescriptionExcerptLength} promptChars=${cached.promptCharCount} promptTokens=${cached.promptApproxTokenCount} modelOut=${cached.modelCount} sanitized=${cached.sanitizedModelCount} fallbackReason=${cached.fallbackReason || 'none'} localFallback=${cached.localFallbackCount}`,
     );
     return cached;
   }
 
   const excludedBrandTokenSet = new Set(sections.excludedBrandTokens);
+  const minimumUsableCount = DISCOVERY_REFINEMENT_LIMITS[mode].minimumUsableCount;
 
   let providerUsed: DiscoveryProviderName | null = null;
   let modelUsed: string | null = null;
   let fallbackReason: DiscoveryProviderAttemptFailureReason | null = null;
   let modelKeywords: string[] = [];
 
-  if (promptKeywords.length > 0) {
+  if (counts.promptSectionCount > 0 || context.title.trim()) {
     const primaryAttempt = await runDiscoveryProviderAttempt({
       prompt,
       mode,
@@ -9006,9 +9006,7 @@ async function refineKeywordsWithModel(
         excludedBrandTokenSet,
         mode,
       );
-      // A valid 120B response is authoritative even when it is shorter than
-      // the preferred pool size. Use 20B only when the primary truly fails.
-      if (sanitizedPrimary.length > 0) {
+      if (isUsableDiscoveryKeywordOutput(sanitizedPrimary.length, minimumUsableCount)) {
         providerUsed = primaryAttempt.result.provider;
         modelUsed = primaryAttempt.result.model;
         modelKeywords = sanitizedPrimary;
@@ -9033,7 +9031,7 @@ async function refineKeywordsWithModel(
           excludedBrandTokenSet,
           mode,
         );
-        if (sanitizedFallback.length >= DISCOVERY_REFINEMENT_LIMITS[mode].minimumUsableCount) {
+        if (isUsableDiscoveryKeywordOutput(sanitizedFallback.length, minimumUsableCount)) {
           providerUsed = fallbackAttempt.result.provider;
           modelUsed = fallbackAttempt.result.model;
           modelKeywords = sanitizedFallback;
@@ -9057,7 +9055,7 @@ async function refineKeywordsWithModel(
             excludedBrandTokenSet,
             mode,
           );
-          if (sanitizedRepair.length >= DISCOVERY_REFINEMENT_LIMITS[mode].minimumUsableCount) {
+          if (isUsableDiscoveryKeywordOutput(sanitizedRepair.length, minimumUsableCount)) {
             providerUsed = repairAttempt.result.provider;
             modelUsed = repairAttempt.result.model;
             modelKeywords = sanitizedRepair;
@@ -9072,29 +9070,24 @@ async function refineKeywordsWithModel(
     }
   }
 
-  const primaryKeywords = modelKeywords.slice(0, refinementPoolLimit);
-  const seen = new Set(primaryKeywords.map((keyword) => normalizeKeyword(keyword)));
-  const fallbackKeywords: string[] = [];
-
-  for (const keyword of dedupeKeywords(rawKeywords.filter(isDiscoveryKeywordCandidate))) {
-    if (keywordContainsExcludedBrandToken(keyword, excludedBrandTokenSet)) {
-      continue;
-    }
-    const normalized = normalizeKeyword(keyword);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
-    fallbackKeywords.push(keyword);
-    if (primaryKeywords.length + fallbackKeywords.length >= refinementPoolLimit) {
-      break;
-    }
-  }
+  const fallbackKeywords = dedupeKeywords(
+    rawKeywords
+      .filter(isDiscoveryKeywordCandidate)
+      .filter((keyword) => !keywordContainsExcludedBrandToken(keyword, excludedBrandTokenSet)),
+  );
+  const finalized = finalizeDiscoveryKeywordPool({
+    modelKeywords,
+    fallbackKeywords,
+    poolLimit,
+  });
 
   const payload: DiscoveryRefinementCacheEntry = {
-    keywords: [...primaryKeywords, ...fallbackKeywords],
+    keywords: finalized.keywords,
     rawCount: rawKeywords.length,
     modelCount: modelKeywords.length,
     sanitizedModelCount: modelKeywords.length,
-    fallbackAddedCount: fallbackKeywords.length,
+    localFallbackCount: finalized.localFallbackCount,
+    generationMode: finalized.generationMode,
     providerUsed,
     modelUsed,
     promptCandidateCount: promptKeywords.length,
@@ -9113,7 +9106,7 @@ async function refineKeywordsWithModel(
   };
 
   console.log(
-    `[keyword-refine] cache=miss mode=${mode} provider=${providerUsed || 'local'} model=${modelUsed || 'none'} raw=${rawKeywords.length} prompt=${promptKeywords.length} sections=${counts.promptSectionCount} purpose=${counts.appPurposeCount} users=${counts.targetUsersCount} features=${counts.featureLineCount} core=${counts.coreFeatureCount} useCases=${counts.useCaseCount} pain=${counts.painPointCount} competitorTerms=${counts.competitorRepeatedTermCount} rawExcerpt=${counts.rawDescriptionExcerptLength} promptChars=${promptCharCount} promptTokens=${promptApproxTokenCount} modelOut=${modelKeywords.length} sanitized=${modelKeywords.length} fallbackReason=${fallbackReason || 'none'} fallbackAdded=${fallbackKeywords.length}`,
+    `[keyword-generate] cache=miss mode=${mode} generation=${finalized.generationMode} provider=${providerUsed || 'local'} model=${modelUsed || 'none'} raw=${rawKeywords.length} prompt=${promptKeywords.length} sections=${counts.promptSectionCount} purpose=${counts.appPurposeCount} users=${counts.targetUsersCount} features=${counts.featureLineCount} core=${counts.coreFeatureCount} useCases=${counts.useCaseCount} pain=${counts.painPointCount} competitorTerms=${counts.competitorRepeatedTermCount} rawExcerpt=${counts.rawDescriptionExcerptLength} promptChars=${promptCharCount} promptTokens=${promptApproxTokenCount} modelOut=${modelKeywords.length} sanitized=${modelKeywords.length} fallbackReason=${fallbackReason || 'none'} localFallback=${finalized.localFallbackCount}`,
   );
 
   keywordRefinementCache.set(cacheKey, payload);
@@ -9383,7 +9376,7 @@ async function buildRankedDiscoveryCandidates(
     signalContext.ownTitleTokens,
   ).map(([term]) => term);
 
-  const refined = await refineKeywordsWithModel(
+  const generated = await generateDiscoveryKeywordsWithModel(
     {
       title: input.title,
       description: input.description,
@@ -9402,27 +9395,28 @@ async function buildRankedDiscoveryCandidates(
     input,
     profile,
     signalContext,
-    refined.keywords,
+    generated.keywords,
   );
 
   const payload: DiscoveryCandidateCacheEntry = {
     completeness: input.mode,
     rankedCandidates,
-    rawCount: refined.rawCount,
-    modelCount: refined.modelCount,
-    sanitizedModelCount: refined.sanitizedModelCount,
+    rawCount: generated.rawCount,
+    modelCount: generated.modelCount,
+    sanitizedModelCount: generated.sanitizedModelCount,
     candidateCount: rankedCandidates.length,
-    providerUsed: refined.providerUsed,
-    modelUsed: refined.modelUsed,
-    promptCandidateCount: refined.promptCandidateCount,
-    featureLineCount: refined.featureLineCount,
-    fallbackReason: refined.fallbackReason,
+    generationMode: generated.generationMode,
+    providerUsed: generated.providerUsed,
+    modelUsed: generated.modelUsed,
+    promptCandidateCount: generated.promptCandidateCount,
+    featureLineCount: generated.featureLineCount,
+    fallbackReason: generated.fallbackReason,
     competitorMiningStatus: signalContext.competitorMiningStatus,
     candidateBuildMs: Date.now() - candidateBuildStartedAt,
   };
 
   console.log(
-    `[discovery-candidates] mode=${input.mode} provider=${refined.providerUsed || 'local'} model=${refined.modelUsed || 'none'} raw=${refined.rawCount} prompt=${refined.promptCandidateCount} features=${refined.featureLineCount} modelOut=${refined.modelCount} sanitized=${refined.sanitizedModelCount} admitted=${rankedCandidates.length} competitorMining=${signalContext.competitorMiningStatus} buildMs=${payload.candidateBuildMs} fallbackReason=${refined.fallbackReason || 'none'}`,
+    `[discovery-candidates] mode=${input.mode} generation=${generated.generationMode} provider=${generated.providerUsed || 'local'} model=${generated.modelUsed || 'none'} raw=${generated.rawCount} prompt=${generated.promptCandidateCount} features=${generated.featureLineCount} modelOut=${generated.modelCount} sanitized=${generated.sanitizedModelCount} admitted=${rankedCandidates.length} competitorMining=${signalContext.competitorMiningStatus} buildMs=${payload.candidateBuildMs} fallbackReason=${generated.fallbackReason || 'none'}`,
   );
 
   discoveryCandidateCache.set(cacheKey, payload);
@@ -11167,6 +11161,9 @@ async function startServer() {
       const userData = userSnapshot.data() as UserTrackingDocument | undefined;
       const state = normalizeUserTrackingDocument(userData);
       const planEntitlements = getResolvedPlanEntitlements(userData);
+      const keepPendingOnInitialError = readOptionalBoolean(
+        req.body?.keepPendingOnInitialError,
+      );
       const requestedTrackedKeywordIdentityKey = getTrackedKeywordIdentityKey({
         appId,
         keyword,
@@ -11195,6 +11192,10 @@ async function startServer() {
         store,
         country,
       });
+      const hasTrackedKeywordHistory = state.rankHistory.some(
+        (entry) =>
+          getTrackedKeywordIdentityKey(entry) === requestedTrackedKeywordIdentityKey,
+      );
       const refreshTrackedKeywordRecordInput =
         existingTrackedKeyword ||
         ({
@@ -11232,12 +11233,24 @@ async function startServer() {
         refreshTrackedKeywordRecordInput,
         rankingDepth,
       );
+      const persistedTrackedKeyword =
+        keepPendingOnInitialError &&
+        refreshResult.hadError &&
+        !hasTrackedKeywordHistory
+          ? {
+              ...refreshTrackedKeywordRecordInput,
+              lastRank: -1,
+              lastCheckStatus: 'pending' as const,
+              lastError: undefined,
+            }
+          : refreshResult.trackedKeyword;
       const nextTrackedKeywords = refreshableTrackedKeywords.map((entry) =>
         getTrackedKeywordKey(entry) === trackedKeywordKey
-          ? refreshResult.trackedKeyword
+          ? persistedTrackedKeyword
           : entry,
       );
-      const nextRankHistory = refreshResult.historyEntry
+      const nextRankHistory =
+        refreshResult.historyEntry && persistedTrackedKeyword.lastCheckStatus !== 'pending'
         ? mergeRankHistory(state.rankHistory, [refreshResult.historyEntry])
         : state.rankHistory;
       const retainedRankHistory = await archiveAndTrimTrackedRankHistory(
@@ -11267,7 +11280,7 @@ async function startServer() {
       } satisfies UserTrackingDocument, { merge: true });
 
       res.json({
-        trackedKeyword: refreshResult.trackedKeyword,
+        trackedKeyword: persistedTrackedKeyword,
         alertEvents: createdEvents,
       });
     } catch (error) {
@@ -11965,7 +11978,7 @@ async function startServer() {
     }
   });
 
-  // Deterministic keyword generation
+  // AI-first keyword generation with local fallback
   app.post('/api/keywords', strictRateLimit, async (req, res) => {
     try {
       await requireAuthenticatedBillingAccess(req);
@@ -11984,7 +11997,7 @@ async function startServer() {
         country: normalizeCountryCode(country, 'us'),
       }, 'deep', DISCOVERY_PROFILES.deep);
       const rawKeywords = candidateSource.keywords;
-      const refined = await refineKeywordsWithModel(
+      const generated = await generateDiscoveryKeywordsWithModel(
         {
           title,
           description,
@@ -11999,7 +12012,7 @@ async function startServer() {
         candidateSource.competitorBrandTokens,
       );
 
-      res.json({ keywords: refined.keywords });
+      res.json({ keywords: generated.keywords });
       
     } catch (error) {
       console.error(`Keyword generation error:`, error);
@@ -12071,8 +12084,8 @@ async function startServer() {
 
   // Vite middleware for development
   if (isDevelopment) {
-    // Blog pages are static HTML and must be served before the custom Vite app fallback.
-    app.use('/blog', express.static(path.join(process.cwd(), 'public', 'blog')));
+    // SEO pages are static HTML and must be served before the custom Vite app fallback.
+    app.use(express.static(path.join(process.cwd(), 'public'), { extensions: ['html'] }));
     const vite = await createViteServer({
       server: {
         middlewareMode: true,

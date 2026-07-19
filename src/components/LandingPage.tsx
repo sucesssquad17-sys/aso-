@@ -313,11 +313,11 @@ export default function LandingPage({
               </div>
               
               <h1 className="mt-6 text-4xl font-black leading-[1.08] tracking-tight text-app-text sm:text-5xl md:text-6xl lg:text-[4rem]">
-                Track rankings, compare competitors, and see movement without <span className="text-cyan-400">the clutter.</span>
+                App keyword rank tracking without <span className="text-cyan-400">the clutter.</span>
               </h1>
               
               <p className="mt-6 max-w-xl text-[16px] leading-7 text-app-text-muted md:text-lg md:leading-8">
-                Rank Analyzer Pro helps app teams track the right keywords by country, compare competitors, and review what changed from one workspace.
+                Rank Analyzer Pro helps app teams discover keywords, check App Store and Google Play ranks by country, compare competitors, and review what changed from one workspace.
               </p>
               
               <div className="mt-8 flex flex-col gap-5 sm:flex-row sm:items-center md:mt-10">
@@ -720,6 +720,11 @@ export default function LandingPage({
                   <li>
                     <a href="/aso-rank-tracker/" className="transition-colors hover:text-app-text">
                       ASO Rank Tracker
+                    </a>
+                  </li>
+                  <li>
+                    <a href="/app-keyword-tracking-tool/" className="transition-colors hover:text-app-text">
+                      App Keyword Tracker
                     </a>
                   </li>
                   <li>

@@ -783,3 +783,46 @@ export function buildDiscoveryRefinementPrompt(input: {
 
   return blocks.filter(Boolean).join("\n");
 }
+
+export function buildDiscoveryGenerationPrompt(input: {
+  context: DiscoveryPromptContext;
+  limits: DiscoveryPromptLimits;
+  mode: DiscoveryMode;
+  sections: DiscoveryPromptSections;
+}) {
+  const blocks = [
+    "You are an App Store Optimization keyword strategist.",
+    "Generate real user-searchable ASO keywords for this app.",
+    "",
+    "App metadata:",
+    `- Title: ${input.context.title || "N/A"}`,
+    `- Category: ${input.context.category || "N/A"}`,
+    `- Developer: ${input.context.developer || "N/A"}`,
+    `- Store: ${input.context.store}`,
+    `- Country: ${input.context.country}`,
+    "",
+    renderListSection("App purpose", input.sections.appPurpose),
+    renderListSection("Target users", input.sections.targetUsers),
+    renderListSection("Core features", input.sections.coreFeatures),
+    renderListSection("Use cases", input.sections.useCases),
+    renderListSection("Pain points solved", input.sections.painPointsSolved),
+    renderListSection(
+      "High-signal phrases from description",
+      input.sections.highSignalDescriptionPhrases,
+    ),
+    renderTextSection("Raw description excerpt", input.sections.rawDescriptionExcerpt),
+    renderListSection("Competitor repeated terms", input.sections.competitorRepeatedTerms),
+    renderListSection("Avoid competitor brands", input.sections.excludedBrandTokens),
+    "Rules:",
+    "1. Return only a JSON array of strings. No markdown. No commentary.",
+    `2. Include at most ${input.limits.outputKeywordLimit} keywords.`,
+    "3. Use the app purpose, audience, use cases, pain points, description phrases, and competitor repetition to generate concrete ASO phrases and adjacent high-intent search variants.",
+    "4. Prefer natural, human-searchable keywords with clear user intent grounded in this app context, regardless of phrase length.",
+    "5. Exclude junk, release-note phrasing, unrelated broad terms, competitor-brand phrases, and lists made only from generic category labels or broad synonyms.",
+    "6. Allow single-word and multi-word terms when they are strongly grounded in the title, category, semantic app intent, or real user search behavior. Do not bias toward or against a keyword because of word count alone.",
+    "7. Cover a mix of primary, feature, audience, problem, and use-case phrases. Closely related variants are allowed when they reflect meaningfully different search intent.",
+    "8. Keep each keyword phrase natural and human-searchable, with a maximum of 8 words.",
+  ];
+
+  return blocks.filter(Boolean).join("\n");
+}

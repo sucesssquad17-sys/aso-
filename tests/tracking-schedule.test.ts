@@ -15,6 +15,8 @@ import {
 } from '../src/lib/backendTracking';
 import {
   getDefaultTrackingSchedule,
+  getLatestTrackedHistoryEntriesByIdentity,
+  getTrackedKeywordStateFromHistoryEntry,
   normalizeWeeklyReportSettingsState,
   normalizeTrackingScheduleState,
   reconcileCompetitorTrackedKeywordCountryEdit,
@@ -45,7 +47,12 @@ import {
   trimDiscoveryPayloadForMode,
 } from '../src/lib/discoveryCache';
 import {
+  finalizeDiscoveryKeywordPool,
+  isUsableDiscoveryKeywordOutput,
+} from '../src/lib/discoveryGeneration';
+import {
   buildDiscoveryContextCandidateKeywords,
+  buildDiscoveryGenerationPrompt,
   buildDiscoveryPromptSections,
   buildDiscoveryRefinementPrompt,
   extractDiscoveryFeatureSummary,
@@ -198,6 +205,73 @@ test('frontend weekly report settings reject invalid timezone values', () => {
   );
 
   assert.equal(normalized.timezone, 'America/New_York');
+});
+
+test('latest tracked history lookup keeps the newest non-simulated entry per keyword identity', () => {
+  const latestByIdentity = getLatestTrackedHistoryEntriesByIdentity([
+    {
+      groupId: 'group-old',
+      appId: 'app.demo',
+      keyword: 'habit tracker',
+      store: 'android',
+      country: 'US',
+      rank: 12,
+      timestamp: '2026-07-01T09:00:00.000Z',
+    },
+    {
+      groupId: 'group-simulated',
+      appId: 'app.demo',
+      keyword: 'habit tracker',
+      store: 'android',
+      country: 'US',
+      rank: 4,
+      timestamp: '2026-07-03T09:00:00.000Z',
+      isSimulated: true,
+    },
+    {
+      groupId: 'group-new',
+      appId: 'app.demo',
+      keyword: 'habit tracker',
+      store: 'android',
+      country: 'US',
+      rank: 7,
+      timestamp: '2026-07-02T09:00:00.000Z',
+    },
+  ]);
+
+  const latest = latestByIdentity.get('android:app.demo:habit tracker:us');
+
+  assert.ok(latest);
+  assert.equal(latest?.groupId, 'group-new');
+  assert.equal(latest?.rank, 7);
+});
+
+test('tracked keyword state hydration restores ok and not-ranked states from history', () => {
+  assert.deepEqual(
+    getTrackedKeywordStateFromHistoryEntry({
+      rank: 5,
+      timestamp: '2026-07-02T09:00:00.000Z',
+    }),
+    {
+      lastRank: 5,
+      lastChecked: '2026-07-02T09:00:00.000Z',
+      lastCheckStatus: 'ok',
+      lastError: undefined,
+    },
+  );
+
+  assert.deepEqual(
+    getTrackedKeywordStateFromHistoryEntry({
+      rank: -1,
+      timestamp: '2026-07-03T09:00:00.000Z',
+    }),
+    {
+      lastRank: -1,
+      lastChecked: '2026-07-03T09:00:00.000Z',
+      lastCheckStatus: 'not_ranked',
+      lastError: undefined,
+    },
+  );
 });
 
 test('weekly report delivery eligibility matches local weekday and suppresses same-week duplicates', () => {
@@ -1255,6 +1329,79 @@ test('discovery refinement prompt uses structured sections in order and omits em
   assert.ok(prompt.includes('Closely related variants are allowed when they reflect meaningfully different search intent.'));
   assert.ok(prompt.includes('Do not stay too literal to title words if the broader app purpose supports better search phrasing.'));
   assert.ok(prompt.includes('Prefer natural, human-searchable keywords with clear user intent grounded in this app context, regardless of phrase length.'));
+});
+
+test('discovery generation prompt uses structured context without requiring a candidate shortlist', () => {
+  const { sections } = buildDiscoveryPromptSections({
+    context: {
+      title: 'Habit Flow',
+      description: 'Build routines with reminders and a morning checklist for busy adults who want consistent streaks without overwhelm.',
+      category: 'productivity',
+      developer: 'Flow Labs',
+      store: 'android',
+      country: 'us',
+    },
+    limits: discoveryPromptLimits,
+    candidateKeywords: [],
+    competitorRepeatedTerms: ['habit streak', 'routine planner'],
+    excludedBrandTokens: ['fabulous'],
+  });
+  const prompt = buildDiscoveryGenerationPrompt({
+    context: {
+      title: 'Habit Flow',
+      description: 'Build routines with reminders and a morning checklist for busy adults who want consistent streaks without overwhelm.',
+      category: 'productivity',
+      developer: 'Flow Labs',
+      store: 'android',
+      country: 'us',
+    },
+    limits: discoveryPromptLimits,
+    mode: 'fast',
+    sections,
+  });
+
+  assert.ok(prompt.includes('App purpose:'));
+  assert.ok(prompt.includes('Target users:'));
+  assert.ok(prompt.includes('Core features:'));
+  assert.ok(prompt.includes('Use cases:'));
+  assert.ok(prompt.includes('Pain points solved:'));
+  assert.ok(prompt.includes('High-signal phrases from description:'));
+  assert.ok(prompt.includes('Raw description excerpt:'));
+  assert.ok(prompt.includes('Competitor repeated terms:'));
+  assert.equal(prompt.includes('Candidate keywords:'), false);
+  assert.ok(prompt.includes('Generate real user-searchable ASO keywords for this app.'));
+  assert.ok(prompt.includes('Return only a JSON array of strings. No markdown. No commentary.'));
+});
+
+test('discovery generation fallback helper uses ai output when it is usable and does not merge local fallback keywords', () => {
+  assert.equal(isUsableDiscoveryKeywordOutput(10, 10), true);
+  assert.equal(isUsableDiscoveryKeywordOutput(9, 10), false);
+
+  assert.deepEqual(
+    finalizeDiscoveryKeywordPool({
+      modelKeywords: ['habit tracker', 'routine planner'],
+      fallbackKeywords: ['fallback one', 'fallback two'],
+      poolLimit: 10,
+    }),
+    {
+      keywords: ['habit tracker', 'routine planner'],
+      generationMode: 'ai-first',
+      localFallbackCount: 0,
+    },
+  );
+
+  assert.deepEqual(
+    finalizeDiscoveryKeywordPool({
+      modelKeywords: [],
+      fallbackKeywords: ['fallback one', 'fallback two'],
+      poolLimit: 10,
+    }),
+    {
+      keywords: ['fallback one', 'fallback two'],
+      generationMode: 'local-fallback',
+      localFallbackCount: 2,
+    },
+  );
 });
 
 test('discovery prompt limits keep output caps unchanged while expanding input context', () => {
