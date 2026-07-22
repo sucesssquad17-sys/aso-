@@ -208,7 +208,11 @@ export function UpgradePage({
     availableIntervals[0] || "monthly",
   );
 
-  // No longer needed — we always show both intervals regardless of what's configured
+  React.useEffect(() => {
+    if (!availableIntervals.includes(selectedInterval)) {
+      setSelectedInterval(availableIntervals[0] || "monthly");
+    }
+  }, [availableIntervals, selectedInterval]);
 
   const currentPeriodEnd = formatDate(billingStatus?.currentPeriodEnd);
   const availablePlans = new Set(

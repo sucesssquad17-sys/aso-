@@ -99,12 +99,12 @@ const faqItems = [
   {
     question: "Can I monitor my competitors' keyword strategies?",
     answer:
-      "Yes. You can build dedicated competitor battle groups around your app and direct rivals. Rank Analyzer Pro allows you to review overlapping search terms, see exactly where competitors are outranking you, and track their daily movement. This helps you identify high-pressure keywords where you are losing ground and discover new terms driving traffic to competitors.",
+      "Yes, on paid plans. You can build dedicated competitor battle groups around your app and direct rivals. Rank Analyzer Pro allows you to review overlapping search terms, see exactly where competitors are outranking you, and track their daily movement. This helps you identify high-pressure keywords where you are losing ground and discover new terms driving traffic to competitors.",
   },
   {
     question: "Do I have to manually build reports from my tracking data?",
     answer:
-      "No. All movement reporting is fed directly and automatically from your daily tracked history. The platform surfaces top winners, sudden ranking drops, and high-pressure terms immediately. You can review your app's movement and competitor shifts directly in the workspace without ever needing to export CSVs, deal with spreadsheets, or rebuild the same analysis each week.",
+      "On paid plans, movement reporting is automatically built from your daily tracked history. The platform surfaces top winners, sudden ranking drops, and high-pressure terms immediately. You can review your app's movement and competitor shifts directly in the workspace without needing to rebuild the same analysis each week.",
   },
 ];
 

@@ -69,6 +69,7 @@ import {
 import {
   getSortedCandidateTerms,
 } from '../src/lib/keywordMetrics';
+import { getTrackingScheduleBackfillReason } from '../src/lib/trackingScheduleMigration';
 
 const discoveryPromptLimits: DiscoveryPromptLimits = {
   promptCandidateLimit: 80,
@@ -197,6 +198,34 @@ test('frontend tracking schedule helpers preserve explicit disabled state', () =
   assert.equal(normalized.timezone, 'UTC');
   assert.equal(normalized.lastRunAt, '2026-06-21T03:30:00.000Z');
   assert.equal(normalized.lastRunKey, '2026-06-21T09:00');
+});
+
+test('tracking schedule backfill only enables missing schedules for eligible paid accounts with tracked data', () => {
+  assert.equal(getTrackingScheduleBackfillReason({
+    isPremium: true,
+    subscriptionTier: 'indie',
+    subscriptionStatus: 'active',
+    trackedKeywords: [{ keyword: 'habit tracker' }],
+  }), 'eligible');
+  assert.equal(getTrackingScheduleBackfillReason({
+    isPremium: true,
+    subscriptionTier: 'indie',
+    subscriptionStatus: 'active',
+    trackedKeywords: [{ keyword: 'habit tracker' }],
+    trackingSchedule: { enabled: false },
+  }), 'explicit_preference');
+  assert.equal(getTrackingScheduleBackfillReason({
+    trackedKeywords: [{ keyword: 'habit tracker' }],
+  }), 'ineligible_plan');
+  assert.equal(getTrackingScheduleBackfillReason({
+    isPremium: true,
+    subscriptionTier: 'indie',
+    subscriptionStatus: 'active',
+  }), 'no_tracked_data');
+  assert.equal(getTrackingScheduleBackfillReason({
+    accountStatus: 'deleted',
+    trackedKeywords: [{ keyword: 'habit tracker' }],
+  }), 'deleted');
 });
 
 test('frontend weekly report settings default to disabled sunday with caller timezone', () => {

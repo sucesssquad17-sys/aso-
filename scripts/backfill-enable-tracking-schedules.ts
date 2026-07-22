@@ -5,6 +5,7 @@ import {
   normalizeTrackingSchedule,
   type TrackingSchedule,
 } from '../src/lib/backendTracking';
+import { getTrackingScheduleBackfillReason } from '../src/lib/trackingScheduleMigration';
 
 const APPLY = process.argv.includes('--apply');
 const BATCH_SIZE = 200;
@@ -35,6 +36,10 @@ async function main() {
   let scanned = 0;
   let changed = 0;
   let unchanged = 0;
+  let skippedDeleted = 0;
+  let skippedExplicitPreference = 0;
+  let skippedNoTrackedData = 0;
+  let skippedIneligiblePlan = 0;
   const sampleUids: string[] = [];
 
   let batch = db.batch();
@@ -42,7 +47,17 @@ async function main() {
 
   for (const userDoc of snapshot.docs) {
     scanned += 1;
-    const current = userDoc.data()?.trackingSchedule as Partial<TrackingSchedule> | undefined;
+    const data = userDoc.data();
+    const current = data?.trackingSchedule as Partial<TrackingSchedule> | undefined;
+    const reason = getTrackingScheduleBackfillReason(data);
+    if (reason !== 'eligible') {
+      if (reason === 'deleted') skippedDeleted += 1;
+      if (reason === 'explicit_preference') skippedExplicitPreference += 1;
+      if (reason === 'no_tracked_data') skippedNoTrackedData += 1;
+      if (reason === 'ineligible_plan') skippedIneligiblePlan += 1;
+      continue;
+    }
+
     const next = {
       ...normalizeTrackingSchedule(current, DEFAULT_TRACKING_SCHEDULE),
       enabled: true,
@@ -90,6 +105,10 @@ async function main() {
         scanned,
         changed,
         unchanged,
+        skippedDeleted,
+        skippedExplicitPreference,
+        skippedNoTrackedData,
+        skippedIneligiblePlan,
         sampleUids,
       },
       null,
