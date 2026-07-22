@@ -641,6 +641,31 @@ a {
   padding-left: 18px;
 }
 
+.product-shot {
+  margin: 0;
+  padding: 14px;
+}
+
+.product-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  border: 1px solid var(--media-border);
+  box-shadow: var(--shadow);
+}
+
+.product-shot figcaption {
+  padding: 14px 4px 2px;
+  color: var(--muted);
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.product-shot figcaption strong {
+  color: var(--text);
+}
+
 .faq-list {
   display: grid;
   gap: 14px;

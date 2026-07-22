@@ -43,26 +43,41 @@
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SoftwareApplication",
-        "name": "Rank Analyzer Pro",
-        "applicationCategory": "BusinessApplication",
-        "operatingSystem": "Web",
-        "url": "https://rankanalyzerpro.com/",
-        "image": "https://rankanalyzerpro.com/og-card.svg",
-        "description": "App keyword rank tracking software for keyword discovery, App Store and Google Play rank checks, competitor monitoring, alerts, and movement reports across stores and countries.",
-        "offers": {
-          "@type": "Offer",
-          "priceCurrency": "USD",
-          "price": "0",
-          "description": "Free tier available; paid tiers unlock higher capacity, reports, and alert automation.",
-          "availability": "https://schema.org/InStock"
-        },
-        "publisher": {
-          "@type": "Organization",
-          "name": "Vantalum Studio",
-          "email": "vantalumstudio@gmail.com",
-          "url": "https://rankanalyzerpro.com/"
-        }
+        "@graph": [
+          {
+            "@type": "Organization",
+            "@id": "https://rankanalyzerpro.com/#organization",
+            "name": "Vantalum Studio",
+            "url": "https://rankanalyzerpro.com/",
+            "email": "vantalumstudio@gmail.com",
+            "logo": "https://rankanalyzerpro.com/apple-touch-icon.svg"
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://rankanalyzerpro.com/#website",
+            "url": "https://rankanalyzerpro.com/",
+            "name": "Rank Analyzer Pro",
+            "publisher": { "@id": "https://rankanalyzerpro.com/#organization" }
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://rankanalyzerpro.com/#software",
+            "name": "Rank Analyzer Pro",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Web",
+            "url": "https://rankanalyzerpro.com/",
+            "image": "https://rankanalyzerpro.com/og-card.svg",
+            "description": "App keyword rank tracking software for keyword discovery, App Store and Google Play rank checks, competitor monitoring, alerts, and movement reports across stores and countries.",
+            "offers": {
+              "@type": "Offer",
+              "priceCurrency": "USD",
+              "price": "0",
+              "description": "Free tier available; paid tiers unlock higher capacity, reports, and alert automation.",
+              "availability": "https://schema.org/InStock"
+            },
+            "publisher": { "@id": "https://rankanalyzerpro.com/#organization" }
+          }
+        ]
       }
     </script>
   </head>
