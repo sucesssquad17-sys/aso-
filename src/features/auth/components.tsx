@@ -119,8 +119,8 @@ export function PrivacyPolicyPage({
       </p>
       <p>
         If you enable browser notifications, we also store device registration
-        tokens so notification delivery can work. If you use a paid plan or
-        trial, we also store billing status and related metadata such as plan,
+        tokens so notification delivery can work. If you use a paid plan,
+        we also store billing status and related metadata such as plan,
         interval, subscription state, Dodo customer or product identifiers, and
         transaction references required to manage access.
       </p>
@@ -220,9 +220,9 @@ export function TermsPage({
         your sign-in methods, and the accuracy of information you submit through
         the service.
       </p>
-      <h2>Subscriptions, Trials, and Billing</h2>
+      <h2>Free and Paid Plans</h2>
       <p>
-        Paid access, trials, and plan limits are governed by the pricing and
+        Paid access and plan limits are governed by the pricing and
         checkout terms shown at purchase. Subscription billing, renewals,
         cancellations, and billing portal access may be handled through Dodo
         Payments or another payment provider used by the service.
@@ -239,7 +239,7 @@ export function TermsPage({
         <SupportEmailLink>vantalumstudio@gmail.com</SupportEmailLink>. Cancellation generally stops future renewals
         but does not automatically create a refund for charges already incurred.
         Refund decisions, if offered, are handled case by case and may depend on
-        payment-provider rules, trial use, abuse review, and applicable law.
+        payment-provider rules, abuse review, and applicable law.
       </p>
       <h2>Data and Availability</h2>
       <p>

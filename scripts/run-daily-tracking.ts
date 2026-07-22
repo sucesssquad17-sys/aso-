@@ -85,6 +85,7 @@ import {
   TRACKING_HISTORY_LIMIT as SHARED_TRACKING_HISTORY_LIMIT,
   TRACKING_REFRESH_CONCURRENCY,
 } from '../src/lib/backendTracking';
+import { EMBEDDED_TRACKING_HISTORY_LIMIT } from '../src/lib/trackingConstants';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -300,7 +301,6 @@ const CRON_FAILURE_EMAIL_RECIPIENTS = (process.env.CRON_FAILURE_EMAIL || '')
   .filter(Boolean);
 const ALERT_EMAIL_APP_URL = getSafeAppUrl(process.env.APP_URL);
 const EMAIL_UNSUBSCRIBE_SECRET = process.env.EMAIL_UNSUBSCRIBE_SECRET?.trim() || '';
-const EMBEDDED_TRACKING_HISTORY_LIMIT = 1200;
 const USER_RANK_HISTORY_ARCHIVE_COLLECTION = 'rank_history';
 const USER_COMPETITOR_RANK_HISTORY_ARCHIVE_COLLECTION = 'competitor_rank_history';
 const DAILY_TRACKING_LEASE_OWNER = `job:${process.pid}:${crypto.randomUUID()}`;
@@ -2648,7 +2648,7 @@ async function main() {
       const alertRules = normalizeAlertRules(data?.alertRules);
       const notificationSettings = normalizeNotificationSettings(data?.notificationSettings);
       const schedule = normalizeSharedTrackingSchedule(data?.trackingSchedule, {
-        enabled: true,
+        enabled: false,
         time: DEFAULT_GLOBAL_TRACKING_TIME,
         timezone: GLOBAL_TRACKING_TIMEZONE,
       });
@@ -2674,6 +2674,7 @@ async function main() {
       const planEntitlements = getBillingFeatureEntitlements(
         resolvedBilling.effectivePlanId,
       );
+      const automatedTrackingEnabled = planEntitlements.automatedTracking;
       const competitorTrackingEnabled = planEntitlements.competitorTracking;
       const executionState: TrackingState = competitorTrackingEnabled
         ? state
@@ -2699,7 +2700,7 @@ async function main() {
         | 'weeklyReportSettings'
       > = state;
 
-      if (hasTrackedData) {
+      if (hasTrackedData && automatedTrackingEnabled) {
         if (!shouldRunTrackingRefresh(state.schedule, { hasTrackedData: true, runKey })) {
           log(`  â†’ User ${userDoc.id}: tracking already ran for ${runKey}, skipping refresh`);
         } else {

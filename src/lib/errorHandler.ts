@@ -11,19 +11,16 @@ export const initErrorTracking = () => {
       dsn,
       integrations: [
         Sentry.browserTracingIntegration(),
-        Sentry.replayIntegration(),
+        Sentry.replayIntegration({ maskAllText: true, blockAllMedia: true }),
       ],
       // Performance Monitoring
-      tracesSampleRate: 1.0, //  Capture 100% of the transactions
+      tracesSampleRate: import.meta.env.DEV ? 1 : 0.1,
       // Set 'tracePropagationTargets' to control for which URLs distributed tracing should be enabled
-      tracePropagationTargets: ["localhost", /^https:\/\/ais-dev-.*\.run\.app/],
+      tracePropagationTargets: ["localhost", /^https:\/\/rankanalyzerpro\.com(?:\/|$)/],
       // Session Replay
-      replaysSessionSampleRate: 0.1, // This sets the sample rate at 10%. You may want to change it to 100% while in development and then sample at a lower rate in production.
-      replaysOnErrorSampleRate: 1.0, // If you're not already sampling the entire session, change the sample rate to 100% when sampling sessions where errors occur.
+      replaysSessionSampleRate: 0,
+      replaysOnErrorSampleRate: import.meta.env.DEV ? 1 : 0.1,
     });
-    console.log("Sentry initialized");
-  } else {
-    console.warn("Sentry DSN not found. Error tracking is disabled.");
   }
 };
 
@@ -32,14 +29,14 @@ export const initErrorTracking = () => {
  * @param error The error object or message
  * @param context Additional context for the error
  */
-export const logError = (error: any, context?: Record<string, any>) => {
+export const logError = (error: unknown, context?: Record<string, unknown>) => {
   console.error("Error logged:", error, context);
   
   if (import.meta.env.VITE_SENTRY_DSN) {
     Sentry.withScope((scope) => {
-      if (context) {
-        scope.setExtras(context);
-      }
+      if (context?.operation && typeof context.operation === "string") scope.setTag("operation", context.operation.slice(0, 100));
+      if (context?.code && typeof context.code === "string") scope.setTag("error_code", context.code.slice(0, 100));
+      if (context?.view && typeof context.view === "string") scope.setTag("view", context.view.slice(0, 100));
       Sentry.captureException(error);
     });
   }
@@ -122,5 +119,5 @@ export const getFriendlyErrorMessage = (error: any): string => {
     return "The requested resource was not found.";
   }
 
-  return "Something went wrong. Our team has been notified.";
+  return "Something went wrong. Please try again.";
 };

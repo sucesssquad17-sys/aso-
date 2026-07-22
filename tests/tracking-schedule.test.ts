@@ -112,10 +112,10 @@ test('shared schedule normalization preserves explicit disabled state and timing
   });
 });
 
-test('shared schedule normalization defaults missing enabled to true', () => {
+test('shared schedule normalization keeps a missing schedule disabled', () => {
   const normalized = normalizeTrackingSchedule(undefined, fallback);
 
-  assert.equal(normalized.enabled, true);
+  assert.equal(normalized.enabled, false);
   assert.equal(normalized.time, '09:00');
   assert.equal(normalized.timezone, 'Asia/Kolkata');
 });
@@ -144,6 +144,20 @@ test('global watchdog window stays closed at midnight and opens at the due time'
   );
 });
 
+test('global watchdog uses the requested timezone including daylight saving time', () => {
+  const summerDay = new Date('2026-07-22T12:00:00.000Z');
+  const winterDay = new Date('2026-01-22T12:00:00.000Z');
+
+  assert.equal(
+    getGlobalTrackingWatchdogDueAtIso(summerDay, 60, '09:00', 'America/New_York'),
+    '2026-07-22T14:00:00.000Z',
+  );
+  assert.equal(
+    getGlobalTrackingWatchdogDueAtIso(winterDay, 60, '09:00', 'America/New_York'),
+    '2026-01-22T15:00:00.000Z',
+  );
+});
+
 test('tracking refresh eligibility requires tracked data and respects lastRunKey unless forced', () => {
   assert.equal(
     shouldRunTrackingRefresh({ enabled: false, lastRunKey: undefined }, { hasTrackedData: true, runKey: '2026-06-22T09:00' }),
@@ -168,7 +182,7 @@ test('tracking refresh eligibility requires tracked data and respects lastRunKey
 });
 
 test('frontend tracking schedule helpers preserve explicit disabled state', () => {
-  assert.equal(getDefaultTrackingSchedule().enabled, true);
+  assert.equal(getDefaultTrackingSchedule().enabled, false);
 
   const normalized = normalizeTrackingScheduleState({
     enabled: false,

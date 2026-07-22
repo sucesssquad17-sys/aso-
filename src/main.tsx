@@ -15,7 +15,7 @@ import { applyTheme, getInitialTheme } from "./lib/theme";
 applyTheme(getInitialTheme());
 initErrorTracking();
 
-const AppRoot = import.meta.env.DEV ? Fragment : StrictMode;
+const AppRoot = import.meta.env.DEV ? StrictMode : Fragment;
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
@@ -90,10 +90,24 @@ function MissingFirebaseConfigScreen({
   );
 }
 
+function StartupScreen() {
+  return (
+    <div className="min-h-screen bg-app-surface text-app-text flex items-center justify-center p-6" role="status" aria-live="polite">
+      <div className="flex items-center gap-3 rounded-full border border-app-border bg-app-surface-muted/90 px-5 py-3 shadow-lg">
+        <span className="h-5 w-5 animate-spin rounded-full border-2 border-cyan-400 border-r-transparent" aria-hidden="true" />
+        <span className="text-sm font-semibold">Opening your workspace...</span>
+      </div>
+    </div>
+  );
+}
+
 async function loadFirebaseBootstrapState(): Promise<FirebaseBootstrapState> {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 12_000);
   try {
     const response = await fetch("/api/public-config", {
       cache: "no-store",
+      signal: controller.signal,
       headers: {
         Accept: "application/json",
       },
@@ -136,10 +150,17 @@ async function loadFirebaseBootstrapState(): Promise<FirebaseBootstrapState> {
           ? error.message
           : "Failed to load Firebase client configuration.",
     };
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 }
 
 const root = createRoot(rootElement);
+root.render(
+  <AppRoot>
+    <StartupScreen />
+  </AppRoot>,
+);
 
 async function bootstrap() {
   const firebaseState = await loadFirebaseBootstrapState();
@@ -157,15 +178,27 @@ async function bootstrap() {
     return;
   }
 
-  initializeFirebaseServices(firebaseState.config);
-  const { default: App } = await import("./App.tsx");
+  try {
+    initializeFirebaseServices(firebaseState.config);
+    const { default: App } = await import("./App.tsx");
 
-  root.render(
-    <AppRoot>
-      <App />
-      <Toaster position="top-right" richColors />
-    </AppRoot>,
-  );
+    root.render(
+      <AppRoot>
+        <App />
+        <Toaster position="top-right" richColors />
+      </AppRoot>,
+    );
+  } catch (error) {
+    root.render(
+      <AppRoot>
+        <MissingFirebaseConfigScreen
+          loadError={error instanceof Error ? `Application failed to load: ${error.message}` : "Application failed to load."}
+          missingKeys={[]}
+        />
+        <Toaster position="top-right" richColors />
+      </AppRoot>,
+    );
+  }
 }
 
 void bootstrap();

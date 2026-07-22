@@ -16,7 +16,8 @@ import {
   DISPLAY_BILLING_PLANS,
   PUBLIC_BILLING_PLANS,
   PRICING_COMPARISON_ROWS,
-  PRICING_INCLUDED_CAPABILITIES,
+  FREE_CAPABILITIES,
+  PAID_CAPABILITIES,
   formatBillingAmountFromMinorUnits,
   getAvailableBillingIntervals,
   getPlanPrice,
@@ -353,6 +354,9 @@ export default function LandingPage({
                   <img 
                     src="/hero-app-screenshot.png" 
                     alt="Rank Analyzer Pro Workspace" 
+                    width="1024"
+                    height="486"
+                    fetchPriority="high"
                     className="w-full object-cover"
                   />
                 </div>
@@ -404,14 +408,24 @@ export default function LandingPage({
               </p>
             </div>
 
-            <div className="mt-8 grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
-              {PRICING_INCLUDED_CAPABILITIES.map((cap) => (
-                <div key={cap.label} className="flex min-w-0 flex-col">
-                  <div className="flex items-center gap-2">
-                     <Check className="h-4 w-4 shrink-0 text-cyan-400" />
-                    <span className="text-sm font-semibold text-app-text">{cap.label}</span>
+            <div className="mt-8 grid gap-6 lg:grid-cols-2">
+              {[
+                { title: "Included on Free", capabilities: FREE_CAPABILITIES },
+                { title: "Unlocked on paid plans", capabilities: PAID_CAPABILITIES },
+              ].map((group) => (
+                <div key={group.title} className="rounded-2xl border border-app-border/70 bg-app-surface/45 p-5">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-cyan-400">{group.title}</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {group.capabilities.map((cap) => (
+                      <div key={cap.label} className="flex min-w-0 flex-col">
+                        <div className="flex items-center gap-2">
+                          <Check className="h-4 w-4 shrink-0 text-cyan-400" />
+                          <span className="text-sm font-semibold text-app-text">{cap.label}</span>
+                        </div>
+                        <span className="ml-6 mt-0.5 text-xs text-app-text-muted">{cap.sub}</span>
+                      </div>
+                    ))}
                   </div>
-                  <span className="ml-6 mt-0.5 text-xs text-app-text-muted">{cap.sub}</span>
                 </div>
               ))}
             </div>

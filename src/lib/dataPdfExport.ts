@@ -105,7 +105,7 @@ function resolveAutoTable(module: Record<string, unknown>) {
   return candidate as AutoTableFn;
 }
 
-function buildPdfPlan(
+export function buildPdfPlan(
   payload: DataExportPayload,
   settings?: PdfExportSettings,
 ): PdfPlan {
@@ -225,7 +225,7 @@ function buildSinglePlan(
       },
       {
         columns: [
-          { header: "App", dataKey: "appTitle" },
+          { header: "Keyword", dataKey: "keyword" },
           { header: "Rank", dataKey: "rank" },
           { header: "Demand", dataKey: "demand" },
           { header: "Volume", dataKey: "volume" },
@@ -348,7 +348,7 @@ function buildComparePlan(
       },
       {
         columns: [
-          { header: "Keyword", dataKey: "keyword" },
+          { header: "App", dataKey: "appTitle" },
           { header: "Rank", dataKey: "rank" },
           { header: "Demand", dataKey: "demand" },
           { header: "Volume", dataKey: "volume" },

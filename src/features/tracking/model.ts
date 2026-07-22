@@ -9,6 +9,7 @@ import {
   getTrackedKeywordIdentityKey,
 } from "../../lib/planLimits";
 import { safeStorage } from "../../lib/storage";
+import { TRACKING_HISTORY_LIMIT } from "../../lib/trackingConstants";
 import {
   DEFAULT_GLOBAL_TRACKING_TIME,
   GLOBAL_TRACKING_TIMEZONE,
@@ -503,7 +504,7 @@ export const TRACKED_KEYWORD_REFRESH_CONCURRENCY = 1;
 export const TRACKED_KEYWORD_RANKING_DEPTH = 100;
 export { DISCOVERY_CACHE_TTL, DISCOVERY_CACHE_VERSION };
 export const SEARCH_CACHE_VERSION = "v2";
-export const TRACKING_HISTORY_LIMIT = 2000;
+export { TRACKING_HISTORY_LIMIT } from "../../lib/trackingConstants";
 export const API_REQUEST_TIMEOUT_MS = 45000;
 export const DISCOVERY_FAST_TIMEOUT_MS = 240000;
 export const DISCOVERY_DEEP_TIMEOUT_MS = 420000;
@@ -521,7 +522,7 @@ export function getBrowserTimeZone() {
 
 export function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
-    enabled: true,
+    enabled: false,
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
   };
@@ -2396,7 +2397,7 @@ export function serializeEditableUserStateForApi(
       competitorRankHistory: state.competitorRankHistory,
       trackingSchedule: state.trackingSchedule
         ? {
-            enabled: true,
+            enabled: state.trackingSchedule.enabled,
             time: state.trackingSchedule.time,
             timezone: state.trackingSchedule.timezone,
             lastRunAt: state.trackingSchedule.lastRunAt,

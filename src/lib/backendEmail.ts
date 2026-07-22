@@ -139,66 +139,6 @@ export function buildAlertEmailHtml(
   `;
 }
 
-function buildBatchedAlertEmailHtml(
-  events: AlertEvent[],
-  dashboardUrl: string,
-  preferencesUrl?: string,
-) {
-  const rows = events
-    .slice()
-    .sort(
-      (left, right) =>
-        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
-    )
-    .map((event) => {
-      const scopeLabel =
-        event.scope === "competitor_aso" ? "Competitor ASO" : "Keyword";
-      const changedFields =
-        Array.isArray(event.changedFields) && event.changedFields.length
-          ? ` · ${event.changedFields
-              .map((field) => formatAlertChangedFieldLabel(field))
-              .join(", ")}`
-          : "";
-      return `
-        <div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #ffffff;">
-          <div style="display: flex; justify-content: space-between; gap: 12px; align-items: baseline;">
-            <strong style="color: #0f172a;">${escapeEmailHtml(
-              event.scope === "competitor_aso"
-                ? event.changedAppTitle || event.keyword
-                : event.keyword,
-            )}</strong>
-            <span style="color: #64748b; font-size: 12px;">${escapeEmailHtml(formatEmailTimestamp(event.createdAt))}</span>
-          </div>
-          <div style="margin-top: 6px; color: #334155; font-size: 13px; line-height: 1.55;">
-            <div><strong>${escapeEmailHtml(scopeLabel)}</strong> · ${escapeEmailHtml(
-              event.store === "ios" ? "iOS" : "Android",
-            )} · ${escapeEmailHtml(event.country.toUpperCase())}${escapeEmailHtml(changedFields)}</div>
-            <div style="margin-top: 4px;">${escapeEmailHtml(event.message)}</div>
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
-  return `
-    <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; color: #0f172a;">
-      <h2 style="margin: 0 0 12px; font-size: 22px;">${escapeEmailHtml(getAlertBatchEmailSubject(events))}</h2>
-      <p style="margin: 0 0 18px; color: #334155;">${escapeEmailHtml(
-        events.length === 1
-          ? "One alert triggered in your workspace."
-          : `${events.length} alerts triggered in your workspace.`,
-      )}</p>
-      <div style="display: grid; gap: 10px;">${rows}</div>
-      <a href="${escapeEmailHtml(dashboardUrl)}" style="display: inline-block; margin-top: 20px; padding: 12px 20px; border-radius: 10px; background: #06b6d4; color: #082f49; text-decoration: none; font-weight: 700;">
-        Open Workspace
-      </a>
-      ${preferencesUrl
-        ? `<p style="margin: 18px 0 0; color: #64748b; font-size: 13px;"><a href="${escapeEmailHtml(preferencesUrl)}" style="color: #0f766e; text-decoration: underline;">Manage alert email preferences</a></p>`
-        : ""}
-    </div>
-  `;
-}
-
 export function buildAlertBatchEmailHtml(
   events: AlertEvent[],
   dashboardUrl: string,
