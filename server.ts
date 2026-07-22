@@ -99,6 +99,7 @@ import {
   getTrackedAppIdentityKeysForPlanUsage,
   getTrackedKeywordActivity,
   getTrackedKeywordIdentityKey,
+  preserveRestrictedState,
   resolveBillingPlanId,
   type PlanEntitlements,
   type PlanLimits,
@@ -10382,7 +10383,28 @@ async function startServer() {
         );
       }
       const nextState = normalizeUserTrackingDocument(nextStateInput);
-      const mergedState = mergeEditableUserTrackingState(currentState, nextState);
+      const editableMergedState = mergeEditableUserTrackingState(currentState, nextState);
+      const planEntitlements = getResolvedPlanEntitlements(currentUserData);
+      // User state is saved as one document. Preserve dormant paid-only settings so
+      // they cannot reject unrelated core changes such as adding a tracked keyword.
+      const mergedState: NormalizedUserTrackingDocument = {
+        ...editableMergedState,
+        alertRules: preserveRestrictedState(
+          currentState.alertRules,
+          editableMergedState.alertRules,
+          planEntitlements.alertRules,
+        ),
+        notificationSettings: preserveRestrictedState(
+          currentState.notificationSettings,
+          editableMergedState.notificationSettings,
+          planEntitlements.browserPush,
+        ),
+        weeklyReportSettings: preserveRestrictedState(
+          currentState.weeklyReportSettings,
+          editableMergedState.weeklyReportSettings,
+          planEntitlements.weeklyEmailReports,
+        ),
+      };
       const planLimits = getResolvedPlanLimits(currentUserData);
       const serverUpdatedAt = new Date().toISOString();
       const nextStateVersion = currentState.stateVersion + 1;
@@ -10423,7 +10445,6 @@ async function startServer() {
         userDocRef,
         mergedState.competitorRankHistory,
       );
-      const planEntitlements = getResolvedPlanEntitlements(currentUserData);
       const shouldRestoreAlertEmails =
         planEntitlements.alertDelivery &&
         currentUserData?.alertEmailsEnabled === false &&

@@ -4031,6 +4031,11 @@ function AuthenticatedApp({
   const userStatePersistQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   const userStatePersistVersionRef = React.useRef(0);
   const userStatePersistTimerRef = React.useRef<number | null>(null);
+  const pendingUserStatePersistRef = React.useRef<{
+    state: UserAppStateDocument;
+    signature: string;
+    version: number;
+  } | null>(null);
   const userStateBaseVersionRef = React.useRef(0);
   const lastPersistedUserStateSignatureRef = React.useRef<string | null>(null);
   const billingActivationPollRunRef = React.useRef(0);
@@ -4224,20 +4229,27 @@ function AuthenticatedApp({
       }
       const version = userStatePersistVersionRef.current + 1;
       userStatePersistVersionRef.current = version;
+      pendingUserStatePersistRef.current = { state, signature, version };
       if (userStatePersistTimerRef.current !== null) {
         window.clearTimeout(userStatePersistTimerRef.current);
       }
       return new Promise<void>((resolve, reject) => {
         userStatePersistTimerRef.current = window.setTimeout(() => {
           userStatePersistTimerRef.current = null;
+          const pending = pendingUserStatePersistRef.current;
+          pendingUserStatePersistRef.current = null;
+          if (!pending) {
+            resolve();
+            return;
+          }
           userStatePersistQueueRef.current = userStatePersistQueueRef.current
             .catch(() => undefined)
             .then(async () => {
-              if (version !== userStatePersistVersionRef.current) {
+              if (pending.version !== userStatePersistVersionRef.current) {
                 return;
               }
-              await persistUserStateRemotely(state, {
-                signature,
+              await persistUserStateRemotely(pending.state, {
+                signature: pending.signature,
                 baseStateVersion: userStateBaseVersionRef.current,
               });
             });
@@ -4247,6 +4259,44 @@ function AuthenticatedApp({
     },
     [isDemoMode, persistUserStateRemotely],
   );
+  const flushQueuedUserStatePersist = React.useCallback(() => {
+    if (isDemoMode || !pendingUserStatePersistRef.current) {
+      return;
+    }
+    if (userStatePersistTimerRef.current !== null) {
+      window.clearTimeout(userStatePersistTimerRef.current);
+      userStatePersistTimerRef.current = null;
+    }
+    const pending = pendingUserStatePersistRef.current;
+    pendingUserStatePersistRef.current = null;
+    userStatePersistQueueRef.current = userStatePersistQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        if (pending.version !== userStatePersistVersionRef.current) {
+          return;
+        }
+        await persistUserStateRemotely(pending.state, {
+          signature: pending.signature,
+          baseStateVersion: userStateBaseVersionRef.current,
+        });
+      });
+  }, [isDemoMode, persistUserStateRemotely]);
+  useEffect(() => {
+    const handlePageHide = () => {
+      flushQueuedUserStatePersist();
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        flushQueuedUserStatePersist();
+      }
+    };
+    window.addEventListener("pagehide", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [flushQueuedUserStatePersist]);
   useEffect(() => {
     if (userStatePersistTimerRef.current !== null) {
       window.clearTimeout(userStatePersistTimerRef.current);
@@ -4254,6 +4304,7 @@ function AuthenticatedApp({
     }
     userStatePersistQueueRef.current = Promise.resolve();
     userStatePersistVersionRef.current = 0;
+    pendingUserStatePersistRef.current = null;
     userStateBaseVersionRef.current = 0;
     lastPersistedUserStateSignatureRef.current = null;
   }, [currentUser.uid]);
@@ -4904,6 +4955,7 @@ function AuthenticatedApp({
           getBrowserNotificationPermission(),
         );
         let bootstrappedState: UserAppStateDocument | null = null;
+        let bootstrappedStateVersion: number | null = null;
         if (cancelled) {
           return;
         }
@@ -4941,6 +4993,7 @@ function AuthenticatedApp({
           });
           if (typeof persistedState.stateVersion === "number") {
             userStateBaseVersionRef.current = persistedState.stateVersion;
+            bootstrappedStateVersion = persistedState.stateVersion;
           }
           if (shouldPersistInitialLegalAcceptance) {
             await persistLegalAcceptanceRemotely();
@@ -4975,9 +5028,10 @@ function AuthenticatedApp({
             bootstrappedState?.migratedFromLocalAt ?? remoteState?.migratedFromLocalAt,
         };
         userStateBaseVersionRef.current =
-          typeof remoteState?.stateVersion === "number"
+          bootstrappedStateVersion ??
+          (typeof remoteState?.stateVersion === "number"
             ? remoteState.stateVersion
-            : userStateBaseVersionRef.current;
+            : userStateBaseVersionRef.current);
         lastPersistedUserStateSignatureRef.current = JSON.stringify(
           serializeUserStateForFirestore(hydratedState),
         );
@@ -5455,6 +5509,11 @@ function AuthenticatedApp({
   }, [onboardingDismissStorageKey]);
   useEffect(() => {
     if (isDemoMode) return;
+    if (!currentPlanEntitlements.browserPush) {
+      setTokenRegistrationStatus("idle");
+      setTokenRegistrationError(null);
+      return;
+    }
     if (!fcmToken || notificationPermission !== "granted") {
       if (notificationPermission !== "granted") {
         setTokenRegistrationStatus("idle");
@@ -5524,6 +5583,7 @@ function AuthenticatedApp({
     void registerToken();
   }, [
     currentUser.uid,
+    currentPlanEntitlements.browserPush,
     fcmToken,
     fetchAuthedJson,
     isDemoMode,

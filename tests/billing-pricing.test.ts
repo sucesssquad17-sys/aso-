@@ -8,7 +8,10 @@ import {
   getPlanPriceLabel,
   type BillingPricingCatalog,
 } from "../src/lib/billing";
-import { getPlanEntitlements } from "../src/lib/planLimits";
+import {
+  getPlanEntitlements,
+  preserveRestrictedState,
+} from "../src/lib/planLimits";
 
 const starterPlan = BILLING_PLANS.find((plan) => plan.id === "starter");
 
@@ -116,4 +119,26 @@ test("paid plan entitlements keep reports and alerts enabled", () => {
     browserPush: true,
     dataExport: true,
   });
+});
+
+test("paid-only settings cannot veto unrelated free-plan state saves", () => {
+  const savedPushSettings = { pushEnabled: false, permission: "default" };
+  const requestedPushSettings = { pushEnabled: true, permission: "granted" };
+
+  assert.equal(
+    preserveRestrictedState(
+      savedPushSettings,
+      requestedPushSettings,
+      getPlanEntitlements("free").browserPush,
+    ),
+    savedPushSettings,
+  );
+  assert.equal(
+    preserveRestrictedState(
+      savedPushSettings,
+      requestedPushSettings,
+      getPlanEntitlements("pro").browserPush,
+    ),
+    requestedPushSettings,
+  );
 });

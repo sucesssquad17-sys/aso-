@@ -206,6 +206,14 @@ export function getPlanEntitlements(
   };
 }
 
+export function preserveRestrictedState<T>(
+  currentValue: T,
+  requestedValue: T,
+  entitled: boolean,
+): T {
+  return entitled ? requestedValue : currentValue;
+}
+
 export function getPlanLimitFeatureLines(planId: BillingPlanId): string[] {
   const limits = getPlanLimits(planId);
   const trackedApps =
