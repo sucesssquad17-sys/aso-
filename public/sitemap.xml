@@ -56,4 +56,14 @@
       <image:title>Rank Analyzer Pro specific keyword rank check</image:title>
     </image:image>
   </url>
+  <url>
+    <loc>https://rankanalyzerpro.com/blog/why-did-my-app-keyword-rankings-drop/</loc>
+    <lastmod>2026-07-22</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.75</priority>
+    <image:image>
+      <image:loc>https://rankanalyzerpro.com/blog/assets/keyword-ranking-drop-hero.webp</image:loc>
+      <image:title>Illustration of an app keyword ranking drop</image:title>
+    </image:image>
+  </url>
 </urlset>

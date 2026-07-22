@@ -868,6 +868,29 @@ a {
   font-size: 0.88rem;
 }
 
+.article-hero-media,
+.article-content-media {
+  margin: 26px 0;
+}
+
+.article-hero-media img,
+.article-content-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  border: 1px solid var(--media-border);
+  box-shadow: var(--shadow);
+}
+
+.article-hero-media figcaption,
+.article-content-media figcaption {
+  margin-top: 10px;
+  color: var(--muted-strong);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
 .article-content {
   margin-top: 28px;
 }
@@ -921,6 +944,87 @@ a {
 
 .article-callout p {
   margin: 0;
+}
+
+.article-callout h2 {
+  margin-top: 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 18px 0 28px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.diagnostic-table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  background: var(--card-bg);
+  font-size: 0.92rem;
+}
+
+.diagnostic-table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.diagnostic-table th,
+.diagnostic-table td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  line-height: 1.55;
+  text-align: left;
+  vertical-align: top;
+}
+
+.diagnostic-table thead th {
+  color: var(--text);
+  background: var(--callout-bg);
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.diagnostic-table tbody th {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.diagnostic-table tr:last-child th,
+.diagnostic-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.recovery-steps {
+  display: grid;
+  gap: 12px;
+}
+
+.decision-card h3 {
+  color: var(--text);
+}
+
+.article-nav-current {
+  color: var(--text) !important;
+  font-weight: 800;
+}
+
+.article-nav-current span {
+  display: block;
+  margin-top: 4px;
+  color: var(--cyan);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .article-nav {
