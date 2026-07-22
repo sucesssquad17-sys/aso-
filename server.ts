@@ -66,6 +66,7 @@ import {
   DEFAULT_GLOBAL_TRACKING_TIME,
   GLOBAL_TRACKING_TIMEZONE,
 } from './src/lib/trackingTime';
+import { EMBEDDED_TRACKING_HISTORY_LIMIT as SHARED_EMBEDDED_TRACKING_HISTORY_LIMIT } from './src/lib/trackingConstants';
 import {
   buildWeeklyReportEmailHtml,
   buildWeeklyReportEmailText,
@@ -200,8 +201,8 @@ if (process.env.NODE_ENV !== 'production') {
   process.env.DISABLE_HMR = 'true';
 }
 
-// Discovery rank results and candidate/refinement caches stay fresh for 30 minutes.
-const rankingCache = new NodeCache({ stdTTL: 14400 });
+// Rank lookups expire quickly; explicit manual checks bypass this cache entirely.
+const rankingCache = new NodeCache({ stdTTL: 900 });
 const discoveryCandidateCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000, useClones: false });
 const keywordSourceCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000 });
 const keywordRefinementCache = new NodeCache({ stdTTL: DISCOVERY_CANDIDATE_CACHE_TTL / 1000, useClones: false });
@@ -497,6 +498,8 @@ type UserTrackingDocument = {
   alertEmailsUpdatedAt?: string;
   announcementEmailsEnabled?: boolean;
   announcementEmailsUpdatedAt?: string;
+  announcementEmailsConsentedAt?: string;
+  announcementEmailsPreferenceSource?: string;
   lastAnnouncementEmailSentAt?: string;
   lastAnnouncementEmailCampaignId?: string;
   billingProvider?: BillingProvider;
@@ -691,8 +694,8 @@ const DISCOVERY_PROFILES: Record<DiscoveryMode, DiscoveryProfile> = {
   },
 };
 const TRACKING_STATE_FILE = path.join(process.cwd(), 'data', 'tracking-state.json');
-const TRACKING_HISTORY_LIMIT = 5000;
-const EMBEDDED_TRACKING_HISTORY_LIMIT = 1200;
+const TRACKING_HISTORY_LIMIT = SHARED_TRACKING_HISTORY_LIMIT;
+const EMBEDDED_TRACKING_HISTORY_LIMIT = SHARED_EMBEDDED_TRACKING_HISTORY_LIMIT;
 const USER_RANK_HISTORY_ARCHIVE_COLLECTION = 'rank_history';
 const USER_COMPETITOR_RANK_HISTORY_ARCHIVE_COLLECTION = 'competitor_rank_history';
 const USER_ALERT_EVENTS_COLLECTION = 'alert_events';
@@ -704,7 +707,7 @@ const TRACKED_KEYWORD_RANKING_DEPTH = 100;
 const MAX_RANKING_DEPTH = 100;
 const GLOBAL_TRACKING_HOURS = [9] as const;
 const DEFAULT_TRACKING_SCHEDULE: TrackingSchedule = {
-  enabled: true,
+  enabled: false,
   time: DEFAULT_GLOBAL_TRACKING_TIME,
   timezone: GLOBAL_TRACKING_TIMEZONE,
 };
@@ -4883,11 +4886,6 @@ async function resolveAnnouncementRecipientEmail(
   userDocRef: DocumentReference<DocumentData>,
   userData: UserTrackingDocument | undefined,
 ) {
-  const billingEmail = normalizeEmailAddress(userData?.billingEmail);
-  if (billingEmail && isValidEmailAddress(billingEmail)) {
-    return billingEmail;
-  }
-
   try {
     const userRecord = await authClient.getUser(userDocRef.id);
     const authEmail = normalizeEmailAddress(userRecord.email);
@@ -4913,7 +4911,7 @@ async function loadAnnouncementCampaignRecipients(
     if (
       userData?.accountStatus === 'deleted' ||
       userData?.accountStatus === 'deleting' ||
-      userData?.announcementEmailsEnabled === false
+      userData?.announcementEmailsEnabled !== true
     ) {
       return null;
     }
@@ -7530,6 +7528,7 @@ async function runAllUserTrackingSchedules(
       }
       const state = normalizeUserTrackingDocument(userData);
       const planEntitlements = getResolvedPlanEntitlements(userData);
+      const automatedTrackingEnabled = planEntitlements.automatedTracking;
       const competitorTrackingEnabled = planEntitlements.competitorTracking;
       const executionState = competitorTrackingEnabled
         ? state
@@ -7555,7 +7554,7 @@ async function runAllUserTrackingSchedules(
         | 'weeklyReportSettings'
       > = state;
 
-      if (hasTrackedData) {
+      if (hasTrackedData && automatedTrackingEnabled) {
         const schedule = normalizeTrackingSchedule(state.schedule);
         if (shouldRunTrackingRefresh(schedule, {
           hasTrackedData: true,
@@ -10316,6 +10315,10 @@ async function startServer() {
       if (hasAnnouncementPreference) {
         updates.announcementEmailsEnabled = announcementEmailsEnabled;
         updates.announcementEmailsUpdatedAt = updatedAt;
+        updates.announcementEmailsPreferenceSource = 'account-settings';
+        if (announcementEmailsEnabled) {
+          updates.announcementEmailsConsentedAt = updatedAt;
+        }
       }
       if (hasAlertPreference) {
         if (alertEmailsEnabled && !hasBillingFeature(userData, 'alerts')) {
@@ -10916,6 +10919,8 @@ async function startServer() {
     await input.userDocRef.set({
       announcementEmailsEnabled: input.enabled,
       announcementEmailsUpdatedAt: updatedAt,
+      announcementEmailsPreferenceSource: 'signed-preference-link',
+      ...(input.enabled ? { announcementEmailsConsentedAt: updatedAt } : {}),
       ...(input.campaignId ? { lastAnnouncementEmailCampaignId: input.campaignId } : {}),
       updatedAt,
     } satisfies Partial<UserTrackingDocument>, { merge: true });
@@ -10955,7 +10960,7 @@ async function startServer() {
           ? userData?.alertEmailsEnabled !== false
           : kind === 'weekly'
             ? userData?.weeklyReportSettings?.enabled !== false
-            : userData?.announcementEmailsEnabled !== false;
+            : userData?.announcementEmailsEnabled === true;
 
       const meta = getEmailPreferenceMeta(kind);
       if (setValue === 'on' || setValue === 'off') {
@@ -11146,6 +11151,7 @@ async function startServer() {
       await adminDb.collection('users').doc(uid).set({
         announcementEmailsEnabled: false,
         announcementEmailsUpdatedAt: updatedAt,
+        announcementEmailsPreferenceSource: 'unsubscribe-link',
         ...(campaignId ? { lastAnnouncementEmailCampaignId: campaignId } : {}),
         updatedAt,
       } satisfies Partial<UserTrackingDocument>, { merge: true });
@@ -11903,7 +11909,7 @@ async function startServer() {
         rankingDepth,
         deadlineAt,
       );
-      res.json({ keyword, rank, depth: rankingDepth });
+      res.json({ keyword, rank, depth: rankingDepth, checkedAt: new Date().toISOString() });
     } catch (error) {
       console.error(`Ranking error [keyword=${String(req.query.keyword || '')}, appId=${String(req.query.appId || '')}]:`, error);
       return sendApiError(res, error, 'The keyword ranking request is taking too long. Please try again.');

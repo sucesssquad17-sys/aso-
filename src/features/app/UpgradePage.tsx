@@ -204,7 +204,6 @@ export function UpgradePage({
   onReturn,
 }: UpgradePageProps) {
   const availableIntervals = getAvailableBillingIntervals(billingStatus);
-  const allIntervals: BillingInterval[] = ["monthly", "yearly"];
   const [selectedInterval, setSelectedInterval] = React.useState<BillingInterval>(
     availableIntervals[0] || "monthly",
   );
@@ -791,7 +790,7 @@ export function UpgradePage({
         {/* ── Pricing Cards ────────────────────────────────────────────────── */}
         <div className="mb-6 flex justify-center sm:mb-8">
           <div className="workspace-billing-interval-switcher inline-flex items-center rounded-full border p-1 shadow-sm">
-            {allIntervals.map((interval) => {
+            {availableIntervals.map((interval) => {
               const isActive = selectedInterval === interval;
               return (
                 <button

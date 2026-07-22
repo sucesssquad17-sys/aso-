@@ -47,7 +47,7 @@ function isCategoryEnabled(
     return userData?.alertEmailsEnabled !== false;
   }
   if (category === "announcement") {
-    return userData?.announcementEmailsEnabled !== false;
+    return userData?.announcementEmailsEnabled === true;
   }
   return userData?.weeklyReportSettings?.enabled === true;
 }
@@ -87,7 +87,9 @@ export async function resolveCategoryEmailRecipient(
     };
   }
 
-  const billingEmail = normalizeEmailAddress(userData?.billingEmail);
+  const billingEmail = input.category === "announcement"
+    ? null
+    : normalizeEmailAddress(userData?.billingEmail);
   if (billingEmail) {
     if (isValidEmailAddress(billingEmail)) {
       return {

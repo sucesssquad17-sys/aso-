@@ -284,7 +284,25 @@ test("email category resolution keeps weekly, alert, and announcement preference
   assert.equal(weeklyRecipient.email, "billing@example.com");
   assert.equal(weeklyRecipient.source, "billing");
   assert.equal(announcementRecipient.status, "ready");
-  assert.equal(announcementRecipient.email, "billing@example.com");
+  assert.equal(announcementRecipient.email, "auth@example.com");
+  assert.equal(announcementRecipient.source, "auth");
+});
+
+test("announcement email requires explicit opt-in", async () => {
+  const userDocRef = {
+    id: "user-no-announcement-preference",
+    async get() {
+      return { data: () => ({ billingEmail: "billing@example.com" }) };
+    },
+  };
+
+  const recipient = await resolveCategoryEmailRecipient(userDocRef as never, {
+    category: "announcement",
+    resolveAuthEmail: async () => "auth@example.com",
+  });
+
+  assert.equal(recipient.status, "opted_out");
+  assert.equal(recipient.reason, "announcement-emails-disabled");
 });
 
 test("weekly delivery claim prevents a second overlapping send for the same delivery key", async () => {

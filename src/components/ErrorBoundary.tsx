@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from "react";
 import * as Sentry from "@sentry/react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { safeStorage } from "../lib/storage";
+import { CacheService } from "../lib/cache";
 
 interface Props {
   children?: ReactNode;
@@ -30,7 +31,7 @@ class ErrorBoundary extends Component<Props, State> {
     // Log to Sentry if initialized
     if (import.meta.env.VITE_SENTRY_DSN) {
       Sentry.withScope((scope) => {
-        scope.setExtras(errorInfo as any);
+        scope.setContext("react", { componentStack: errorInfo.componentStack?.slice(0, 4_000) });
         Sentry.captureException(error);
       });
     }
@@ -38,7 +39,8 @@ class ErrorBoundary extends Component<Props, State> {
 
   private handleReset = () => {
     try {
-      safeStorage.clear();
+      CacheService.clearAll();
+      ["aso-selected-view", "aso-last-route"].forEach((key) => safeStorage.removeItem(key));
     } catch (e) {
       console.error('Failed to clear localStorage', e);
     }
@@ -64,7 +66,7 @@ class ErrorBoundary extends Component<Props, State> {
             </div>
             <h2 className="text-2xl font-bold text-zinc-900 mb-2">Something went wrong</h2>
             <p className="text-zinc-600 mb-8">
-              An unexpected error occurred in the application. Our team has been notified.
+              An unexpected error occurred. Reload the workspace to try again.
             </p>
             <div className="space-y-3">
               <button

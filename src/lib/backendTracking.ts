@@ -8,10 +8,10 @@ import {
 import { getFirestore, type Firestore } from 'firebase-admin/firestore';
 import {
   DEFAULT_GLOBAL_TRACKING_TIME,
-  GLOBAL_TRACKING_UTC_OFFSET_MINUTES,
   GLOBAL_TRACKING_TIMEZONE,
   normalizeValidTimeZone,
 } from './trackingTime';
+import { TRACKING_HISTORY_LIMIT } from './trackingConstants';
 
 export type StoreType = 'android' | 'ios';
 export type TrackedKeywordStatus = 'pending' | 'ok' | 'not_ranked' | 'error';
@@ -100,7 +100,7 @@ export type TrackingStateBase = {
 
 export const TRACKING_REFRESH_CONCURRENCY = 1;
 export const TRACKED_KEYWORD_RANKING_DEPTH = 100;
-export const TRACKING_HISTORY_LIMIT = 5000;
+export { TRACKING_HISTORY_LIMIT } from './trackingConstants';
 
 function getRunDayKey(runKey: string) {
   const [dayKey] = runKey.split('T');
@@ -180,7 +180,7 @@ export function normalizeTrackingSchedule(
   fallback: TrackingSchedule,
 ): TrackingSchedule {
   return {
-    enabled: input?.enabled !== false,
+    enabled: input?.enabled === true,
     time:
       typeof input?.time === 'string' && /^\d{2}:\d{2}$/.test(input.time.trim())
         ? input.time.trim()
@@ -347,15 +347,22 @@ export function getGlobalTrackingWatchdogDueAtIso(
   const scheduledMinutes = getGlobalTrackingScheduledMinutes(time) + delayMinutes;
   const dueHour = Math.floor(scheduledMinutes / 60);
   const dueMinute = scheduledMinutes % 60;
-  return new Date(
-    Date.UTC(
-      year,
-      month - 1,
-      day,
-      dueHour,
-      dueMinute - GLOBAL_TRACKING_UTC_OFFSET_MINUTES,
-    ),
-  ).toISOString();
+  const targetWallTime = Date.UTC(year, month - 1, day, dueHour, dueMinute);
+  let utcTimestamp = targetWallTime;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const zoned = getZonedDateParts(new Date(utcTimestamp), timeZone);
+    const observedWallTime = Date.UTC(
+      Number(zoned.year),
+      Number(zoned.month) - 1,
+      Number(zoned.day),
+      zoned.hour,
+      zoned.minute,
+    );
+    const correction = targetWallTime - observedWallTime;
+    utcTimestamp += correction;
+    if (correction === 0) break;
+  }
+  return new Date(utcTimestamp).toISOString();
 }
 
 export function isGlobalTrackingWatchdogWindowOpen(

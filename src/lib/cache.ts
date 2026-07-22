@@ -133,5 +133,5 @@ export const TTL = {
   SEARCH: 1000 * 60 * 60, // 1 hour
   APP_DETAILS: 1000 * 60 * 60 * 24, // 24 hours
   ANALYSIS: 1000 * 60 * 60 * 24 * 7, // 1 week
-  RANKING: 1000 * 60 * 60 * 4, // 4 hours
+  RANKING: 1000 * 60 * 15, // 15 minutes; explicit checks should feel current
 };

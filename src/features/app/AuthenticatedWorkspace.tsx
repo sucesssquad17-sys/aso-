@@ -3749,6 +3749,7 @@ function AuthenticatedApp({
     difficulty?: number;
     relevance?: number;
     confidence?: "low" | "medium" | "high";
+    checkedAt?: string;
   } | null>(null);
   const [isCheckingRank, setIsCheckingRank] = useState(false);
   const [autoRankings, setAutoRankings] = useState<
@@ -7411,6 +7412,13 @@ function AuthenticatedApp({
     }
     setTrackedKeywords(nextTrackedKeywords);
     setTrackedApps(nextTrackedApps);
+    if (
+      trackedEntries.length > 0 &&
+      planEntitlementsForUi.automatedTracking &&
+      !trackingSchedule.enabled
+    ) {
+      setTrackingSchedule((current) => ({ ...current, enabled: true }));
+    }
     if (removedCountries.length > 0) {
       setAllRankHistory((prev) =>
         prev.filter(
@@ -9972,26 +9980,11 @@ function AuthenticatedApp({
     const id = storeType === "ios" ? selectedApp.id : selectedApp.appId;
     if (!id) return;
     const cacheKey = `ranking-${storeType}-${country}-${id}-${keyword.toLowerCase()}`;
-    if (!isRefresh) {
-      const cachedData = CacheService.get<{
-        keyword: string;
-        rank: number;
-        demand?: number;
-        volume?: number;
-        difficulty?: number;
-        relevance?: number;
-        confidence?: "low" | "medium" | "high";
-      }>(cacheKey);
-      if (cachedData) {
-        setRanking(cachedData);
-        return;
-      }
-    }
     setIsCheckingRank(true);
     try {
       const [data, metrics] = await Promise.all([
-        fetchAuthedJson<{ keyword: string; rank: number; depth?: number }>(
-          `/api/ranking?keyword=${encodeURIComponent(keyword)}&appId=${String(id)}&store=${storeType}&country=${country}${isRefresh ? "&refresh=true" : ""}`,
+        fetchAuthedJson<{ keyword: string; rank: number; depth?: number; checkedAt: string }>(
+          `/api/ranking?keyword=${encodeURIComponent(keyword)}&appId=${String(id)}&store=${storeType}&country=${country}&refresh=true`,
         ),
         estimateKeywordMetrics(keyword),
       ]);
@@ -15687,16 +15680,27 @@ function AuthenticatedApp({
                   <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                     <div className="inline-flex items-center gap-2">
                       <BellRing className="w-4 h-4 text-cyan-400" />
-                      Daily tracking refresh at{" "}
-                      <span className="text-app-text">
-                        {formatGlobalTrackingTimeForLocalDisplay(new Date(), {
-                          includeTimeZoneName: true,
-                        })}
-                      </span>
+                      {planEntitlementsForUi.automatedTracking ? (
+                        <>
+                          Daily tracking refresh at{" "}
+                          <span className="text-app-text">
+                            {formatGlobalTrackingTimeForLocalDisplay(new Date(), {
+                              includeTimeZoneName: true,
+                            })}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          Automatic daily refresh is available on paid plans.
+                          <button type="button" onClick={() => setViewMode("upgrade")} className="font-semibold text-cyan-400 hover:text-cyan-300">
+                            View plans
+                          </button>
+                        </>
+                      )}
                     </div>
-                    <div className="text-app-text-muted">
+                    {planEntitlementsForUi.automatedTracking ? <div className="text-app-text-muted">
                       Last refresh: {trackingSchedule.lastRunAt ? formatTrackingChartDateTime(trackingSchedule.lastRunAt) : "Not yet"}
-                    </div>
+                    </div> : null}
                   </div>
                 </div>
               </div>
@@ -17058,6 +17062,11 @@ function AuthenticatedApp({
                             {COUNTRIES.find((c) => c.code === country)?.name ||
                               country}
                           </p>
+                          {ranking.checkedAt ? (
+                            <p className="text-[11px] text-app-text-muted">
+                              Checked {new Date(ranking.checkedAt).toLocaleString()}
+                            </p>
+                          ) : null}
                         </div>
                       ) : (
                         <div

@@ -110,6 +110,7 @@ import {
   type CountryOption,
 } from "./lib/countries";
 import { safeStorage } from "./lib/storage";
+import { TRACKING_HISTORY_LIMIT } from "./lib/trackingConstants";
 import {
   THEME_STORAGE_KEY,
   applyTheme,
@@ -311,7 +312,6 @@ function AppScreenTransition({
 const TRACKED_KEYWORD_REFRESH_CONCURRENCY = 1;
 const TRACKED_KEYWORD_RANKING_DEPTH = 100;
 const SEARCH_CACHE_VERSION = "v2";
-const TRACKING_HISTORY_LIMIT = 2000;
 const API_REQUEST_TIMEOUT_MS = 45000;
 const DISCOVERY_FAST_TIMEOUT_MS = 240000;
 const DISCOVERY_DEEP_TIMEOUT_MS = 420000;
@@ -319,7 +319,7 @@ const LEGAL_VERSION = "2026-05-26";
 
 function getDefaultTrackingSchedule(): TrackingSchedule {
   return {
-    enabled: true,
+    enabled: false,
     time: DEFAULT_GLOBAL_TRACKING_TIME,
     timezone: GLOBAL_TRACKING_TIMEZONE,
   };
@@ -1190,8 +1190,8 @@ function PrivacyPolicyPage({
       </p>
       <p>
         If you enable browser notifications, we also store device registration
-        tokens so notification delivery can work. If you use a paid plan or
-        trial, we also store billing status and related metadata such as plan,
+        tokens so notification delivery can work. If you use a paid plan,
+        we also store billing status and related metadata such as plan,
         interval, subscription state, Dodo customer or product identifiers, and
         transaction references required to manage access.
       </p>
@@ -1289,9 +1289,9 @@ function TermsPage({
         your sign-in methods, and the accuracy of information you submit through
         the service.
       </p>
-      <h2>Subscriptions, Trials, and Billing</h2>
+      <h2>Free and Paid Plans</h2>
       <p>
-        Paid access, trials, and plan limits are governed by the pricing and
+        Paid access and plan limits are governed by the pricing and
         checkout terms shown at purchase. Subscription billing, renewals,
         cancellations, and billing portal access may be handled through Dodo
         Payments or another payment provider used by the service.
@@ -1308,7 +1308,7 @@ function TermsPage({
         <a href="mailto:vantalumstudio@gmail.com">vantalumstudio@gmail.com</a>. Cancellation generally stops future renewals
         but does not automatically create a refund for charges already incurred.
         Refund decisions, if offered, are handled case by case and may depend on
-        payment-provider rules, trial use, abuse review, and applicable law.
+        payment-provider rules, abuse review, and applicable law.
       </p>
       <h2>Data and Availability</h2>
       <p>

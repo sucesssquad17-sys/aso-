@@ -112,10 +112,15 @@ export type PricingComparisonRow = {
 export const PRICING_INCLUDED_COPY =
   "Every plan includes core tracking and keyword research. Paid tiers add reports, alerts, and weekly summaries.";
 
-export const PRICING_INCLUDED_CAPABILITIES: PricingIncludedCapability[] = [
+export const FREE_CAPABILITIES: PricingIncludedCapability[] = [
   { label: "App Store & Google Play tracking", sub: "iOS + Android in one workspace" },
   { label: "Keyword rank tracking", sub: "Per country, per store" },
   { label: "AI-Powered Keyword Discovery", sub: "Intelligent keyword recommendations" },
+  { label: "Manual rank refresh", sub: "Check current visibility when you need it" },
+  { label: "Bookmarks and saved apps", sub: "Keep important listings ready to reopen" },
+];
+
+export const PAID_CAPABILITIES: PricingIncludedCapability[] = [
   { label: "Competitor ASO change alerts", sub: "Rival ASO change alerts" },
   { label: "Competitor analysis", sub: "Track rivals side by side" },
   { label: "Daily automated monitoring", sub: "Runs every day, hands-free" },
@@ -125,7 +130,10 @@ export const PRICING_INCLUDED_CAPABILITIES: PricingIncludedCapability[] = [
   { label: "PDF reports & data export", sub: "Share or archive at any time" },
 ];
 
-const PLAN_SHARED_FEATURES = PRICING_INCLUDED_CAPABILITIES.map(
+export const ALL_PLATFORM_CAPABILITIES = [...FREE_CAPABILITIES, ...PAID_CAPABILITIES];
+export const PRICING_INCLUDED_CAPABILITIES = ALL_PLATFORM_CAPABILITIES;
+
+const PLAN_SHARED_FEATURES = ALL_PLATFORM_CAPABILITIES.map(
   (capability) => capability.label,
 );
 
