@@ -531,7 +531,7 @@ a {
   margin-top: 26px;
 }
 
-.cta-note {
+.hero .cta-note {
   margin: 12px 0 0;
   max-width: 62ch;
   color: var(--muted-strong);
