@@ -267,6 +267,22 @@ a {
   text-transform: uppercase;
 }
 
+.example-label {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  margin-bottom: 8px;
+  padding: 5px 9px;
+  border: 1px solid var(--callout-border);
+  border-radius: 999px;
+  color: var(--cyan);
+  background: var(--callout-bg);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .signal-kicker strong {
   color: var(--text);
 }
